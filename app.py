@@ -7,7 +7,7 @@ import json
 import requests
 import streamlit as st
 import plotly.graph_objects as go
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 # ── Pagina ───────────────────────────────────────────────────────────────────
@@ -23,30 +23,45 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-/* Esconde sidebar toggle */
 [data-testid="collapsedControl"] { display: none; }
 
-/* KPI cards */
-.kpi-row { display: flex; gap: 12px; margin: 16px 0 24px; }
+.kpi-row { display: flex; gap: 12px; margin: 16px 0 24px; flex-wrap: wrap; }
 .kpi-card {
-    flex: 1;
-    background: #131210;
-    border-radius: 10px;
-    padding: 16px 18px;
-    border: 1px solid #272420;
-    text-align: center;
-    min-width: 0;
+    flex: 1; min-width: 130px;
+    background: #131210; border-radius: 10px;
+    padding: 16px 18px; border: 1px solid #272420; text-align: center;
 }
-.kpi-label { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
-.kpi-value { color: #FEC52E; font-size: 26px; font-weight: 700; line-height: 1.1; }
+.kpi-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.kpi-value { color: #FEC52E; font-size: 24px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 11px; margin-top: 5px; }
 
-/* Secao title */
-.sec { color: #FEC52E; font-size: 15px; font-weight: 600; margin: 28px 0 6px;
+.sec { color: #FEC52E; font-size: 15px; font-weight: 600; margin: 28px 0 8px;
        border-bottom: 1px solid #272420; padding-bottom: 6px; }
-
-/* Periodo label */
 .periodo { color: #64748b; font-size: 13px; margin-bottom: 4px; }
+
+/* HTML data tables */
+.dtbl-title { font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; }
+.dtbl-wrap { overflow-x: auto; }
+.dtbl { width: 100%; border-collapse: collapse; font-size: 12px; color: #cbd5e1; }
+.dtbl thead th {
+    background: #1c1a0e; color: #d4b84a;
+    padding: 8px 12px; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.3px; text-transform: uppercase;
+    text-align: left; white-space: nowrap;
+    border-bottom: 1px solid rgba(254,197,46,0.18);
+}
+.dtbl thead th.r { text-align: right; }
+.dtbl thead th.c { text-align: center; }
+.dtbl tbody tr.g0 { background: #1a1814; }
+.dtbl tbody tr.g1 { background: #131210; }
+.dtbl tbody tr.g0:hover, .dtbl tbody tr.g1:hover { background: rgba(254,197,46,0.05); }
+.dtbl tbody td {
+    padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    white-space: nowrap; max-width: 360px;
+}
+.dtbl tbody td.wrap { white-space: normal; word-break: break-word; }
+.dtbl tbody td.r { text-align: right; }
+.dtbl tbody td.c { text-align: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,7 +71,7 @@ try:
     _TOKEN = st.secrets["github"]["token"]
     _REPO  = st.secrets["github"]["repo"]
 except Exception:
-    st.error("Secrets do GitHub nao configurados. Adicione [github] token e repo em Settings > Secrets.")
+    st.error("Secrets do GitHub não configurados. Adicione [github] token e repo em Settings > Secrets.")
     st.stop()
 
 _HEADERS_RAW  = {"Authorization": f"Bearer {_TOKEN}", "Accept": "application/vnd.github.v3.raw"}
@@ -65,37 +80,26 @@ _HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}"}
 # ── Constantes ────────────────────────────────────────────────────────────────
 
 _STATUS_NOMES = {
-    0: "Novo",
-    1: "Pendente",
-    2: "Em Processamento",
-    3: "Aprovado",
-    4: "Reprovado",
-    5: "Suspenso",
-    6: "Pendente Manual",
-    7: "Pendente Falha",
-    8: "Cancelado",
+    0: "Novo", 1: "Pendente", 2: "Em Processamento", 3: "Aprovado",
+    4: "Reprovado", 5: "Suspenso", 6: "Pendente Manual",
+    7: "Pendente Falha", 8: "Cancelado",
 }
-
 _STATUS_CORES = {
-    3: "#22c55e",
-    4: "#ef4444",
-    5: "#f59e0b",
-    2: "#3b82f6",
-    0: "#94a3b8",
-    7: "#a855f7",
-    8: "#64748b",
-    1: "#6366f1",
-    6: "#ec4899",
+    3: "#22c55e", 4: "#ef4444", 5: "#f59e0b", 2: "#3b82f6",
+    0: "#94a3b8", 7: "#a855f7", 8: "#64748b", 1: "#6366f1", 6: "#ec4899",
 }
 
-_ETAPA_ORDER = [
+_ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"})
+
+_ETAPA_WORKFLOW_ORDER = [
+    "Já Reprovado (reentrada)",
     "Validações Internas",
     "Receita Federal PF",
     "Consulta Dataprev",
     "Receita Federal PJ",
     "Análise PH3A (PJ)",
-    "Análise PH3A (PF)",
     "SCR",
+    "Análise PH3A (PF)",
     "Cálculo de Proposta",
 ]
 
@@ -103,7 +107,7 @@ _TEMPLATE = "plotly_dark"
 _CONF     = {"displayModeBar": False, "responsive": True}
 _GRID     = "rgba(255,255,255,0.06)"
 _BG       = "rgba(0,0,0,0)"
-_TF       = dict(size=14, color="#FEC52E")
+_TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=11, color="#94a3b8")
 
 # ── GitHub API ────────────────────────────────────────────────────────────────
@@ -136,21 +140,27 @@ def carregar_dia(dia_str: str) -> dict:
 # ── Agregacao ─────────────────────────────────────────────────────────────────
 
 def agregar(dias_raw: list) -> dict:
-    d_status      = defaultdict(int)
-    fin_n         = defaultdict(int)
-    fin_total     = defaultdict(float)
-    fin_min       = {}
-    fin_max       = {}
-    fin_med_sum   = defaultdict(float)
-    evolucao_d    = defaultdict(lambda: defaultdict(int))
-    evolucao_h    = defaultdict(lambda: defaultdict(int))
-    motivos       = defaultdict(int)
-    empregadores  = defaultdict(int)
-    cbos          = defaultdict(int)
-    bloqueios     = defaultdict(int)
-    etapas        = defaultdict(int)
-    valores_cont  = []
-    aguardando    = 0
+    d_status     = defaultdict(int)
+    fin_n        = defaultdict(int)
+    fin_total    = defaultdict(float)
+    fin_min      = {}
+    fin_max      = {}
+    fin_med_sum  = defaultdict(float)
+    evolucao_d   = defaultdict(lambda: defaultdict(int))
+    evolucao_h   = defaultdict(lambda: defaultdict(int))
+    motivos      = defaultdict(int)
+    motivos_det  = defaultdict(int)
+    empregadores = defaultdict(int)
+    cbos         = defaultdict(int)
+    emp_rep      = defaultdict(int)
+    cnaes        = defaultdict(int)
+    cbos_rep     = defaultdict(int)
+    ufs          = defaultdict(int)
+    bloqueios    = defaultdict(int)
+    etapas       = defaultdict(int)
+    etapa_motivos = defaultdict(lambda: defaultdict(int))
+    valores_cont = []
+    aguardando   = 0
 
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
@@ -162,10 +172,8 @@ def agregar(dias_raw: list) -> dict:
                 fin_n[campo]      += n
                 fin_total[campo]  += s.get("total", 0.0)
                 fin_med_sum[campo] += s.get("mediana", 0.0) * n
-                v_min = s.get("min", float("inf"))
-                v_max = s.get("max", float("-inf"))
-                fin_min[campo] = min(fin_min.get(campo, float("inf")), v_min)
-                fin_max[campo] = max(fin_max.get(campo, float("-inf")), v_max)
+                fin_min[campo] = min(fin_min.get(campo, float("inf")),  s.get("min", float("inf")))
+                fin_max[campo] = max(fin_max.get(campo, float("-inf")), s.get("max", float("-inf")))
 
         for dt, cont in d.get("evolucao_diaria", {}).items():
             for sk, cnt in cont.items():
@@ -178,17 +186,36 @@ def agregar(dias_raw: list) -> dict:
         for k, v in d.get("top_motivos", {}).items():
             if k:
                 motivos[k] += v
+        for k, v in d.get("top_motivos_det", {}).items():
+            if k:
+                motivos_det[k] += v
         for k, v in d.get("top_empregadores", {}).items():
             if k:
                 empregadores[k] += v
         for k, v in d.get("top_cbos", {}).items():
             if k:
                 cbos[k] += v
+        for k, v in d.get("top_empregadores_rep", {}).items():
+            if k:
+                emp_rep[k] += v
+        for k, v in d.get("top_cnaes", {}).items():
+            if k:
+                cnaes[k] += v
+        for k, v in d.get("top_cbos_rep", {}).items():
+            if k:
+                cbos_rep[k] += v
+        for k, v in d.get("top_ufs", {}).items():
+            if k:
+                ufs[k] += v
 
         for k, v in d.get("bloqueios", {}).items():
             bloqueios[k] += v
         for k, v in d.get("etapas", {}).items():
             etapas[k] += v
+
+        for etapa, mots in d.get("etapa_motivos", {}).items():
+            for label, cnt in mots.items():
+                etapa_motivos[etapa][label] += cnt
 
         valores_cont.extend(d.get("valores_contratacao", []))
         aguardando += d.get("aguardando", 0)
@@ -224,27 +251,37 @@ def agregar(dias_raw: list) -> dict:
             "max":    fin_max[campo],
         }
 
+    def _top(dd, n):
+        return dict(sorted(dd.items(), key=lambda x: -x[1])[:n])
+
     return {
-        "funil":            funil,
-        "financeiro":       financeiro,
-        "evolucao_diaria":  {k: dict(v) for k, v in sorted(evolucao_d.items())},
-        "evolucao_horaria": {k: dict(v) for k, v in sorted(evolucao_h.items())},
-        "top_motivos":      dict(sorted(motivos.items(),     key=lambda x: -x[1])[:20]),
-        "top_empregadores": dict(sorted(empregadores.items(),key=lambda x: -x[1])[:15]),
-        "top_cbos":         dict(sorted(cbos.items(),        key=lambda x: -x[1])[:15]),
-        "bloqueios":        dict(bloqueios),
-        "etapas":           dict(etapas),
+        "funil":             funil,
+        "financeiro":        financeiro,
+        "evolucao_diaria":   {k: dict(v) for k, v in sorted(evolucao_d.items())},
+        "evolucao_horaria":  {k: dict(v) for k, v in sorted(evolucao_h.items())},
+        "top_motivos":       _top(motivos,      20),
+        "top_motivos_det":   _top(motivos_det,  20),
+        "top_empregadores":  _top(empregadores, 15),
+        "top_cbos":          _top(cbos,         15),
+        "top_emp_rep":       _top(emp_rep,      20),
+        "top_cnaes":         _top(cnaes,        20),
+        "top_cbos_rep":      _top(cbos_rep,     20),
+        "top_ufs":           _top(ufs,          27),
+        "bloqueios":         dict(bloqueios),
+        "etapas":            dict(etapas),
+        "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "valores_contratacao": valores_cont,
-        "aguardando":       aguardando,
+        "aguardando":        aguardando,
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
 
 def _fig_donut(d_status: dict):
-    items = sorted([(s, n) for s, n in d_status.items() if n > 0], key=lambda x: -x[1])
+    items  = sorted([(s, n) for s, n in d_status.items() if n > 0], key=lambda x: -x[1])
     labels = [_STATUS_NOMES.get(s, f"Status {s}") for s, _ in items]
     values = [n for _, n in items]
     colors = [_STATUS_CORES.get(s, "#666") for s, _ in items]
+    total  = sum(values)
     fig = go.Figure(go.Pie(
         labels=labels, values=values,
         marker=dict(colors=colors, line=dict(color="#0d0c0a", width=2)),
@@ -258,54 +295,59 @@ def _fig_donut(d_status: dict):
         title=dict(text="Distribuição por Status", font=_TF),
         legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
                     orientation="v", x=1.02, y=0.5),
-        margin=dict(t=50, b=10, l=10, r=10), height=340,
+        margin=dict(t=50, b=10, l=10, r=10), height=360,
+        annotations=[dict(text=f"<b>{total:,}</b><br><span style='font-size:10px'>leads</span>",
+                          x=0.5, y=0.5, font=dict(size=14, color="#e2e8f0"), showarrow=False)],
     )
     return fig
 
 
-def _fig_funil(funil: dict):
-    total     = funil.get("total", 0)
-    terminais = funil.get("terminais", 0)
-    aprovados = funil.get("aprovados", 0)
-
+def _fig_funil_rico(funil: dict):
+    d_st = funil.get("_d_status", {})
+    total = funil.get("total", 0)
+    if total == 0:
+        return None
+    _ORDEM = [0, 1, 2, 5, 6, 7, 3, 4, 8]
+    presentes = [s for s in _ORDEM if d_st.get(s, 0) > 0]
+    extras    = [s for s in sorted(d_st) if s not in _ORDEM and d_st.get(s, 0) > 0]
+    steps = [("Total de Leads", total, "#3b82f6")] + [
+        (_STATUS_NOMES.get(s, str(s)), d_st[s], _STATUS_CORES.get(s, "#9ca3af"))
+        for s in presentes + extras if d_st.get(s, 0) > 0
+    ]
+    if len(steps) < 2:
+        return None
+    labels, values, colors = zip(*steps)
     fig = go.Figure(go.Funnel(
-        y=["Total", "Finalizados", "Aprovados"],
-        x=[total, terminais, aprovados],
-        textposition="inside",
-        textinfo="value+percent initial",
-        marker=dict(
-            color=["#1e3a5f", "#15406b", "#166534"],
-            line=dict(color="#0d0c0a", width=1.5),
-        ),
-        textfont=dict(color="#e2e8f0", size=13),
-        connector=dict(line=dict(color="#272420", width=2)),
-        hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
+        y=list(labels), x=list(values),
+        marker=dict(color=list(colors), line=dict(color="#0d0c0a", width=1.5)),
+        texttemplate="%{value:,}<br>%{percentInitial:.1%}",
+        textfont=dict(size=12, color="#e2e8f0"),
+        connector=dict(line=dict(color="rgba(255,255,255,0.2)", width=1)),
+        hovertemplate="<b>%{y}</b><br>%{x:,} leads · %{percentInitial:.2%}<extra></extra>",
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Funil de Conversão", font=_TF),
-        margin=dict(t=50, b=10, l=10, r=10), height=340,
+        margin=dict(t=50, b=10, l=140, r=40), height=360,
     )
     return fig
 
 
 def _fig_evolucao(agg: dict, n_dias: int):
     if n_dias == 1:
-        ev     = agg["evolucao_horaria"]
-        eixo   = sorted(ev.keys())
+        ev    = agg["evolucao_horaria"]
+        eixo  = sorted(ev.keys())
         titulo = "Evolução Horária"
-        xlab   = "Hora"
+        xlab  = "Hora"
     else:
-        ev     = agg["evolucao_diaria"]
-        eixo   = sorted(ev.keys())
+        ev    = agg["evolucao_diaria"]
+        eixo  = sorted(ev.keys())
         titulo = "Evolução Diária"
-        xlab   = "Data"
-
+        xlab  = "Data"
     if not eixo:
         return None
-
     fig = go.Figure()
-    for s in [3, 4, 5, 2, 0, 7, 8]:
+    for s in [3, 4, 5, 2, 0, 7, 8, 1, 6]:
         y = [ev.get(x, {}).get(s, 0) for x in eixo]
         if sum(y) == 0:
             continue
@@ -315,6 +357,8 @@ def _fig_evolucao(agg: dict, n_dias: int):
             mode="lines+markers",
             line=dict(color=_STATUS_CORES.get(s, "#aaa"), width=2),
             marker=dict(size=5),
+            fill="tozeroy" if s == 3 else "none",
+            fillcolor="rgba(34,197,94,0.08)" if s == 3 else None,
             hovertemplate=f"{_STATUS_NOMES.get(s, str(s))}: %{{y:,}}<extra></extra>",
         ))
     fig.update_layout(
@@ -323,106 +367,223 @@ def _fig_evolucao(agg: dict, n_dias: int):
         xaxis=dict(title=xlab, tickfont=_AF, showgrid=True, gridcolor=_GRID),
         yaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID),
         legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
-                    orientation="h", y=-0.20, x=0.5, xanchor="center"),
-        margin=dict(t=50, b=60, l=10, r=10), height=340,
+                    orientation="h", y=-0.22, x=0.5, xanchor="center"),
+        margin=dict(t=50, b=70, l=10, r=10), height=360,
         hovermode="x unified",
     )
     return fig
 
 
-def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15):
+def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 20, pct_base: int = 0):
     items = list(data_dict.items())[:n]
     if not items:
         return None
     labels = [k for k, _ in items]
     values = [v for _, v in items]
+    max_v  = max(values) if values else 1
+    if pct_base > 0:
+        shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in values]
+        texts  = [f"{100*v/pct_base:.1f}%" for v in values]
+        tpos   = "inside"
+    else:
+        shades = color
+        texts  = [f"{v:,}" for v in values]
+        tpos   = "outside"
     fig = go.Figure(go.Bar(
         x=values, y=labels, orientation="h",
-        marker=dict(color=color, line=dict(color="#0d0c0a", width=0.5)),
-        text=[f"{v:,}" for v in values],
-        textposition="outside",
-        textfont=dict(size=10, color="#94a3b8"),
+        marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
+        text=texts, textposition=tpos,
+        insidetextanchor="end" if pct_base else None,
+        textfont=dict(size=10, color="rgba(255,255,255,0.85)" if pct_base else "#94a3b8"),
         hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
     ))
-    h = max(280, len(items) * 32 + 80)
+    h = max(280, len(items) * 34 + 80)
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text=titulo, font=_TF),
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-        yaxis=dict(tickfont=dict(size=10, color="#cbd5e1"), autorange="reversed",
-                   automargin=True),
+        yaxis=dict(tickfont=dict(size=10, color="#cbd5e1"), autorange="reversed", automargin=True),
         margin=dict(t=50, b=20, l=20, r=60), height=h,
-    )
-    return fig
-
-
-def _fig_etapas(etapas: dict, n_rep: int):
-    if not etapas or n_rep == 0:
-        return None
-    ordered = [(e, etapas.get(e, 0)) for e in _ETAPA_ORDER if etapas.get(e, 0) > 0]
-    ordered += [(e, v) for e, v in etapas.items() if e not in _ETAPA_ORDER and v > 0]
-    if not ordered:
-        return None
-
-    labels = [e for e, _ in reversed(ordered)]
-    values = [v for _, v in reversed(ordered)]
-    pcts   = [f"{v/n_rep*100:.1f}%" for v in values]
-
-    fig = go.Figure(go.Bar(
-        x=values, y=labels, orientation="h",
-        marker=dict(
-            color=[f"rgba(251,146,60,{0.45 + 0.50*(v/n_rep):.2f})" for v in values],
-            line=dict(color="#0d0c0a", width=0.5),
-        ),
-        text=[f"{v:,} ({p})" for v, p in zip(values, pcts)],
-        textposition="inside", insidetextanchor="middle",
-        textfont=dict(size=10, color="rgba(255,255,255,0.90)"),
-        hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
-    ))
-    h = max(280, len(ordered) * 44 + 80)
-    fig.update_layout(
-        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-        title=dict(text="Reprovados por Etapa", font=_TF),
-        xaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True),
-        margin=dict(t=50, b=20, l=20, r=40), height=h,
+        uniformtext_minsize=9, uniformtext_mode="hide",
     )
     return fig
 
 
 def _fig_histograma(valores: list):
-    if not valores:
+    if len(valores) < 3:
         return None
+    import statistics as _st
+    mediana = _st.median(valores)
+    media   = _st.mean(valores)
     fig = go.Figure(go.Histogram(
         x=valores, nbinsx=35,
-        marker=dict(color="#FEC52E", line=dict(color="#0d0c0a", width=0.5)),
+        marker=dict(color="#3b82f6", opacity=0.8, line=dict(color="#0d0c0a", width=0.5)),
         hovertemplate="R$ %{x:,.0f}: %{y:,} contratos<extra></extra>",
     ))
+    fig.add_vline(x=mediana, line=dict(color="#f87171", dash="dash", width=2.5))
+    fig.add_vline(x=media,   line=dict(color="#fb923c", dash="dot",  width=2))
+    fig.add_annotation(x=0.98, y=0.97, xref="paper", yref="paper",
+        text=f"Mediana: R$ {mediana:,.0f}", font=dict(color="#f87171", size=12),
+        showarrow=False, xanchor="right", yanchor="top",
+        bgcolor="rgba(13,12,10,0.88)", borderpad=6,
+        bordercolor="rgba(248,113,113,0.35)", borderwidth=1)
+    fig.add_annotation(x=0.98, y=0.84, xref="paper", yref="paper",
+        text=f"Média: R$ {media:,.0f}", font=dict(color="#fb923c", size=12),
+        showarrow=False, xanchor="right", yanchor="top",
+        bgcolor="rgba(13,12,10,0.88)", borderpad=6,
+        bordercolor="rgba(251,146,60,0.35)", borderwidth=1)
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-        title=dict(text="Distribuição — Valor Contratado", font=_TF),
-        xaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID,
-                   tickprefix="R$ ", tickformat=",.0f"),
+        title=dict(text="Distribuição do Valor Contratado (Aprovados)", font=_TF),
+        xaxis=dict(title="Valor (R$)", tickformat=",.0f", tickfont=_AF,
+                   showgrid=True, gridcolor=_GRID),
         yaxis=dict(title="Contratos", tickfont=_AF, showgrid=True, gridcolor=_GRID),
-        bargap=0.05,
-        margin=dict(t=50, b=40, l=10, r=10), height=300,
+        margin=dict(t=50, b=50, l=10, r=10), height=340, showlegend=False, bargap=0.04,
     )
     return fig
 
 
-def _fig_bloqueios(bloqueios: dict):
+def _fig_etapas_split(etapas: dict, n_rep: int):
+    if not etapas or n_rep == 0:
+        return None
+    n_antes = sum(etapas.get(e, 0) for e in _ETAPAS_ANTES)
+    n_corte = n_rep - n_antes
+    antes_sorted  = sorted([(n, v) for n, v in etapas.items() if n in _ETAPAS_ANTES],     key=lambda x: x[1])
+    depois_sorted = sorted([(n, v) for n, v in etapas.items() if n not in _ETAPAS_ANTES], key=lambda x: x[1])
+    _GAP = " "
+    all_items = depois_sorted + [(_GAP, 0)] + antes_sorted
+    y_labs = [n for n, _ in all_items]
+    x_vals = [v for _, v in all_items]
+    max_v  = max((v for v in x_vals if v), default=1)
+    colors, texts, hovers = [], [], []
+    for name, v in all_items:
+        if name == _GAP:
+            colors.append("rgba(0,0,0,0)"); texts.append(""); hovers.append(""); continue
+        shade = 0.40 + 0.55 * (v / max_v)
+        is_antes = name in _ETAPAS_ANTES
+        denom = n_antes if is_antes else n_corte
+        pct   = 100 * v / denom if denom else 0
+        gc    = "rgba(251,146,60," if is_antes else "rgba(96,165,250,"
+        gl    = (f"dos {n_antes:,} reprov. antes do clique"
+                 if is_antes else f"dos {n_corte:,} reprov. após clique")
+        colors.append(f"{gc}{shade:.2f})")
+        texts.append(f"{v:,} ({pct:.1f}%)")
+        hovers.append(f"<b>{name}</b><br>{v:,} leads · {pct:.2f}% {gl}")
+    n_dep = len(depois_sorted)
+    n_ant = len(antes_sorted)
+    shapes = [
+        dict(type="line", x0=0, x1=1, xref="paper", y0=n_dep-0.5, y1=n_dep-0.5, yref="y",
+             line=dict(color="rgba(255,255,255,0.10)", width=1, dash="dot")),
+        dict(type="line", x0=0, x1=1, xref="paper", y0=n_dep+0.5, y1=n_dep+0.5, yref="y",
+             line=dict(color="rgba(255,255,255,0.10)", width=1, dash="dot")),
+    ]
+    annotations = []
+    if n_ant > 0:
+        annotations.append(dict(xref="paper", yref="y", x=1.02, y=n_dep+1+(n_ant-1)/2,
+            text="<b>Antes<br>do clique</b>", showarrow=False, xanchor="left",
+            font=dict(size=10, color="#fb923c"), align="left"))
+    if n_dep > 0:
+        annotations.append(dict(xref="paper", yref="y", x=1.02, y=(n_dep-1)/2,
+            text="<b>Depois<br>do clique</b>", showarrow=False, xanchor="left",
+            font=dict(size=10, color="#60a5fa"), align="left"))
+    bar_h = max(360, len(all_items) * 34 + 90)
+    fig = go.Figure(go.Bar(
+        x=x_vals, y=y_labs, orientation="h",
+        marker=dict(color=colors, line=dict(color="#0d0c0a", width=0.5)),
+        text=texts, textposition="inside", insidetextanchor="end",
+        textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+        hovertemplate="%{customdata}<extra></extra>", customdata=hovers,
+    ))
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+        title=dict(text="Reprovados por Etapa — Antes vs. Depois do Clique", font=_TF),
+        xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
+        uniformtext_minsize=9, uniformtext_mode="hide",
+        shapes=shapes, annotations=annotations,
+        margin=dict(t=50, b=30, l=20, r=110), height=bar_h,
+    )
+    return fig
+
+
+def _fig_funil_etapa(etapas: dict, n_rep: int):
+    if not etapas or n_rep == 0:
+        return None
+    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+    etapas_sorted = sorted(etapas.keys(), key=lambda e: _order_idx.get(e, 999))
+    restante = n_rep
+    rows = []
+    for etapa in etapas_sorted:
+        n_rej = etapas.get(etapa, 0)
+        pct   = 100 * n_rej / restante if restante > 0 else 0
+        rows.append({"etapa": etapa, "chegaram": restante, "rejeitados": n_rej,
+                     "pct": pct, "restante_apos": restante - n_rej})
+        restante -= n_rej
+    if not rows:
+        return None
+    rows_r   = list(reversed(rows))
+    y_labels = [r["etapa"] for r in rows_r]
+    rej_colors = []
+    for r in rows_r:
+        shade = 0.50 + 0.45 * (r["rejeitados"] / n_rep)
+        if r["etapa"] in _ETAPAS_ANTES:
+            rej_colors.append(f"rgba(251,146,60,{shade:.2f})")
+        else:
+            rej_colors.append(f"rgba(96,165,250,{shade:.2f})")
+    rej_hover = [
+        f"<b>{r['etapa']}</b><br>Chegaram: {r['chegaram']:,}<br>"
+        f"Reprovados aqui: {r['rejeitados']:,} ({r['pct']:.1f}%)<br>"
+        f"Avançaram: {r['restante_apos']:,}"
+        for r in rows_r
+    ]
+    bar_h = max(360, len(rows) * 52 + 90)
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[r["rejeitados"] for r in rows_r], y=y_labels, orientation="h",
+        name="Reprovados",
+        marker=dict(color=rej_colors, line=dict(color="#0d0c0a", width=0.5)),
+        text=[f"{r['rejeitados']:,} ({r['pct']:.1f}%)" for r in rows_r],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(size=11, color="rgba(255,255,255,0.90)"),
+        hovertemplate="%{customdata}<extra></extra>", customdata=rej_hover,
+    ))
+    fig.add_trace(go.Bar(
+        x=[r["restante_apos"] for r in rows_r], y=y_labels, orientation="h",
+        name="Avançaram",
+        marker=dict(color="rgba(255,255,255,0.07)", line=dict(color="#0d0c0a", width=0.5)),
+        text=[f"{r['restante_apos']:,}" if r["restante_apos"] > 0 else "" for r in rows_r],
+        textposition="inside", insidetextanchor="middle",
+        textfont=dict(size=10, color="rgba(255,255,255,0.35)"),
+        hovertemplate="%{y}: %{x:,} avançaram<extra></extra>",
+    ))
+    fig.update_layout(
+        barmode="stack",
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+        title=dict(text="Funil de Reprovação por Etapa", font=_TF),
+        xaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True),
+        legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
+                    orientation="h", y=-0.10, x=0.5, xanchor="center"),
+        uniformtext_minsize=9, uniformtext_mode="hide",
+        margin=dict(t=50, b=60, l=20, r=40), height=bar_h,
+    )
+    return fig, rows  # retorna rows para a tabela resumo
+
+
+def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
     if not any(bloqueios.values()):
         return None
     nomes = {"cpf": "CPF Bloqueado", "cnpj": "CNPJ Bloqueado",
              "cnae": "CNAE Bloqueado", "cbo": "CBO Bloqueado"}
-    cores = {"cpf": "#ef4444", "cnpj": "#f97316", "cnae": "#eab308", "cbo": "#a855f7"}
+    cores = {"cpf": "#f87171", "cnpj": "#fb923c", "cnae": "#a78bfa", "cbo": "#60a5fa"}
     labels = [nomes.get(k, k) for k, v in bloqueios.items() if v > 0]
     values = [v for v in bloqueios.values() if v > 0]
+    pcts   = [100*v/n_rep if n_rep else 0 for v in values]
     colors = [cores.get(k, "#666") for k, v in bloqueios.items() if v > 0]
     fig = go.Figure(go.Bar(
         x=labels, y=values,
-        marker=dict(color=colors, line=dict(color="#0d0c0a", width=0.5)),
-        text=[f"{v:,}" for v in values],
+        marker=dict(color=colors, line=dict(color="#0d0c0a", width=1), opacity=0.88),
+        text=[f"{v:,}<br>{p:.1f}%" for v, p in zip(values, pcts)],
         textposition="outside",
         textfont=dict(size=12, color="#e2e8f0"),
         hovertemplate="%{x}: <b>%{y:,}</b><extra></extra>",
@@ -432,9 +593,299 @@ def _fig_bloqueios(bloqueios: dict):
         title=dict(text="Leads com Bloqueio por Tipo", font=_TF),
         xaxis=dict(tickfont=dict(size=12, color="#cbd5e1")),
         yaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID),
-        margin=dict(t=50, b=10, l=10, r=10), height=280,
+        margin=dict(t=50, b=20, l=10, r=10), height=300,
     )
     return fig
+
+
+# ── HTML helpers ──────────────────────────────────────────────────────────────
+
+def _html_diagrama(etapas: dict, n_rep: int) -> str:
+    """HTML do Workflow 37 portado de gerar_relatorio_html.py."""
+    if not etapas or not n_rep:
+        return ""
+
+    _PRE  = [("Inicializa Dados", ["Já Reprovado (reentrada)"])]
+    _MC   = [
+        ("Validações Internas", ["Validações Internas"]),
+        ("Receita Federal PF",  ["Receita Federal PF"]),
+        ("Consulta Dataprev",   ["Consulta Dataprev"]),
+        ("Receita Federal PJ",  ["Receita Federal PJ"]),
+        ("PH3A PJ",             ["Análise PH3A (PJ)"]),
+        ("SCR",                 ["SCR"]),
+        ("PH3A PF",             ["Análise PH3A (PF)"]),
+    ]
+    _POST = [
+        ("Cálculo Proposta",    ["Cálculo de Proposta"]),
+        ("Proposta Leilão",     []),
+        ("Cadastro Proposta",   []),
+        ("Formalização",        []),
+        ("Obter CCB",           []),
+        ("Averbação Dataprev",  []),
+        ("Antifraude",          []),
+        ("Pagamento Pix",       []),
+        ("Aprovação",           []),
+    ]
+
+    _S_OK  = ("background:#1a3560;border:1px solid rgba(96,165,250,0.25);"
+               "color:#93c5fd;border-radius:8px;padding:8px 13px;"
+               "font-size:11px;font-weight:500;text-align:center;white-space:nowrap;")
+    _S_REJ = ("background:#431407;border:1.5px solid #f97316;"
+               "color:#fed7aa;border-radius:8px;padding:8px 13px;"
+               "font-size:11px;font-weight:500;text-align:center;white-space:nowrap;")
+    _ARR   = '<div style="padding:11px 5px 0;color:#374151;font-size:12px;flex-shrink:0;">&#9654;</div>'
+
+    def _unit(name, etapa_keys):
+        count = sum(etapas.get(e, 0) for e in etapa_keys)
+        pct   = 100 * count / n_rep if n_rep and count else 0
+        box   = f'<div style="{_S_REJ if count else _S_OK}">{name}</div>'
+        below = ""
+        if count:
+            sub = "".join(
+                f'<div style="font-size:9px;color:#94a3b8;white-space:nowrap;">'
+                f'&#8226; {e}: {etapas[e]:,}</div>'
+                for e in etapa_keys if etapas.get(e, 0)
+            )
+            below = (
+                f'<div style="font-size:10px;color:#f97316;margin-top:5px;'
+                f'font-weight:700;white-space:nowrap;text-align:center;">'
+                f'&#11015; {count:,}&nbsp;({pct:.1f}%)</div>{sub}'
+            )
+        return (
+            f'<div style="display:flex;flex-direction:column;'
+            f'align-items:center;flex-shrink:0;">{box}{below}</div>'
+        )
+
+    inicio = (
+        '<div style="display:flex;flex-direction:column;align-items:center;'
+        'flex-shrink:0;padding-top:7px;">'
+        '<div style="width:22px;height:22px;border-radius:50%;background:#22c55e;'
+        'border:2px solid #16a34a;"></div>'
+        '<div style="font-size:9px;color:#64748b;margin-top:4px;">Início</div>'
+        '</div>'
+    )
+
+    pre_html = inicio
+    for name, etapa_keys in _PRE:
+        pre_html += _ARR + _unit(name, etapa_keys)
+
+    mc_inner = ""
+    for i, (name, etapa_keys) in enumerate(_MC):
+        if i > 0:
+            mc_inner += _ARR
+        mc_inner += _unit(name, etapa_keys)
+
+    mc_label = (
+        '<div style="font-size:9px;color:#a5b4fc;font-weight:700;'
+        'text-align:center;padding-bottom:6px;white-space:nowrap;'
+        'text-transform:uppercase;letter-spacing:0.5px;">Motor de Cr&#233;dito</div>'
+    )
+    mc_flow = (
+        '<div style="display:flex;align-items:flex-start;'
+        'border:1px solid rgba(99,102,241,0.40);border-radius:10px;'
+        'padding:8px;background:rgba(99,102,241,0.06);">'
+        + mc_inner + '</div>'
+    )
+    mc_html = (
+        _ARR
+        + '<div style="display:flex;flex-direction:column;flex-shrink:0;">'
+        + mc_label + mc_flow + '</div>'
+    )
+
+    post_html = ""
+    for name, etapa_keys in _POST:
+        post_html += _ARR + _unit(name, etapa_keys)
+
+    fim_html = (
+        _ARR
+        + '<div style="display:flex;flex-direction:column;align-items:center;'
+          'flex-shrink:0;padding-top:7px;">'
+          '<div style="width:22px;height:22px;border-radius:50%;background:#dc2626;'
+          'border:2px solid #b91c1c;"></div>'
+          '<div style="font-size:9px;color:#64748b;margin-top:4px;">Aprovado</div>'
+          '</div>'
+    )
+
+    legend = (
+        '<div style="display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;">'
+        '<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;">'
+        '<div style="width:12px;height:12px;border-radius:3px;background:#431407;'
+        'border:1.5px solid #f97316;flex-shrink:0;"></div>Com reprovações</div>'
+        '<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;">'
+        '<div style="width:12px;height:12px;border-radius:3px;background:#1a3560;'
+        'border:1px solid rgba(96,165,250,0.25);flex-shrink:0;"></div>Sem reprovações</div>'
+        '<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;">'
+        '<div style="width:30px;height:12px;border-radius:3px;'
+        'border:1px solid rgba(99,102,241,0.40);'
+        'background:rgba(99,102,241,0.06);flex-shrink:0;"></div>'
+        'Motor de Cr&#233;dito</div>'
+        '</div>'
+    )
+
+    title_html = (
+        '<div style="font-size:10px;color:#475569;text-transform:uppercase;'
+        'letter-spacing:0.6px;margin-bottom:12px;font-weight:600;">'
+        'Fluxo do Workflow 37 &#8212; Motor de Cr&#233;dito expandido</div>'
+    )
+
+    flow = (
+        '<div style="overflow-x:auto;">'
+        '<div style="display:flex;align-items:flex-start;gap:0;'
+        'min-width:max-content;padding:4px 0 10px;">'
+        + pre_html + mc_html + post_html + fim_html
+        + '</div></div>'
+    )
+
+    return title_html + flow + legend
+
+
+def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> str:
+    if not etapa_motivos or not etapas or n_rep == 0:
+        return ""
+    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+    etapas_sorted = sorted(etapas.keys(), key=lambda e: (_order_idx.get(e, 999), -etapas.get(e, 0)))
+
+    n_antes = sum(etapas.get(e, 0) for e in _ETAPAS_ANTES)
+    n_corte = n_rep - n_antes
+    show_corte = n_corte > 0 and n_antes > 0
+
+    _SEP_ANT = (
+        "background:#1c1a0e;color:#d4b84a;font-size:10px;font-weight:700;"
+        "letter-spacing:0.5px;text-transform:uppercase;"
+        "padding:9px 12px 7px;border-top:10px solid #0d0c0a;"
+        "border-bottom:1px solid rgba(254,197,46,0.2);"
+    )
+    _SEP_DEP = (
+        "background:#0a1a2e;color:#93c5fd;font-size:10px;font-weight:700;"
+        "letter-spacing:0.5px;text-transform:uppercase;"
+        "padding:9px 12px 7px;border-top:10px solid #0d0c0a;"
+        "border-bottom:1px solid rgba(96,165,250,0.2);"
+    )
+
+    thead = (
+        "<thead><tr>"
+        "<th>Etapa</th><th>Motivo de Reprovação</th>"
+        '<th class="r">Leads</th><th class="r">%</th>'
+        "</tr></thead>"
+    )
+
+    tbody_rows = []
+    shade_idx  = -1
+    prev_group = None
+
+    for etapa in etapas_sorted:
+        if etapa not in etapa_motivos and etapas.get(etapa, 0) == 0:
+            continue
+        is_antes = etapa in _ETAPAS_ANTES
+        group    = "antes" if is_antes else "depois"
+
+        if show_corte and group != prev_group:
+            label_sep = ("Antes do cliente clicar na proposta" if group == "antes"
+                         else "Depois do cliente clicar na proposta")
+            sep_style = _SEP_ANT if group == "antes" else _SEP_DEP
+            tbody_rows.append(f'<tr><td colspan="4" style="{sep_style}">{label_sep}</td></tr>')
+            prev_group = group
+
+        motivos_etapa = sorted(etapa_motivos.get(etapa, {}).items(), key=lambda x: -x[1])
+        if not motivos_etapa:
+            # etapa sem motivos detalhados — mostra total
+            motivos_etapa = [("—", etapas.get(etapa, 0))]
+
+        shade_idx += 1
+        rc = "g0" if shade_idx % 2 == 0 else "g1"
+        denom = n_antes if is_antes else n_corte
+        for i, (motivo, cnt) in enumerate(motivos_etapa):
+            pct = f"{100*cnt/denom:.1f}%" if denom else "—"
+            tbody_rows.append(
+                f'<tr class="{rc}">'
+                f"<td>{etapa if i == 0 else ''}</td>"
+                f'<td class="wrap">{motivo}</td>'
+                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r">{pct}</td>'
+                f"</tr>"
+            )
+
+    if not tbody_rows:
+        return ""
+    tbody = "<tbody>" + "".join(tbody_rows) + "</tbody>"
+    return (
+        '<div class="dtbl-title">Detalhamento por Etapa × Motivo</div>'
+        '<div class="dtbl-wrap"><table class="dtbl">'
+        + thead + tbody
+        + "</table></div>"
+    )
+
+
+def _html_tabela_resumo_funil(rows: list) -> str:
+    if not rows:
+        return ""
+    _C_ANT = "#fb923c"
+    _C_DEP = "#60a5fa"
+    _C_Z   = "#64748b"
+    trs = []
+    for r in rows:
+        cor     = _C_ANT if r["etapa"] in _ETAPAS_ANTES else (_C_DEP if r["rejeitados"] else _C_Z)
+        pct_str = f"{r['pct']:.1f}%" if r["rejeitados"] else "—"
+        trs.append(
+            f'<tr>'
+            f'<td style="color:{cor};font-weight:600">{r["etapa"]}</td>'
+            f'<td style="text-align:right">{r["chegaram"]:,}</td>'
+            f'<td style="text-align:right">{r["rejeitados"]:,}</td>'
+            f'<td style="text-align:right;color:{cor}">{pct_str}</td>'
+            f'<td style="text-align:right;color:#64748b">{r["restante_apos"]:,}</td>'
+            f'</tr>'
+        )
+    return (
+        '<div style="margin-top:18px;overflow-x:auto">'
+        '<table class="dtbl" style="max-width:680px">'
+        '<thead><tr>'
+        '<th>Etapa</th><th class="r">Chegaram</th><th class="r">Reprovados</th>'
+        '<th class="r">% dos chegados</th><th class="r">Restante</th>'
+        '</tr></thead>'
+        f'<tbody>{"".join(trs)}</tbody>'
+        '</table></div>'
+    )
+
+
+def _html_tabela_financeira(fin: dict) -> str:
+    campos = [
+        ("ValorContratacao", "Valor Contratado",  lambda x: f"R$ {x:,.2f}"),
+        ("RendaLiquida",     "Renda Líquida",      lambda x: f"R$ {x:,.2f}"),
+        ("Prazo",            "Prazo (meses)",       lambda x: f"{x:.0f}"),
+        ("Taxa",             "Taxa Mensal (%)",     lambda x: f"{x:.2f}"),
+    ]
+    rows_html = []
+    for campo, label, fmt in campos:
+        v = fin.get(campo, {})
+        if v.get("n", 0) < 1:
+            continue
+        total_s = fmt(v["total"]) if campo == "ValorContratacao" else "—"
+        rc = "g0" if len(rows_html) % 2 == 0 else "g1"
+        rows_html.append(
+            f'<tr class="{rc}">'
+            f'<td>{label}</td>'
+            f'<td class="r">{v["n"]:,}</td>'
+            f'<td class="r">{fmt(v["media"])}</td>'
+            f'<td class="r">{fmt(v["mediana"])}</td>'
+            f'<td class="r">{fmt(v["min"])}</td>'
+            f'<td class="r">{fmt(v["max"])}</td>'
+            f'<td class="r">{total_s}</td>'
+            f'</tr>'
+        )
+    if not rows_html:
+        return ""
+    return (
+        '<div class="dtbl-title">Estatísticas Financeiras — Aprovados</div>'
+        '<div class="dtbl-wrap"><table class="dtbl">'
+        '<thead><tr>'
+        '<th>Campo</th><th class="r">N</th><th class="r">Média</th>'
+        '<th class="r">Mediana*</th><th class="r">Mínimo</th><th class="r">Máximo</th>'
+        '<th class="r">Total</th>'
+        '</tr></thead>'
+        '<tbody>' + "".join(rows_html) + '</tbody>'
+        '</table></div>'
+    )
+
 
 # ── Carrega datas disponiveis ─────────────────────────────────────────────────
 
@@ -447,12 +898,12 @@ data_min = datetime.strptime(datas[0],  "%Y%m%d").date()
 data_max = datetime.strptime(datas[-1], "%Y%m%d").date()
 d_ini_default = max(data_min, data_max - timedelta(days=6))
 
-# ── Header + seletor de periodo ───────────────────────────────────────────────
+# ── Header + seletor ──────────────────────────────────────────────────────────
 
 col_title, col_picker = st.columns([1, 1])
 
 with col_title:
-    st.markdown("## 📊 Leads SWorks")
+    st.markdown("## Leads SWorks")
     st.markdown(
         f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
         f'até {data_max.strftime("%d/%m/%Y")}</div>',
@@ -463,24 +914,17 @@ with col_picker:
     intervalo = st.date_input(
         "Período de análise",
         value=(d_ini_default, data_max),
-        min_value=data_min,
-        max_value=data_max,
+        min_value=data_min, max_value=data_max,
         format="DD/MM/YYYY",
     )
 
 if isinstance(intervalo, (list, tuple)):
-    if len(intervalo) == 2:
-        d_ini, d_fim = intervalo[0], intervalo[1]
-    else:
-        d_ini = d_fim = intervalo[0]
+    d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
 else:
     d_ini = d_fim = data_max
 
-datas_sel = [
-    d for d in datas
-    if d_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim
-]
-n_dias = len(datas_sel)
+datas_sel = [d for d in datas if d_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim]
+n_dias    = len(datas_sel)
 
 if not datas_sel:
     st.warning("Nenhum dado no período selecionado.")
@@ -489,8 +933,7 @@ if not datas_sel:
 # ── Carrega e agrega ──────────────────────────────────────────────────────────
 
 with st.spinner(f"Carregando {n_dias} dia(s)..."):
-    dias_raw = [carregar_dia(d) for d in datas_sel]
-    dias_raw = [d for d in dias_raw if d]
+    dias_raw = [d for d in [carregar_dia(d) for d in datas_sel] if d]
 
 if not dias_raw:
     st.warning("Sem dados para o período selecionado.")
@@ -547,114 +990,216 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Secao 1 — Distribuicao por status + funil ─────────────────────────────────
+# ── 1. Distribuição por Status ────────────────────────────────────────────────
 
-st.markdown('<div class="sec">Distribuição por Status</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">1. Distribuição por Status</div>', unsafe_allow_html=True)
 
 col_d, col_f = st.columns(2)
 with col_d:
     fig = _fig_donut(f.get("_d_status", {}))
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
 with col_f:
-    fig = _fig_funil(f)
+    fig = _fig_funil_rico(f)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-# ── Secao 2 — Evolucao temporal ───────────────────────────────────────────────
+# ── 2. Evolução Temporal ──────────────────────────────────────────────────────
 
-st.markdown('<div class="sec">Evolução Temporal</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">2. Evolução Temporal</div>', unsafe_allow_html=True)
 
 fig = _fig_evolucao(agg, n_dias)
 if fig:
     st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-# ── Secao 3 — Reprovados (Etapas + Motivos) ───────────────────────────────────
+# ── 3. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-st.markdown('<div class="sec">Reprovados</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">3. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
 
-col_e, col_m = st.columns(2)
+html_fin = _html_tabela_financeira(fin)
+if html_fin:
+    st.markdown(html_fin, unsafe_allow_html=True)
+    if n_dias > 1:
+        st.caption("*Mediana = média ponderada das medianas diárias")
 
-with col_e:
-    fig = _fig_etapas(agg.get("etapas", {}), f.get("reprovados", 0))
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    else:
-        st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
+fig = _fig_histograma(agg.get("valores_contratacao", []))
+if fig:
+    st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-with col_m:
-    fig = _fig_barras_h(agg.get("top_motivos", {}), "Top Motivos de Reprovação", "#ef4444")
+# ── 4. Etapa de Reprovação ────────────────────────────────────────────────────
+
+st.markdown('<div class="sec">4. Etapa de Reprovação</div>', unsafe_allow_html=True)
+
+n_rep    = f.get("reprovados", 0)
+etapas_d = agg.get("etapas", {})
+etapa_motivos_d = agg.get("etapa_motivos", {})
+
+# Diagrama do Workflow
+diagrama_html = _html_diagrama(etapas_d, n_rep)
+if diagrama_html:
+    st.markdown(diagrama_html, unsafe_allow_html=True)
+    st.markdown("")
+
+# 3 abas: Visão Geral | Visão Detalhada | Visão de Funil
+if etapas_d and n_rep > 0:
+    tab_g, tab_d, tab_f = st.tabs(["Visão Geral", "Visão Detalhada", "Visão de Funil"])
+
+    with tab_g:
+        _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+        ordered = sorted(
+            [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
+            key=lambda x: _order_idx.get(x[0], 999)
+        )
+        max_v = max(v for _, v in ordered) if ordered else 1
+        y  = [e for e, _ in reversed(ordered)]
+        x  = [v for _, v in reversed(ordered)]
+        ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
+        shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
+
+        fig_g = go.Figure(go.Bar(
+            x=x, y=y, orientation="h",
+            marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
+            text=[f"{v:,} ({p})" for v, p in zip(x, ps)],
+            textposition="inside", insidetextanchor="end",
+            textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+            hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
+        ))
+        h = max(300, len(ordered) * 40 + 80)
+        fig_g.update_layout(
+            template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+            title=dict(text="Reprovados por Etapa de Workflow", font=_TF),
+            xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+            yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
+            uniformtext_minsize=9, uniformtext_mode="hide",
+            margin=dict(t=50, b=30, l=20, r=40), height=h,
+        )
+        st.plotly_chart(fig_g, use_container_width=True, config=_CONF)
+
+        tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
+        if tbl_g:
+            st.markdown(tbl_g, unsafe_allow_html=True)
+
+    with tab_d:
+        fig_d = _fig_etapas_split(etapas_d, n_rep)
+        if fig_d:
+            st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
+
+        tbl_d = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
+        if tbl_d:
+            st.markdown(tbl_d, unsafe_allow_html=True)
+
+    with tab_f:
+        result_f = _fig_funil_etapa(etapas_d, n_rep)
+        if result_f:
+            fig_f, rows_f = result_f
+            st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
+            tbl_resumo = _html_tabela_resumo_funil(rows_f)
+            if tbl_resumo:
+                st.markdown(tbl_resumo, unsafe_allow_html=True)
+else:
+    st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
+
+# ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
+
+st.markdown('<div class="sec">5. Motivos de Reprovação</div>', unsafe_allow_html=True)
+
+col_m1, col_m2 = st.columns(2)
+
+with col_m1:
+    fig = _fig_barras_h(agg.get("top_motivos", {}),
+                        "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
     else:
         st.info("Sem dados de motivos.")
 
-# ── Secao 4 — Aprovados (Histograma + Financeiro) ────────────────────────────
+with col_m2:
+    mot_det = agg.get("top_motivos_det", {})
+    if mot_det:
+        n_det = sum(mot_det.values())
+        fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
+                            pct_base=n_det)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    else:
+        st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
 
-st.markdown('<div class="sec">Aprovados — Perfil Financeiro</div>', unsafe_allow_html=True)
+# ── 6. Bloqueios ──────────────────────────────────────────────────────────────
 
-col_h, col_fin = st.columns([1.2, 1])
+st.markdown('<div class="sec">6. Bloqueios por Tipo</div>', unsafe_allow_html=True)
 
-with col_h:
-    fig = _fig_histograma(agg.get("valores_contratacao", []))
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
-with col_fin:
-    st.markdown("**Estatísticas dos aprovados**")
-    _CAMPOS_FIN = [
-        ("ValorContratacao", "Valor contratado", "R$",     True),
-        ("Prazo",            "Prazo",             "meses",  False),
-        ("Taxa",             "Taxa de juros",     "% a.m.", False),
-        ("RendaLiquida",     "Renda líquida",     "R$",     True),
-    ]
-    for campo, label, unid, is_money in _CAMPOS_FIN:
-        s = fin.get(campo)
-        if not s or s.get("n", 0) == 0:
-            continue
-
-        def _fmt(v, _is_money=is_money, _unid=unid):
-            if _is_money:
-                return f"R$ {v:,.2f}"
-            return f"{v:,.2f} {_unid}"
-
-        with st.expander(f"**{label}** — n = {s['n']:,}", expanded=True):
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Média",    _fmt(s["media"]))
-            c2.metric("Mediana*", _fmt(s["mediana"]))
-            c3.metric("Total",    f"R$ {s['total']:,.0f}" if is_money else _fmt(s["total"]))
-            c4, c5 = st.columns(2)
-            c4.metric("Mínimo", _fmt(s["min"]))
-            c5.metric("Máximo", _fmt(s["max"]))
-
-    if n_dias > 1:
-        st.caption("\\* Mediana = média ponderada das medianas diárias")
-
-# ── Secao 5 — Empregadores + CBOs ─────────────────────────────────────────────
-
-st.markdown('<div class="sec">Top Empregadores e CBOs (Aprovados)</div>', unsafe_allow_html=True)
-
-col_emp, col_cbo = st.columns(2)
-
-with col_emp:
-    fig = _fig_barras_h(agg.get("top_empregadores", {}), "Top Empregadores", "#22c55e")
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
-with col_cbo:
-    fig = _fig_barras_h(agg.get("top_cbos", {}), "Top CBOs", "#3b82f6")
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
-# ── Secao 6 — Bloqueios ───────────────────────────────────────────────────────
-
-st.markdown('<div class="sec">Bloqueios por Tipo</div>', unsafe_allow_html=True)
-
-fig = _fig_bloqueios(agg.get("bloqueios", {}))
+fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
 if fig:
     col_bl, _ = st.columns([1, 1])
     with col_bl:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
 else:
-    st.info("Sem dados de bloqueios (campo ausente nos JSONs desta data).")
+    st.info("Sem dados de bloqueios.")
+
+# ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
+
+st.markdown('<div class="sec">7. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+
+col_s1, col_s2 = st.columns(2)
+
+with col_s1:
+    fig = _fig_barras_h(agg.get("top_emp_rep", {}),
+                        "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep)
+    if fig:
+        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    else:
+        st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
+
+with col_s2:
+    cnaes = agg.get("top_cnaes", {})
+    if cnaes:
+        n_cnae = sum(cnaes.values())
+        fig = _fig_barras_h(cnaes, "Top CNAEs Bloqueados (Reprovados)", "#eab308",
+                            pct_base=n_cnae)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    else:
+        st.info("Sem dados de CNAE bloqueado.")
+
+col_s3, col_s4 = st.columns(2)
+
+with col_s3:
+    cbos_rep = agg.get("top_cbos_rep", {})
+    if cbos_rep:
+        n_cbo_r = sum(cbos_rep.values())
+        fig = _fig_barras_h(cbos_rep, "Top CBOs Bloqueados (Reprovados)", "#a855f7",
+                            pct_base=n_cbo_r)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    else:
+        st.info("Sem dados de CBO dos reprovados.")
+
+with col_s4:
+    ufs = agg.get("top_ufs", {})
+    if ufs:
+        n_ufs = sum(ufs.values())
+        fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    else:
+        st.info("Sem dados de UF dos reprovados.")
+
+# ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
+
+st.markdown('<div class="sec">8. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+
+n_ap = f.get("aprovados", 0)
+
+col_e, col_c = st.columns(2)
+
+with col_e:
+    fig = _fig_barras_h(agg.get("top_empregadores", {}),
+                        "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+    if fig:
+        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+with col_c:
+    fig = _fig_barras_h(agg.get("top_cbos", {}),
+                        "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+    if fig:
+        st.plotly_chart(fig, use_container_width=True, config=_CONF)
