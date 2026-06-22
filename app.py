@@ -333,18 +333,36 @@ def _fig_funil_rico(funil: dict):
     return fig
 
 
-def _fig_evolucao(agg: dict, n_dias: int):
+def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None):
+    slots = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 15)]
     if n_dias == 1:
-        ev    = agg["evolucao_horaria"]
-        # Sempre mostra todos os 96 slots de 15 min (00:00–23:45)
-        eixo  = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 15)]
-        titulo = "Evolução por 15 min"
-        xlab  = "Hora"
+        ev         = agg["evolucao_horaria"]
+        eixo       = slots
+        titulo     = "Evolução por 15 min"
+        xlab       = "Hora"
+        xaxis_extra = {}
+        trace_mode = "lines+markers"
     else:
-        ev    = agg["evolucao_diaria"]
-        eixo  = sorted(ev.keys())
-        titulo = "Evolução Diária"
-        xlab  = "Data"
+        # Série temporal completa: 96 slots × N dias, tick só nas datas
+        dias_sorted = sorted(dias_raw or [], key=lambda d: d.get("data", ""))
+        eixo, ev_ts, tickvals, ticktext = [], {}, [], []
+        for d in dias_sorted:
+            raw = d.get("data", "")                    # "20260620"
+            lbl = f"{raw[6:8]}/{raw[4:6]}"            # "20/06"
+            ev_h = d.get("evolucao_horaria", {})
+            for slot in slots:
+                key = f"{lbl} {slot}"
+                eixo.append(key)
+                # converte chaves string→int (formato JSON) para .get(s, 0) funcionar
+                ev_ts[key] = {int(k): v for k, v in ev_h.get(slot, {}).items()}
+            tickvals.append(f"{lbl} 00:00")
+            ticktext.append(lbl)
+        ev         = ev_ts
+        titulo     = "Evolução Diária (15 min)"
+        xlab       = "Data"
+        xaxis_extra = dict(tickmode="array", tickvals=tickvals, ticktext=ticktext)
+        trace_mode = "lines"
+
     if not eixo:
         return None
     fig = go.Figure()
@@ -355,7 +373,7 @@ def _fig_evolucao(agg: dict, n_dias: int):
         fig.add_trace(go.Scatter(
             x=eixo, y=y,
             name=_STATUS_NOMES.get(s, str(s)),
-            mode="lines+markers",
+            mode=trace_mode,
             line=dict(color=_STATUS_CORES.get(s, "#aaa"), width=2),
             marker=dict(size=5),
             fill="tozeroy" if s == 3 else "none",
@@ -365,7 +383,7 @@ def _fig_evolucao(agg: dict, n_dias: int):
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text=titulo, font=_TF),
-        xaxis=dict(title=xlab, tickfont=_AF, showgrid=True, gridcolor=_GRID),
+        xaxis=dict(title=xlab, tickfont=_AF, showgrid=True, gridcolor=_GRID, **xaxis_extra),
         yaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID),
         legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
                     orientation="h", y=-0.22, x=0.5, xanchor="center"),
@@ -1064,7 +1082,7 @@ with col_f:
 
 st.markdown('<div class="sec">2. Evolução Temporal</div>', unsafe_allow_html=True)
 
-fig = _fig_evolucao(agg, n_dias)
+fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw)
 if fig:
     st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
