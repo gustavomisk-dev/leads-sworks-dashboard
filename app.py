@@ -601,31 +601,57 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
 # ── HTML helpers ──────────────────────────────────────────────────────────────
 
 def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
-                          subtitulo: str = "") -> str:
-    """Tabela compacta de ranking: #, nome, leads, % — aparece abaixo dos gráficos de barras."""
+                          subtitulo: str = "",
+                          code_col_title: str = "Código") -> str:
+    """Tabela compacta de ranking: #, [código,] nome, leads, %.
+    Se as chaves tiverem formato 'CODIGO — Descrição', exibe 2 colunas separadas."""
     if not data_dict:
         return ""
+    _SEP = " — "
+    has_sep = any(_SEP in str(k) for k in list(data_dict.keys())[:5])
     rows_html = []
     for i, (label, cnt) in enumerate(data_dict.items()):
         pct = f"{100*cnt/n_total:.1f}%" if n_total else "—"
         rc = "g0" if i % 2 == 0 else "g1"
-        rows_html.append(
-            f'<tr class="{rc}">'
-            f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
-            f'<td class="wrap">{label}</td>'
-            f'<td class="r">{cnt:,}</td>'
-            f'<td class="r" style="color:#94a3b8">{pct}</td>'
-            f'</tr>'
+        if has_sep and _SEP in str(label):
+            code, desc = str(label).split(_SEP, 1)
+            rows_html.append(
+                f'<tr class="{rc}">'
+                f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
+                f'<td style="color:#94a3b8;white-space:nowrap">{code}</td>'
+                f'<td class="wrap">{desc}</td>'
+                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r" style="color:#94a3b8">{pct}</td>'
+                f'</tr>'
+            )
+        else:
+            rows_html.append(
+                f'<tr class="{rc}">'
+                f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
+                f'<td class="wrap">{label}</td>'
+                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r" style="color:#94a3b8">{pct}</td>'
+                f'</tr>'
+            )
+    if has_sep:
+        thead = (
+            f'<thead><tr><th class="c">#</th><th>{code_col_title}</th><th>{titulo_col}</th>'
+            '<th class="r">Leads</th><th class="r">%</th>'
+            '</tr></thead>'
+        )
+    else:
+        thead = (
+            f'<thead><tr><th class="c">#</th><th>{titulo_col}</th>'
+            '<th class="r">Leads</th><th class="r">%</th>'
+            '</tr></thead>'
         )
     titulo_html = f'<div class="dtbl-title" style="margin-top:14px">{subtitulo}</div>' if subtitulo else ""
     return (
         titulo_html
         + '<div class="dtbl-wrap"><table class="dtbl">'
-        f'<thead><tr><th class="c">#</th><th>{titulo_col}</th>'
-        '<th class="r">Leads</th><th class="r">%</th>'
-        '</tr></thead>'
-        '<tbody>' + "".join(rows_html) + '</tbody>'
-        '</table></div>'
+        + thead
+        + '<tbody>' + "".join(rows_html) + '</tbody>'
+        + '</table></div>'
     )
 
 
@@ -1191,7 +1217,7 @@ with col_s2:
                             pct_base=n_cnae)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        tbl = _html_tabela_ranking(cnaes, "Descrição / Código CNAE", n_cnae)
+        tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
         if tbl:
             st.markdown(tbl, unsafe_allow_html=True)
     else:
@@ -1207,7 +1233,7 @@ with col_s3:
                             pct_base=n_cbo_r)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        tbl = _html_tabela_ranking(cbos_rep, "Código CBO", n_cbo_r)
+        tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
         if tbl:
             st.markdown(tbl, unsafe_allow_html=True)
     else:
@@ -1248,6 +1274,6 @@ with col_c:
     fig = _fig_barras_h(cbos_ap, "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    tbl = _html_tabela_ranking(cbos_ap, "Código CBO", n_ap)
+    tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
     if tbl:
         st.markdown(tbl, unsafe_allow_html=True)
