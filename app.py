@@ -600,6 +600,35 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
 
 # ── HTML helpers ──────────────────────────────────────────────────────────────
 
+def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
+                          subtitulo: str = "") -> str:
+    """Tabela compacta de ranking: #, nome, leads, % — aparece abaixo dos gráficos de barras."""
+    if not data_dict:
+        return ""
+    rows_html = []
+    for i, (label, cnt) in enumerate(data_dict.items()):
+        pct = f"{100*cnt/n_total:.1f}%" if n_total else "—"
+        rc = "g0" if i % 2 == 0 else "g1"
+        rows_html.append(
+            f'<tr class="{rc}">'
+            f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
+            f'<td class="wrap">{label}</td>'
+            f'<td class="r">{cnt:,}</td>'
+            f'<td class="r" style="color:#94a3b8">{pct}</td>'
+            f'</tr>'
+        )
+    titulo_html = f'<div class="dtbl-title" style="margin-top:14px">{subtitulo}</div>' if subtitulo else ""
+    return (
+        titulo_html
+        + '<div class="dtbl-wrap"><table class="dtbl">'
+        f'<thead><tr><th class="c">#</th><th>{titulo_col}</th>'
+        '<th class="r">Leads</th><th class="r">%</th>'
+        '</tr></thead>'
+        '<tbody>' + "".join(rows_html) + '</tbody>'
+        '</table></div>'
+    )
+
+
 def _html_diagrama(etapas: dict, n_rep: int) -> str:
     """HTML do Workflow 37 portado de gerar_relatorio_html.py."""
     if not etapas or not n_rep:
@@ -1143,10 +1172,14 @@ st.markdown('<div class="sec">7. Segmentação — Reprovados</div>', unsafe_all
 col_s1, col_s2 = st.columns(2)
 
 with col_s1:
-    fig = _fig_barras_h(agg.get("top_emp_rep", {}),
-                        "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep)
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    emp_rep = agg.get("top_emp_rep", {})
+    if emp_rep:
+        fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        tbl = _html_tabela_ranking(emp_rep, "Razão Social", n_rep)
+        if tbl:
+            st.markdown(tbl, unsafe_allow_html=True)
     else:
         st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
 
@@ -1158,6 +1191,9 @@ with col_s2:
                             pct_base=n_cnae)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        tbl = _html_tabela_ranking(cnaes, "Descrição / Código CNAE", n_cnae)
+        if tbl:
+            st.markdown(tbl, unsafe_allow_html=True)
     else:
         st.info("Sem dados de CNAE bloqueado.")
 
@@ -1171,6 +1207,9 @@ with col_s3:
                             pct_base=n_cbo_r)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        tbl = _html_tabela_ranking(cbos_rep, "Código CBO", n_cbo_r)
+        if tbl:
+            st.markdown(tbl, unsafe_allow_html=True)
     else:
         st.info("Sem dados de CBO dos reprovados.")
 
@@ -1181,6 +1220,9 @@ with col_s4:
         fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
+        if tbl:
+            st.markdown(tbl, unsafe_allow_html=True)
     else:
         st.info("Sem dados de UF dos reprovados.")
 
@@ -1193,13 +1235,19 @@ n_ap = f.get("aprovados", 0)
 col_e, col_c = st.columns(2)
 
 with col_e:
-    fig = _fig_barras_h(agg.get("top_empregadores", {}),
-                        "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+    emp_ap = agg.get("top_empregadores", {})
+    fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    tbl = _html_tabela_ranking(emp_ap, "Razão Social", n_ap)
+    if tbl:
+        st.markdown(tbl, unsafe_allow_html=True)
 
 with col_c:
-    fig = _fig_barras_h(agg.get("top_cbos", {}),
-                        "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+    cbos_ap = agg.get("top_cbos", {})
+    fig = _fig_barras_h(cbos_ap, "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
+    tbl = _html_tabela_ranking(cbos_ap, "Código CBO", n_ap)
+    if tbl:
+        st.markdown(tbl, unsafe_allow_html=True)
