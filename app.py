@@ -336,9 +336,9 @@ def _fig_funil_rico(funil: dict):
 def _fig_evolucao(agg: dict, n_dias: int):
     if n_dias == 1:
         ev    = agg["evolucao_horaria"]
-        # Sempre mostra 00:00–23:00, mesmo que algumas horas não tenham leads
-        eixo  = [f"{h:02d}:00" for h in range(24)]
-        titulo = "Evolução Horária"
+        # Sempre mostra todos os 96 slots de 15 min (00:00–23:45)
+        eixo  = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 15)]
+        titulo = "Evolução por 15 min"
         xlab  = "Hora"
     else:
         ev    = agg["evolucao_diaria"]
