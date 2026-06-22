@@ -975,7 +975,7 @@ if not datas:
 
 data_min = datetime.strptime(datas[0],  "%Y%m%d").date()
 data_max = datetime.strptime(datas[-1], "%Y%m%d").date()
-d_ini_default = max(data_min, data_max - timedelta(days=6))
+d_ini_default = max(data_min, data_max - timedelta(days=1))
 
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
