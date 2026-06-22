@@ -333,7 +333,7 @@ def _fig_funil_rico(funil: dict):
     return fig
 
 
-def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None):
+def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list = None):
     slots = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 15)]
     if n_dias == 1:
         ev         = agg["evolucao_horaria"]
@@ -343,12 +343,17 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None):
         xaxis_extra = {}
         trace_mode = "lines+markers"
     else:
-        # Série temporal completa: 96 slots × N dias, tick só nas datas
-        dias_sorted = sorted(dias_raw or [], key=lambda d: d.get("data", ""))
+        # Série temporal completa: 96 slots × N dias, tick só nas datas.
+        # Usa datas_sel como base do eixo-x para garantir que todos os dias
+        # selecionados apareçam, mesmo que o JSON de algum dia não tenha carregado.
+        dia_map = {d.get("data", ""): d for d in (dias_raw or [])}
+        # Ordena pela string da data (YYYYMMDD) — mesma ordem de datas_sel
+        dias_base = sorted(datas_sel or list(dia_map.keys()))
         eixo, ev_ts, tickvals, ticktext = [], {}, [], []
-        for d in dias_sorted:
-            raw = d.get("data", "")                    # "20260620"
-            lbl = f"{raw[6:8]}/{raw[4:6]}"            # "20/06"
+        for dia_str in dias_base:
+            d    = dia_map.get(dia_str, {})           # {} se não carregou
+            raw  = dia_str                             # "20260620"
+            lbl  = f"{raw[6:8]}/{raw[4:6]}"           # "20/06"
             ev_h = d.get("evolucao_horaria", {})
             for slot in slots:
                 key = f"{lbl} {slot}"
@@ -1082,7 +1087,7 @@ with col_f:
 
 st.markdown('<div class="sec">2. Evolução Temporal</div>', unsafe_allow_html=True)
 
-fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw)
+fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
 if fig:
     st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
