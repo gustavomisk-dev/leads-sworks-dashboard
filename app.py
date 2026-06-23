@@ -1550,9 +1550,24 @@ if st.query_params.get("tv", "0") == "1":
     with _cp3:
         st.empty()
     with _cp4:
-        if st.button("Sair do modo TV", key="tv_exit", use_container_width=True):
-            st.query_params.clear()
-            st.rerun()
+        components.html("""
+        <style>
+        #tv-exit{display:block;width:100%;padding:.35rem .5rem;background:#262523;
+          color:#e2e8f0;text-align:center;text-decoration:none;border-radius:4px;
+          font-size:14px;border:1px solid #3a3734;cursor:pointer;box-sizing:border-box;
+          font-family:sans-serif}
+        #tv-exit:hover{background:#333}
+        </style>
+        <a id="tv-exit" href="#">Sair do modo TV</a>
+        <script>
+        document.getElementById('tv-exit').onclick=function(e){
+          e.preventDefault();
+          try{var fn=parent.document.exitFullscreen||parent.document.webkitExitFullscreen
+                       ||parent.document.mozCancelFullScreen;if(fn)fn.call(parent.document);}catch(ex){}
+          parent.window.location.href='/';
+        };
+        </script>
+        """, height=36)
 
     if _new_ini != _d_ini_tv:
         st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
