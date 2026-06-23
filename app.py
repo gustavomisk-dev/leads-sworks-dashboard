@@ -14,7 +14,7 @@ from collections import defaultdict
 # ── Pagina ───────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Leads SWorks",
+    page_title="Zilieads",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -1357,7 +1357,30 @@ col_title, col_picker = st.columns([1, 1])
 with col_title:
     _c_tit, _c_tv = st.columns([3, 1])
     with _c_tit:
-        st.markdown("## Leads SWorks")
+        st.markdown(
+            '<div style="display:flex;align-items:center;gap:6px;margin:4px 0 6px">'
+            '<svg width="38" height="36" viewBox="0 0 483 462" fill="none" '
+            'xmlns="http://www.w3.org/2000/svg">'
+            '<path d="M400.738 373.763C392.772 365.797 377.074 359.276 365.814 '
+            '359.276H214.153C202.893 359.276 198.725 351.579 204.876 342.134L'
+            '224.641 311.882C230.792 302.471 229.313 288.252 221.38 280.286L'
+            '178.053 236.959C170.087 228.993 158.524 230.17 152.306 239.581L'
+            '18.191 443.14C12.0063 452.551 16.1406 460.215 27.4009 460.215H'
+            '466.753C478.014 460.215 480.703 453.694 472.736 445.728L400.738 '
+            '373.729V373.763Z" fill="#FEC52E"/>'
+            '<path d="M219.065 100.939C230.325 100.939 234.46 108.636 228.275 '
+            '118.014L197.889 164.131C191.704 173.543 193.15 187.727 201.116 '
+            '195.693L244.174 238.751C252.14 246.717 263.669 245.508 269.854 '
+            '236.096L412.944 17.1424C419.095 7.73085 414.927 0 403.667 0H'
+            '10.5652C-0.695032 0 -3.38405 6.52066 4.58217 14.4869L76.5807 '
+            '86.4856C84.547 94.4518 100.244 100.972 111.504 100.972H219.065V'
+            '100.939Z" fill="#FEC52E"/>'
+            '</svg>'
+            '<span style="font-size:28px;font-weight:700;line-height:1;'
+            'color:#e2e8f0;letter-spacing:-0.5px">ilieads</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
             f'até {data_max.strftime("%d/%m/%Y")}</div>',
