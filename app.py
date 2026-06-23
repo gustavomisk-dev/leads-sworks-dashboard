@@ -274,7 +274,7 @@ section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!i
 .kpi-sub{font-size:15px!important}
 .dtbl{font-size:22px!important;width:100%}
 .dtbl th,.dtbl td{padding:10px 16px!important}
-.dtbl-title{font-size:26px!important;padding:12px 0!important}
+.dtbl-title{display:none!important}
 </style>"""
 
 # ── GitHub API ────────────────────────────────────────────────────────────────
@@ -1260,6 +1260,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig.update_traces(textfont=dict(size=25, color="#e2e8f0"))
             fig.update_layout(
                 height=450,
+                title=dict(text=""),
                 xaxis=dict(tickfont=_TV_AF),
                 yaxis=dict(tickfont=_TV_YTXT, automargin=True),
                 margin=dict(t=10, b=20, l=220, r=40),
@@ -1274,6 +1275,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 height=620,
                 title=dict(text=""),
                 margin=dict(t=120, b=20, l=10, r=20),
+                xaxis=dict(tickfont=_TV_AF),
+                yaxis=dict(tickfont=_TV_AF),
                 legend=dict(
                     orientation="h",
                     x=0.5, y=1.04,
