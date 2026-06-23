@@ -639,30 +639,32 @@ def _fig_mapa_ufs(ufs: dict):
     lats   = [_UF_CENTROIDS[uf][0] for uf, _ in pairs]
     lons   = [_UF_CENTROIDS[uf][1] for uf, _ in pairs]
     vals   = [v for _, v in pairs]
-    siglas = [uf for uf, _ in pairs]
-    hovers = [f"<b>{uf}</b>: {v:,} leads ({100*v/total:.1f}%)"
-              for uf, v in pairs]
-    sizes  = [14 + 41 * v / max_v for v in vals]
+    pcts   = [round(100 * v / total, 1) for _, v in pairs]
+    # Texto: sigla + quantidade na bolha
+    labels = [f"{uf}<br>{v:,}" for (uf, v), _ in zip(pairs, pcts)]
+    hovers = [f"<b>{uf}</b>: {v:,} leads ({p:.1f}%)"
+              for (uf, v), p in zip(pairs, pcts)]
+    sizes  = [16 + 44 * v / max_v for v in vals]
 
     fig = go.Figure(go.Scattergeo(
         lat=lats, lon=lons,
         mode="markers+text",
-        text=siglas,
+        text=labels,
         textposition="middle center",
-        textfont=dict(size=9, color="#0d0c0a"),
+        textfont=dict(size=8, color="#0d0c0a"),
         customdata=hovers,
         hovertemplate="%{customdata}<extra></extra>",
         marker=dict(
             size=sizes,
             color=vals,
             colorscale=[
-                [0.0, "rgba(30,58,138,0.40)"],
-                [0.4, "rgba(96,165,250,0.80)"],
+                [0.0, "rgba(30,58,138,0.45)"],
+                [0.4, "rgba(96,165,250,0.85)"],
                 [1.0, "#93c5fd"],
             ],
             showscale=True,
             colorbar=dict(
-                title=dict(text="%", font=dict(color="#94a3b8", size=13)),
+                title=dict(text="Leads", font=dict(color="#94a3b8", size=13)),
                 tickfont=dict(color="#94a3b8", size=12),
                 bgcolor="rgba(13,12,10,0.7)",
                 outlinecolor="rgba(255,255,255,0.1)",
@@ -671,7 +673,7 @@ def _fig_mapa_ufs(ufs: dict):
                 len=0.75,
                 x=1.0,
             ),
-            opacity=0.9,
+            opacity=0.88,
         ),
     ))
     fig.update_geos(
@@ -682,18 +684,18 @@ def _fig_mapa_ufs(ufs: dict):
         landcolor="#1c1a17",
         oceancolor=_BG,
         lakecolor=_BG,
-        coastlinecolor="rgba(255,255,255,0.15)",
-        coastlinewidth=0.8,
-        countrycolor="rgba(255,255,255,0.25)",
-        countrywidth=0.8,
+        coastlinecolor="rgba(255,255,255,0.20)",
+        coastlinewidth=1.0,
+        countrycolor="rgba(255,255,255,0.30)",
+        countrywidth=1.2,
         showcoastlines=True,
         showland=True,
         showocean=True,
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.20)",
-        subunitwidth=0.5,
+        subunitcolor="rgba(255,255,255,0.30)",
+        subunitwidth=1.0,
     )
     fig.update_layout(
         paper_bgcolor=_BG,
