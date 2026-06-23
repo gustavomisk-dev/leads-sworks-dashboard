@@ -1082,16 +1082,13 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         _tv_h("Etapas de Reprovação · Visão Detalhada", _periodo)
         etapas_d = _agg.get("etapas", {})
         if etapas_d and n_rep > 0:
-            c1, c2 = st.columns(2)
-            with c1:
-                html_d = _html_diagrama(etapas_d, n_rep)
-                if html_d:
-                    st.markdown(html_d, unsafe_allow_html=True)
-            with c2:
-                fig_d = _fig_etapas_split(etapas_d, n_rep)
-                if fig_d:
-                    fig_d.update_layout(height=540)
-                    st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
+            html_d = _html_diagrama(etapas_d, n_rep)
+            if html_d:
+                st.markdown(html_d, unsafe_allow_html=True)
+            fig_d = _fig_etapas_split(etapas_d, n_rep)
+            if fig_d:
+                fig_d.update_layout(height=320)
+                st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
