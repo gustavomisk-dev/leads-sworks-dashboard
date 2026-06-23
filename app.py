@@ -269,11 +269,11 @@ section.main>.block-container{
 [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
 iframe{height:0!important;min-height:0!important;overflow:hidden!important}
 section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
-.kpi-value{font-size:40px!important}
-.kpi-label{font-size:18px!important;letter-spacing:.06em}
-.kpi-sub{font-size:15px!important}
-.dtbl{font-size:22px!important;width:100%}
-.dtbl th,.dtbl td{padding:10px 16px!important}
+.kpi-value{font-size:43px!important}
+.kpi-label{font-size:21px!important;letter-spacing:.06em}
+.kpi-sub{font-size:18px!important}
+.dtbl{font-size:25px!important;width:100%}
+.dtbl th,.dtbl td{padding:12px 18px!important}
 .dtbl-title{display:none!important}
 </style>"""
 
@@ -476,6 +476,8 @@ def _fig_donut(d_status: dict):
             y=0.5,
             font=dict(size=14, color="#e2e8f0"),
             showarrow=False,
+            xanchor="center",
+            yanchor="middle",
         )],
     )
     return fig
@@ -1205,9 +1207,9 @@ def _tv_nav(slide: int) -> None:
 
 
 def _tv_h(titulo: str, periodo: str = "") -> None:
-    sub = f'<span style="color:#475569;font-size:20px;margin-left:12px">{periodo}</span>' if periodo else ""
+    sub = f'<span style="color:#475569;font-size:23px;margin-left:12px">{periodo}</span>' if periodo else ""
     st.markdown(
-        f'<div style="color:#FEC52E;font-size:25px;font-weight:700;'
+        f'<div style="color:#FEC52E;font-size:28px;font-weight:700;'
         f'border-bottom:1px solid #272420;padding-bottom:8px;margin-bottom:14px">'
         f'{titulo}{sub}</div>',
         unsafe_allow_html=True,
@@ -1220,11 +1222,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     n_rep = funil.get("reprovados", 0)
     n_ap  = funil.get("aprovados", 0)
 
-    # TV font constants — 25px so every label reads comfortably from 3 metres
-    _TV_TF   = dict(size=25, color="#FEC52E")
-    _TV_AF   = dict(size=25, color="#94a3b8")
-    _TV_TXT  = dict(size=25, color="rgba(255,255,255,0.92)")
-    _TV_YTXT = dict(size=25, color="#cbd5e1")
+    # TV font constants — 28px so every label reads comfortably from 3 metres
+    _TV_TF   = dict(size=28, color="#FEC52E")
+    _TV_AF   = dict(size=28, color="#94a3b8")
+    _TV_TXT  = dict(size=28, color="rgba(255,255,255,0.92)")
+    _TV_YTXT = dict(size=28, color="#cbd5e1")
 
     taxa  = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol   = fin.get("ValorContratacao", {})
@@ -1253,11 +1255,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(_kpi_html, unsafe_allow_html=True)
         fig = _fig_donut(funil.get("_d_status", {}))
         if fig:
-            fig.update_traces(textfont=dict(size=18))
-            fig.update_annotations(font_size=25)
+            fig.update_traces(textfont=dict(size=21))
+            fig.update_annotations(font_size=28)
             fig.update_layout(
-                height=430,
-                legend=dict(font=dict(size=20, color="#94a3b8")),
+                height=440,
+                legend=dict(font=dict(size=23, color="#94a3b8")),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
@@ -1266,13 +1268,13 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(_kpi_html, unsafe_allow_html=True)
         fig = _fig_funil_rico(funil)
         if fig:
-            fig.update_traces(textfont=dict(size=25, color="#e2e8f0"))
+            fig.update_traces(textfont=dict(size=28, color="#e2e8f0"))
             fig.update_layout(
-                height=450,
+                height=460,
                 title=dict(text=""),
                 xaxis=dict(tickfont=_TV_AF),
                 yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                margin=dict(t=10, b=20, l=220, r=40),
+                margin=dict(t=10, b=20, l=250, r=40),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
@@ -1293,7 +1295,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     bgcolor="rgba(15,14,11,0.88)",
                     bordercolor="rgba(255,255,255,0.10)",
                     borderwidth=1,
-                    font=dict(size=25, color="#94a3b8"),
+                    font=dict(size=28, color="#94a3b8"),
                 ),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1310,7 +1312,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _tv_h("Distribuição do Valor Contratado — Aprovados", periodo)
         fig = _fig_histograma(agg.get("valores_contratacao", []))
         if fig:
-            fig.update_annotations(font_size=22)
+            fig.update_annotations(font_size=25)
             fig.update_layout(
                 height=680,
                 title=dict(text="", font=_TV_TF),
@@ -1338,11 +1340,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 fig_d.update_layout(
                     height=580,
                     title=dict(text=""),
-                    uniformtext_minsize=22, uniformtext_mode="show",
+                    uniformtext_minsize=25, uniformtext_mode="show",
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    legend=dict(font=dict(size=22, color="#94a3b8")),
-                    margin=dict(t=10, b=80, l=20, r=40),
+                    legend=dict(font=dict(size=25, color="#94a3b8")),
+                    margin=dict(t=10, b=85, l=20, r=55),
                 )
                 st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
@@ -1356,11 +1358,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             if result_f:
                 fig_f, _ = result_f
                 fig_f.update_traces(
-                    textfont=dict(size=25, color="rgba(255,255,255,0.92)"),
+                    textfont=dict(size=28, color="rgba(255,255,255,0.92)"),
+                    selector=dict(type="bar"),
                 )
                 fig_f.update_layout(
                     height=580,
-                    title=dict(font=_TV_TF),
+                    title=dict(text=""),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
                     legend=dict(
@@ -1369,9 +1372,9 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                         bgcolor="rgba(15,14,11,0.85)",
                         bordercolor="rgba(255,255,255,0.08)",
                         borderwidth=1,
-                        font=dict(size=25),
+                        font=dict(size=28),
                     ),
-                    margin=dict(t=60, b=20, l=20, r=40),
+                    margin=dict(t=10, b=20, l=20, r=40),
                 )
                 st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
         else:
@@ -1384,12 +1387,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if fig:
             fig.update_traces(textfont=_TV_TXT)
             fig.update_layout(
-                uniformtext_minsize=22, uniformtext_mode="show",
+                uniformtext_minsize=25, uniformtext_mode="show",
                 height=620,
                 title=dict(text="", font=_TV_TF),
                 xaxis=dict(tickfont=_TV_AF),
                 yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                margin=dict(t=10, b=20, l=20, r=100),
+                margin=dict(t=10, b=20, l=20, r=120),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1408,7 +1411,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=100),
+                    margin=dict(t=10, b=20, l=20, r=120),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1418,11 +1421,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _tv_h("Leads com Bloqueio por Tipo", periodo)
         fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
         if fig:
-            fig.update_traces(textfont=dict(size=25, color="#e2e8f0"))
+            fig.update_traces(textfont=dict(size=28, color="#e2e8f0"))
             fig.update_layout(
                 height=520,
                 title=dict(text=""),
-                xaxis=dict(tickfont=dict(size=25, color="#cbd5e1")),
+                xaxis=dict(tickfont=dict(size=28, color="#cbd5e1")),
                 yaxis=dict(tickfont=_TV_AF),
                 margin=dict(t=10, b=40, l=80, r=80),
             )
@@ -1442,7 +1445,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=100),
+                    margin=dict(t=10, b=20, l=20, r=120),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1461,7 +1464,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=100),
+                    margin=dict(t=10, b=20, l=20, r=120),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1481,7 +1484,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=40),
+                    margin=dict(t=10, b=20, l=20, r=55),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1501,7 +1504,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=40),
+                    margin=dict(t=10, b=20, l=20, r=55),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1519,7 +1522,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=100),
+                    margin=dict(t=10, b=20, l=20, r=120),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
@@ -1537,7 +1540,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     title=dict(text="", font=_TV_TF),
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=40),
+                    margin=dict(t=10, b=20, l=20, r=55),
                 )
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
