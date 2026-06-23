@@ -592,6 +592,96 @@ def _sem_codigo(d: dict, max_chars: int = 50) -> dict:
     return out
 
 
+# CNAE_BLOCKLIST e CNAE_RED sempre disparam juntos; idem CBO — junta em um só rótulo.
+_MOTIVOS_DET_MERGE = {
+    "COMPANY_CNAE_BLOCKLIST": "CNAE Bloqueado",
+    "CNAE_RED":               "CNAE Bloqueado",
+    "CBO_BLOCKLIST":          "CBO Bloqueado",
+    "CBO_RED":                "CBO Bloqueado",
+}
+
+
+def _merge_motivos_det(d: dict) -> dict:
+    out: dict = {}
+    for k, v in d.items():
+        label = _MOTIVOS_DET_MERGE.get(k, k)
+        out[label] = out.get(label, 0) + v
+    return out
+
+
+# ── Mapa coroplético — UF dos Reprovados ──────────────────────────────────────
+
+_UF_IBGE_CODE = {
+    "RO": "11", "AC": "12", "AM": "13", "RR": "14", "PA": "15",
+    "AP": "16", "TO": "17", "MA": "21", "PI": "22", "CE": "23",
+    "RN": "24", "PB": "25", "PE": "26", "AL": "27", "SE": "28",
+    "BA": "29", "MG": "31", "ES": "32", "RJ": "33", "SP": "35",
+    "PR": "41", "SC": "42", "RS": "43", "MS": "50", "MT": "51",
+    "GO": "52", "DF": "53",
+}
+
+
+@st.cache_data(ttl=86400 * 30, show_spinner=False)
+def _load_brazil_geojson():
+    try:
+        r = requests.get(
+            "https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR"
+            "?formato=application/vnd.geo+json&qualidade=minima&divisao=estado",
+            timeout=15,
+        )
+        r.raise_for_status()
+        gj = r.json()
+        for f in gj.get("features", []):
+            raw = f.get("id") or f.get("properties", {}).get("codarea", "")
+            f["id"] = str(raw)
+        return gj
+    except Exception:
+        return None
+
+
+def _fig_mapa_ufs(ufs: dict):
+    geojson = _load_brazil_geojson()
+    if not geojson or not ufs:
+        return None
+    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_IBGE_CODE]
+    if not pairs:
+        return None
+    locations = [_UF_IBGE_CODE[uf] for uf, _ in pairs]
+    z_vals    = [v for _, v in pairs]
+    labels    = [f"{uf}: {v:,}" for uf, v in pairs]
+    fig = go.Figure(go.Choroplethmapbox(
+        geojson=geojson,
+        locations=locations,
+        z=z_vals,
+        featureidkey="id",
+        colorscale=[[0, "rgba(30,58,138,0.25)"], [0.4, "rgba(96,165,250,0.60)"], [1, "#93c5fd"]],
+        text=labels,
+        hovertemplate="%{text}<extra></extra>",
+        marker_line_color="rgba(255,255,255,0.12)",
+        marker_line_width=0.8,
+        showscale=True,
+        colorbar=dict(
+            title=dict(text="Leads", font=dict(color="#94a3b8", size=14)),
+            tickfont=dict(color="#94a3b8", size=13),
+            bgcolor="rgba(13,12,10,0.7)",
+            outlinecolor="rgba(255,255,255,0.1)",
+            outlinewidth=1,
+            thickness=16,
+        ),
+        zmin=0,
+    ))
+    fig.update_layout(
+        mapbox=dict(
+            style="carto-darkmatter",
+            center={"lat": -14.5, "lon": -52.0},
+            zoom=2.8,
+        ),
+        paper_bgcolor=_BG,
+        margin=dict(t=0, b=0, l=0, r=0),
+    )
+    return fig
+
+
 def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0,
                   show_abs: bool = False, show_pct: bool = True):
     items = list(data_dict.items())[:n]
@@ -1259,11 +1349,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(_kpi_html, unsafe_allow_html=True)
         fig = _fig_donut(funil.get("_d_status", {}))
         if fig:
-            fig.update_traces(textfont=dict(size=21))
-            fig.update_annotations(font_size=28)
+            fig.update_traces(textfont=dict(size=27))
+            fig.update_annotations(font_size=30)
             fig.update_layout(
                 height=440,
-                legend=dict(font=dict(size=23, color="#94a3b8")),
+                legend=dict(font=dict(size=30, color="#94a3b8")),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
@@ -1272,7 +1362,10 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(_kpi_html, unsafe_allow_html=True)
         fig = _fig_funil_rico(funil)
         if fig:
-            fig.update_traces(textfont=dict(size=28, color="#e2e8f0"))
+            fig.update_traces(
+                textfont=dict(size=32, color="#e2e8f0"),
+                texttemplate="%{value:,}  %{percentInitial:.1%}",
+            )
             fig.update_layout(
                 height=460,
                 title=dict(text=""),
@@ -1403,7 +1496,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     elif slide == 8:
         _tv_h("Motivos de Reprovação — Detalhado", periodo)
-        mot_det = agg.get("top_motivos_det", {})
+        mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
         if mot_det:
             n_det = sum(mot_det.values())
             fig = _fig_barras_h(mot_det, "Motivo Detalhado", "#f97316", pct_base=n_det)
@@ -1458,18 +1551,23 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _tv_h("UF dos Reprovados", periodo)
         ufs = agg.get("top_ufs", {})
         if ufs:
-            n_ufs = sum(ufs.values())
-            fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=27, pct_base=n_ufs)
+            fig = _fig_mapa_ufs(ufs)
             if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=120),
-                )
+                fig.update_layout(height=600)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                n_ufs = sum(ufs.values())
+                fig2 = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=27, pct_base=n_ufs)
+                if fig2:
+                    fig2.update_traces(textfont=_TV_TXT)
+                    fig2.update_layout(
+                        height=620,
+                        title=dict(text="", font=_TV_TF),
+                        xaxis=dict(tickfont=_TV_AF),
+                        yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                        margin=dict(t=10, b=20, l=20, r=120),
+                    )
+                    st.plotly_chart(fig2, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de UF.")
 
@@ -1959,7 +2057,7 @@ with col_m1:
         st.info("Sem dados de motivos.")
 
 with col_m2:
-    mot_det = agg.get("top_motivos_det", {})
+    mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
     if mot_det:
         n_det = sum(mot_det.values())
         fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
