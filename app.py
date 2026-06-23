@@ -609,99 +609,91 @@ def _merge_motivos_det(d: dict) -> dict:
     return out
 
 
-# ── Mapa coroplético — UF dos Reprovados ──────────────────────────────────────
-# Usa go.Choropleth com GeoJSON da IBGE (cacheado 30 dias).
-# Renderiza como SVG vetorial — sem tiles externos, carregamento instantâneo.
+# ── Mapa de bolhas — UF dos Reprovados ───────────────────────────────────────
+# go.Scattergeo usa dados Natural Earth embutidos no Plotly (zero rede).
+# showsubunits=True exibe bordas dos estados brasileiros sem GeoJSON externo.
 
-_UF_IBGE_CODE = {
-    "RO": "11", "AC": "12", "AM": "13", "RR": "14", "PA": "15",
-    "AP": "16", "TO": "17", "MA": "21", "PI": "22", "CE": "23",
-    "RN": "24", "PB": "25", "PE": "26", "AL": "27", "SE": "28",
-    "BA": "29", "MG": "31", "ES": "32", "RJ": "33", "SP": "35",
-    "PR": "41", "SC": "42", "RS": "43", "MS": "50", "MT": "51",
-    "GO": "52", "DF": "53",
+_UF_CENTROIDS = {
+    "AC": (-9.02, -70.81), "AL": (-9.57, -36.78), "AM": (-3.47, -65.10),
+    "AP": (0.90,  -52.00), "BA": (-12.97,-41.75), "CE": (-5.20, -39.53),
+    "DF": (-15.78,-47.93), "ES": (-19.19,-40.34), "GO": (-15.98,-49.86),
+    "MA": (-5.42, -45.44), "MG": (-18.10,-44.38), "MS": (-20.51,-54.54),
+    "MT": (-12.64,-55.42), "PA": (-3.79, -52.48), "PB": (-7.28, -36.72),
+    "PE": (-8.38, -37.86), "PI": (-7.72, -42.73), "PR": (-24.89,-51.55),
+    "RJ": (-22.25,-42.66), "RN": (-5.81, -36.59), "RO": (-10.83,-63.34),
+    "RR": (1.99,  -61.33), "RS": (-30.17,-53.50), "SC": (-27.45,-50.95),
+    "SE": (-10.57,-37.45), "SP": (-22.19,-48.79), "TO": (-10.18,-48.33),
 }
-
-
-_IBGE_TO_UF = {v: k for k, v in _UF_IBGE_CODE.items()}
-
-
-@st.cache_data(ttl=86400 * 30, show_spinner=False)
-def _load_brazil_geojson():
-    url = ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR"
-           "?formato=application/vnd.geo+json&qualidade=minima&divisao=estado")
-    try:
-        r = requests.get(url, timeout=15)
-        r.raise_for_status()
-        gj = r.json()
-        features = gj.get("features", [])
-        # GeoJSON de estados deve ter exatamente 27 features
-        if len(features) < 25 or len(features) > 30:
-            return None
-        for f in features:
-            props = f.get("properties") or {}
-            # Extrai o código numérico do estado (2 dígitos IBGE)
-            raw = f.get("id") or props.get("codarea") or props.get("codigo") or ""
-            try:
-                code = str(int(str(raw)))   # "011" → "11",  11 → "11"
-            except (ValueError, TypeError):
-                code = str(raw)
-            if f.get("properties") is None:
-                f["properties"] = {}
-            f["properties"]["codarea"] = code
-            f["properties"]["sigla"] = _IBGE_TO_UF.get(code, "")
-        return gj
-    except Exception:
-        return None
 
 
 def _fig_mapa_ufs(ufs: dict):
     if not ufs:
         return None
-    geojson = _load_brazil_geojson()
-    if not geojson:
-        return None
-
     total = sum(ufs.values()) or 1
-    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_IBGE_CODE]
+    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_CENTROIDS]
     if not pairs:
         return None
+    pairs = sorted(pairs, key=lambda x: -x[1])
+    max_v = pairs[0][1]
 
-    locations = [uf for uf, _ in pairs]           # siglas 2 letras
-    z_pct     = [round(100 * v / total, 1) for _, v in pairs]
-    hovers    = [f"<b>{uf}</b><br>{v:,} leads ({100*v/total:.1f}%)"
-                 for uf, v in pairs]
+    lats   = [_UF_CENTROIDS[uf][0] for uf, _ in pairs]
+    lons   = [_UF_CENTROIDS[uf][1] for uf, _ in pairs]
+    vals   = [v for _, v in pairs]
+    siglas = [uf for uf, _ in pairs]
+    hovers = [f"<b>{uf}</b>: {v:,} leads ({100*v/total:.1f}%)"
+              for uf, v in pairs]
+    sizes  = [14 + 41 * v / max_v for v in vals]
 
-    fig = go.Figure(go.Choropleth(
-        geojson=geojson,
-        locations=locations,
-        z=z_pct,
-        featureidkey="properties.sigla",   # campo que nós mesmos setamos
-        colorscale=[
-            [0.0, "rgba(30,58,138,0.20)"],
-            [0.3, "rgba(96,165,250,0.65)"],
-            [1.0, "#93c5fd"],
-        ],
-        text=hovers,
-        hovertemplate="%{text}<extra></extra>",
-        marker_line_color="rgba(255,255,255,0.20)",
-        marker_line_width=0.8,
-        showscale=True,
-        colorbar=dict(
-            title=dict(text="%", font=dict(color="#94a3b8", size=13)),
-            tickfont=dict(color="#94a3b8", size=12),
-            bgcolor="rgba(13,12,10,0.7)",
-            outlinecolor="rgba(255,255,255,0.1)",
-            outlinewidth=1,
-            thickness=14,
-            len=0.75,
+    fig = go.Figure(go.Scattergeo(
+        lat=lats, lon=lons,
+        mode="markers+text",
+        text=siglas,
+        textposition="middle center",
+        textfont=dict(size=9, color="#0d0c0a"),
+        customdata=hovers,
+        hovertemplate="%{customdata}<extra></extra>",
+        marker=dict(
+            size=sizes,
+            color=vals,
+            colorscale=[
+                [0.0, "rgba(30,58,138,0.40)"],
+                [0.4, "rgba(96,165,250,0.80)"],
+                [1.0, "#93c5fd"],
+            ],
+            showscale=True,
+            colorbar=dict(
+                title=dict(text="%", font=dict(color="#94a3b8", size=13)),
+                tickfont=dict(color="#94a3b8", size=12),
+                bgcolor="rgba(13,12,10,0.7)",
+                outlinecolor="rgba(255,255,255,0.1)",
+                outlinewidth=1,
+                thickness=14,
+                len=0.75,
+                x=1.0,
+            ),
+            opacity=0.9,
         ),
-        zmin=0,
     ))
     fig.update_geos(
+        scope="south america",
         fitbounds="locations",
-        visible=False,
+        resolution=50,
         bgcolor=_BG,
+        landcolor="#1c1a17",
+        oceancolor=_BG,
+        lakecolor=_BG,
+        coastlinecolor="rgba(255,255,255,0.15)",
+        coastlinewidth=0.8,
+        countrycolor="rgba(255,255,255,0.25)",
+        countrywidth=0.8,
+        showcoastlines=True,
+        showland=True,
+        showocean=True,
+        showlakes=False,
+        showrivers=False,
+        showsubunits=True,
+        subunitcolor="rgba(255,255,255,0.20)",
+        subunitwidth=0.5,
     )
     fig.update_layout(
         paper_bgcolor=_BG,
