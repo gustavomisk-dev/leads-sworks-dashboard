@@ -4,6 +4,7 @@ Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
 import json
+import time
 import requests
 import streamlit as st
 import plotly.graph_objects as go
@@ -974,8 +975,7 @@ import streamlit.components.v1 as _stcmp
 
 
 def _tv_nav(slide: int) -> None:
-    """Barra de progresso + indicadores + auto-avanço JS."""
-    prox = (slide + 1) % _TV_N_SLIDES
+    """Barra de progresso + indicadores de slide (sem JS — avanço via time.sleep+rerun)."""
     dots = "".join(
         f'<div style="width:8px;height:8px;border-radius:50%;background:'
         f'{"#FEC52E" if i == slide else "#2a2820"};flex-shrink:0"></div>'
@@ -992,13 +992,6 @@ def _tv_nav(slide: int) -> None:
     <div style="position:fixed;top:8px;right:60px;color:#475569;
          font-size:11px;font-family:monospace;z-index:9999">
       {slide+1}/{_TV_N_SLIDES}</div>
-    <script>
-    setTimeout(function(){{
-      var p=new URLSearchParams(window.parent.location.search);
-      p.set('tv','1');p.set('slide','{prox}');
-      window.parent.location.search=p.toString();
-    }},{_TV_INTERVAL_S*1000});
-    </script>
     """, height=0)
 
 
@@ -1022,6 +1015,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     footer{display:none!important}
     #MainMenu{display:none!important}
     [data-testid="stDeployButton"]{display:none!important}
+    [data-testid="stStatusWidget"]{display:none!important}
     section.main>.block-container{padding:.5rem 1.5rem 2.5rem!important;max-width:100%!important}
     </style>
     """, unsafe_allow_html=True)
@@ -1277,7 +1271,9 @@ if st.query_params.get("tv", "0") == "1":
         _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
         len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
     )
-    st.stop()
+    time.sleep(_TV_INTERVAL_S)
+    st.query_params["slide"] = str((_tv_slide + 1) % _TV_N_SLIDES)
+    st.rerun()
 
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
