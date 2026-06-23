@@ -252,7 +252,7 @@ _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=13, color="#94a3b8")
 
-_TV_N_SLIDES   = 12
+_TV_N_SLIDES   = 14
 _TV_INTERVAL_S = 15  # seconds per slide
 
 _TV_CSS = """<style>
@@ -450,7 +450,7 @@ def _fig_donut(d_status: dict):
         marker=dict(colors=colors, line=dict(color="#0d0c0a", width=2)),
         hole=0.46,
         textinfo="percent",          # only % on slices (no label — cleaner)
-        domain=dict(x=[0, 0.60]),   # pie in left 60%
+        domain=dict(x=[0, 0.55]),   # pie in left 55%
         textfont=dict(size=11, color="#e2e8f0"),
         hovertemplate="%{label}: <b>%{value:,}</b> (%{percent})<extra></extra>",
     ))
@@ -458,17 +458,17 @@ def _fig_donut(d_status: dict):
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Distribuição por Status", font=_TF),
         legend=dict(
-            font=dict(size=12, color="#94a3b8"),
+            font=dict(size=13, color="#94a3b8"),
             bgcolor="rgba(13,12,10,0.85)",
             bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
             orientation="v",
-            x=0.64, y=0.50,         # starts at 64%, well outside the pie
+            x=0.58, y=0.50,         # starts at 58%, well outside the pie
             xanchor="left", yanchor="middle",
         ),
         margin=dict(t=50, b=10, l=10, r=10), height=360,
         annotations=[dict(
             text=f"<b>{total:,}</b><br>leads",
-            x=0.30,                  # center of pie domain [0, 0.60]
+            x=0.275,                 # center of pie domain [0, 0.55]
             y=0.5,
             font=dict(size=14, color="#e2e8f0"),
             showarrow=False,
@@ -582,7 +582,8 @@ def _sem_codigo(d: dict) -> dict:
     return out
 
 
-def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0):
+def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0,
+                  show_abs: bool = False):
     items = list(data_dict.items())[:n]
     if not items:
         return None
@@ -591,7 +592,10 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
     max_v  = max(values) if values else 1
     if pct_base > 0:
         shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in values]
-        texts  = [f"{100*v/pct_base:.1f}%" for v in values]
+        if show_abs:
+            texts = [f"{v:,}  |  {100*v/pct_base:.1f}%" for v in values]
+        else:
+            texts  = [f"{100*v/pct_base:.1f}%" for v in values]
         tpos   = "inside"
     else:
         shades = color
@@ -1202,6 +1206,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     n_rep = funil.get("reprovados", 0)
     n_ap  = funil.get("aprovados", 0)
 
+    # TV font constants — large enough to read comfortably from 3 metres away
+    _TV_TF   = dict(size=22, color="#FEC52E")                          # chart title font for TV
+    _TV_AF   = dict(size=17, color="#94a3b8")                          # axis tick font for TV
+    _TV_TXT  = dict(size=19, color="rgba(255,255,255,0.92)")           # bar text font for TV
+    _TV_YTXT = dict(size=17, color="#cbd5e1")                          # y-axis label font for TV
+
     if slide == 0:
         _tv_h("KPIs · Distribuição por Status · Funil de Conversão", periodo)
         taxa  = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
@@ -1242,14 +1252,18 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
         if fig:
             fig.update_layout(
-                height=650, title=dict(text=""),
-                margin=dict(t=20, b=20, l=10, r=20),
-                legend=dict(orientation="v", x=0.70, y=1,
-                            xanchor="left", yanchor="top",
-                            bgcolor="rgba(15,14,11,0.80)",
-                            bordercolor="rgba(255,255,255,0.08)",
-                            borderwidth=1,
-                            font=dict(size=14)),
+                height=680,
+                title=dict(text=""),
+                margin=dict(t=10, b=20, l=10, r=20),
+                legend=dict(
+                    orientation="v",
+                    x=0.01, y=0.99,
+                    xanchor="left", yanchor="top",
+                    bgcolor="rgba(15,14,11,0.88)",
+                    bordercolor="rgba(255,255,255,0.10)",
+                    borderwidth=1,
+                    font=dict(size=22, color="#94a3b8"),  # big enough to read from 3m
+                ),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
@@ -1267,167 +1281,218 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 3:
-        _tv_h("Etapas de Reprovação · Visão Detalhada", periodo)
+        _tv_h("Etapas de Reprovação — Visão Detalhada", periodo)
         etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
-            html_d = _html_diagrama(etapas_d, n_rep)
-            if html_d:
-                st.markdown(html_d, unsafe_allow_html=True)
             fig_d = _fig_etapas_split(etapas_d, n_rep)
             if fig_d:
-                fig_d.update_traces(textposition="outside", cliponaxis=False)
-                fig_d.update_layout(height=320, margin=dict(r=160))
+                fig_d.update_traces(
+                    textfont=_TV_TXT,
+                    textposition="outside",
+                    cliponaxis=False,
+                )
+                fig_d.update_layout(
+                    height=580,
+                    title=dict(font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=60, b=20, l=20, r=200),
+                )
                 st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
     elif slide == 4:
-        _tv_h("Etapas de Reprovação · Visão de Funil", periodo)
+        _tv_h("Etapas de Reprovação — Visão de Funil", periodo)
         etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
-            html_d = _html_diagrama(etapas_d, n_rep)
-            if html_d:
-                st.markdown(html_d, unsafe_allow_html=True)
             result_f = _fig_funil_etapa(etapas_d, n_rep)
             if result_f:
                 fig_f, _ = result_f
+                fig_f.update_traces(
+                    textfont=dict(size=17, color="rgba(255,255,255,0.92)"),
+                )
                 fig_f.update_layout(
-                    height=430,
-                    legend=dict(orientation="v", x=0.82, y=0.04,
-                                xanchor="left", yanchor="bottom",
-                                bgcolor="rgba(15,14,11,0.80)",
-                                bordercolor="rgba(255,255,255,0.08)",
-                                borderwidth=1, font=dict(size=13)),
-                    margin=dict(b=50),
+                    height=580,
+                    title=dict(font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    legend=dict(
+                        orientation="v", x=0.82, y=0.04,
+                        xanchor="left", yanchor="bottom",
+                        bgcolor="rgba(15,14,11,0.85)",
+                        bordercolor="rgba(255,255,255,0.08)",
+                        borderwidth=1,
+                        font=dict(size=18),
+                    ),
+                    margin=dict(t=60, b=20, l=20, r=40),
                 )
                 st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
     elif slide == 5:
-        _tv_h("Motivos de Reprovação — Alto Nível e Detalhado", periodo)
-        c1, c2 = st.columns(2)
-        with c1:
-            fig = _fig_barras_h(agg.get("top_motivos", {}),
-                                "Motivo — Alto Nível", "#ef4444", pct_base=n_rep)
-            if fig:
-                fig.update_layout(height=500)
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            else:
-                st.info("Sem dados de motivos.")
-        with c2:
-            mot_det = agg.get("top_motivos_det", {})
-            if mot_det:
-                n_det = sum(mot_det.values())
-                fig = _fig_barras_h(mot_det, "Motivo — Detalhado", "#f97316", pct_base=n_det)
-                if fig:
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            else:
-                st.info("Sem dados de motivos detalhados.")
+        _tv_h("Motivos de Reprovação — Alto Nível", periodo)
+        mot = agg.get("top_motivos", {})
+        fig = _fig_barras_h(mot, "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
+        if fig:
+            fig.update_traces(textfont=_TV_TXT)
+            fig.update_layout(
+                height=620,
+                title=dict(text="", font=_TV_TF),
+                xaxis=dict(tickfont=_TV_AF),
+                yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                margin=dict(t=10, b=20, l=20, r=100),
+            )
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de motivos.")
 
     elif slide == 6:
+        _tv_h("Motivos de Reprovação — Detalhado", periodo)
+        mot_det = agg.get("top_motivos_det", {})
+        if mot_det:
+            n_det = sum(mot_det.values())
+            fig = _fig_barras_h(mot_det, "Motivo Detalhado", "#f97316", pct_base=n_det)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=100),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de motivos detalhados.")
+
+    elif slide == 7:
         _tv_h("Leads com Bloqueio por Tipo", periodo)
         fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
         if fig:
-            fig.update_layout(height=500, margin=dict(t=40, b=40, l=80, r=80))
+            fig.update_traces(textfont=dict(size=20, color="#e2e8f0"))
+            fig.update_layout(
+                height=520,
+                title=dict(font=_TV_TF),
+                xaxis=dict(tickfont=dict(size=18, color="#cbd5e1")),
+                yaxis=dict(tickfont=_TV_AF),
+                margin=dict(t=60, b=40, l=80, r=80),
+            )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de bloqueios.")
 
-    elif slide == 7:
-        _tv_h("Top Empregadores dos Reprovados · UF dos Reprovados", periodo)
-        c1, c2 = st.columns(2)
-        with c1:
-            emp_rep = agg.get("top_emp_rep", {})
-            if emp_rep:
-                fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep)
-                if fig:
-                    fig.update_layout(height=480)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            else:
-                st.info("Sem dados de empregadores dos reprovados.")
-        with c2:
-            ufs = agg.get("top_ufs", {})
-            if ufs:
-                n_ufs = sum(ufs.values())
-                fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=10, pct_base=n_ufs)
-                if fig:
-                    fig.update_layout(height=480)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            else:
-                st.info("Sem dados de UF.")
-
     elif slide == 8:
+        _tv_h("Top Empregadores dos Reprovados", periodo)
+        emp_rep = agg.get("top_emp_rep", {})
+        if emp_rep:
+            fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=100),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de empregadores dos reprovados.")
+
+    elif slide == 9:
+        _tv_h("UF dos Reprovados", periodo)
+        ufs = agg.get("top_ufs", {})
+        if ufs:
+            n_ufs = sum(ufs.values())
+            fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=27, pct_base=n_ufs)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=100),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de UF.")
+
+    elif slide == 10:
         _tv_h("CNAEs Bloqueados dos Reprovados", periodo)
         cnaes = agg.get("top_cnaes", {})
         if cnaes:
             n_cnae = sum(cnaes.values())
-            c1, c2 = st.columns(2)
-            with c1:
-                fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados", "#eab308", pct_base=n_cnae)
-                if fig:
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            with c2:
-                tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae,
-                                           code_col_title="Código CNAE")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+            fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados", "#eab308",
+                                pct_base=n_cnae, show_abs=True)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=40),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de CNAE bloqueado.")
 
-    elif slide == 9:
+    elif slide == 11:
         _tv_h("CBOs Bloqueados dos Reprovados", periodo)
         cbos_rep = agg.get("top_cbos_rep", {})
         if cbos_rep:
             n_cbo_r = sum(cbos_rep.values())
-            c1, c2 = st.columns(2)
-            with c1:
-                fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados", "#a855f7", pct_base=n_cbo_r)
-                if fig:
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            with c2:
-                tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r,
-                                           code_col_title="Código CBO")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+            fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados", "#a855f7",
+                                pct_base=n_cbo_r, show_abs=True)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=40),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de CBO dos reprovados.")
 
-    elif slide == 10:
+    elif slide == 12:
         _tv_h("Top Empregadores dos Aprovados", periodo)
         emp_ap = agg.get("top_empregadores", {})
         if emp_ap:
-            c1, c2 = st.columns(2)
-            with c1:
-                fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
-                if fig:
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            with c2:
-                tbl = _html_tabela_ranking(emp_ap, "Razão Social", n_ap)
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+            fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=100),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de empregadores dos aprovados.")
 
-    elif slide == 11:
+    elif slide == 13:
         _tv_h("Top CBOs dos Aprovados", periodo)
         cbos_ap = agg.get("top_cbos", {})
         if cbos_ap:
-            c1, c2 = st.columns(2)
-            with c1:
-                fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
-                if fig:
-                    fig.update_layout(height=500)
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            with c2:
-                tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap,
-                                           code_col_title="Código CBO")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+            fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+            if fig:
+                fig.update_traces(textfont=_TV_TXT)
+                fig.update_layout(
+                    height=620,
+                    title=dict(text="", font=_TV_TF),
+                    xaxis=dict(tickfont=_TV_AF),
+                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    margin=dict(t=10, b=20, l=20, r=40),
+                )
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de CBO dos aprovados.")
 
