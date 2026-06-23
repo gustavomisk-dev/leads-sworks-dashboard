@@ -3,13 +3,17 @@ Dashboard de leads SWorks — Streamlit Community Cloud.
 Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
+import hashlib
+import hmac
 import json
 import time
+import bcrypt
 import requests
 import streamlit as st
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from collections import defaultdict
+from streamlit_cookies_controller import CookieController
 
 # ── Pagina ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +81,133 @@ except Exception:
 
 _HEADERS_RAW  = {"Authorization": f"Bearer {_TOKEN}", "Accept": "application/vnd.github.v3.raw"}
 _HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}"}
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+_COOKIE_NAME    = "zileads_session"
+_COOKIE_MAX_AGE = 86400 * 7   # 7 dias
+_login_attempts: dict = {}    # {email: {"count": int, "blocked_until": float|None}}
+
+_SVG_Z = (
+    '<svg viewBox="0 0 483 462" xmlns="http://www.w3.org/2000/svg" '
+    'style="height:52px;width:auto;display:block;margin:0 auto 4px">'
+    '<path d="M400.738 373.763C392.772 365.797 377.074 359.276 365.814 '
+    '359.276H214.153C202.893 359.276 198.725 351.579 204.876 342.134L'
+    '224.641 311.882C230.792 302.471 229.313 288.252 221.38 280.286L'
+    '178.053 236.959C170.087 228.993 158.524 230.17 152.306 239.581L'
+    '18.191 443.14C12.0063 452.551 16.1406 460.215 27.4009 460.215H'
+    '466.753C478.014 460.215 480.703 453.694 472.736 445.728L400.738 373.729V373.763Z" fill="#FEC52E"/>'
+    '<path d="M219.065 100.939C230.325 100.939 234.46 108.636 228.275 '
+    '118.014L197.889 164.131C191.704 173.543 193.15 187.727 201.116 '
+    '195.693L244.174 238.751C252.14 246.717 263.669 245.508 269.854 '
+    '236.096L412.944 17.1424C419.095 7.73085 414.927 0 403.667 0H'
+    '10.5652C-0.695032 0 -3.38405 6.52066 4.58217 14.4869L76.5807 '
+    '86.4856C84.547 94.4518 100.244 100.972 111.504 100.972H219.065V100.939Z" fill="#FEC52E"/>'
+    '</svg>'
+)
+
+
+def _session_secret() -> str:
+    try:
+        return st.secrets["auth"]["secret"]
+    except Exception:
+        raise RuntimeError("auth.secret não configurado em Streamlit Secrets.")
+
+
+def _make_token(email: str) -> str:
+    expires = int(time.time()) + _COOKIE_MAX_AGE
+    msg = f"{email}:{expires}"
+    sig = hmac.new(_session_secret().encode(), msg.encode(), hashlib.sha256).hexdigest()
+    return f"{msg}:{sig}"
+
+
+def _verify_token(token: str) -> str | None:
+    """Retorna email se token válido, None caso contrário."""
+    try:
+        email, expires_str, sig = token.rsplit(":", 2)
+        if time.time() > int(expires_str):
+            return None
+        expected = hmac.new(
+            _session_secret().encode(),
+            f"{email}:{expires_str}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return email if hmac.compare_digest(sig, expected) else None
+    except Exception:
+        return None
+
+
+def _find_user(email: str) -> dict | None:
+    try:
+        for u in st.secrets["auth"]["users"].values():
+            if str(u.get("email", "")).lower() == email.strip().lower():
+                return dict(u)
+    except Exception:
+        pass
+    return None
+
+
+def _check_password(password: str, hash_str: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode(), hash_str.encode())
+    except Exception:
+        return False
+
+
+def _login_page(cookies: CookieController) -> None:
+    st.markdown("""<style>
+    body,[data-testid="stAppViewContainer"]{background:#0a0908!important}
+    [data-testid="stHeader"],footer,#MainMenu{display:none!important}
+    [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
+    div[data-testid="stForm"]{background:#141210;border:1px solid #272420;
+        border-radius:12px;padding:28px 24px}
+    </style>""", unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1, 1.1, 1])
+    with col:
+        st.markdown(
+            f'<div style="text-align:center;margin:56px 0 28px">'
+            f'{_SVG_Z}'
+            f'<div style="font-size:28px;font-weight:700;color:#e2e8f0;'
+            f'letter-spacing:-0.5px;margin-top:6px">ilieads</div>'
+            f'<div style="font-size:13px;color:#475569;margin-top:4px">Dashboard de Leads</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        with st.form("login_form", border=False):
+            email_in = st.text_input("E-mail", placeholder="seu@zilicred.com.br")
+            senha_in = st.text_input("Senha", type="password")
+            entrar   = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+
+        if entrar:
+            attempt = _login_attempts.get(email_in, {"count": 0, "blocked_until": None})
+            bu = attempt.get("blocked_until")
+            if bu and time.time() < bu:
+                mins = max(1, int((bu - time.time()) / 60))
+                st.error(f"Acesso bloqueado. Tente novamente em {mins} minuto(s).")
+            else:
+                user  = _find_user(email_in)
+                pw_ok = user is not None and _check_password(senha_in, user.get("password_hash", ""))
+                if pw_ok:
+                    _login_attempts.pop(email_in, None)
+                    cookies.set(_COOKIE_NAME, _make_token(email_in), max_age=_COOKIE_MAX_AGE)
+                    st.session_state.update({
+                        "logged_in":    True,
+                        "user_email":   email_in,
+                        "display_name": user.get("display_name", email_in),
+                        "_cookie_set":  True,
+                        "_cookie_checked": True,
+                    })
+                    st.rerun()
+                else:
+                    attempt["count"] = attempt.get("count", 0) + 1
+                    if attempt["count"] >= 3:
+                        attempt["blocked_until"] = time.time() + 3600
+                    _login_attempts[email_in] = attempt
+                    st.error("E-mail ou senha incorretos.")
+
+    st.stop()
+
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -1300,6 +1431,46 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     _tv_nav(slide)
 
 
+# ── Autenticação ─────────────────────────────────────────────────────────────
+
+_cookies = CookieController()
+
+if not st.session_state.get("logged_in"):
+    token = _cookies.get(_COOKIE_NAME)
+    if token is None and not st.session_state.get("_cookie_checked"):
+        # Primeira renderização: cookie controller ainda não leu o cookie — aguarda
+        st.session_state["_cookie_checked"] = True
+        st.markdown("""<style>
+        body,[data-testid="stAppViewContainer"]{background:#0a0908!important}
+        [data-testid="stHeader"],footer,#MainMenu{display:none!important}
+        </style>""", unsafe_allow_html=True)
+        st.stop()
+    if token:
+        email_from_cookie = _verify_token(token)
+        if email_from_cookie:
+            user_from_cookie = _find_user(email_from_cookie)
+            if user_from_cookie:
+                st.session_state.update({
+                    "logged_in":    True,
+                    "user_email":   email_from_cookie,
+                    "display_name": user_from_cookie.get("display_name", email_from_cookie),
+                    "_cookie_set":  True,
+                    "_cookie_checked": True,
+                })
+                st.rerun()
+        _cookies.remove(_COOKIE_NAME)
+    st.session_state["_cookie_checked"] = True
+    _login_page(_cookies)
+
+if not st.session_state.get("_cookie_set"):
+    try:
+        _cookies.set(_COOKIE_NAME, _make_token(st.session_state["user_email"]),
+                     max_age=_COOKIE_MAX_AGE)
+    except RuntimeError as e:
+        st.error(str(e))
+        st.stop()
+    st.session_state["_cookie_set"] = True
+
 # ── Carrega datas disponiveis ─────────────────────────────────────────────────
 
 datas = listar_datas()
@@ -1392,7 +1563,7 @@ if st.query_params.get("tv", "0") == "1":
 col_title, col_picker = st.columns([1, 1])
 
 with col_title:
-    _c_tit, _c_tv = st.columns([3, 1])
+    _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
     with _c_tit:
         st.markdown(
             '<div style="display:flex;align-items:flex-end;gap:4px;margin:4px 0 6px">'
@@ -1429,6 +1600,13 @@ with col_title:
         if st.button("📺 Modo TV", use_container_width=True):
             st.query_params["tv"] = "1"
             st.query_params["slide"] = "0"
+            st.rerun()
+    with _c_out:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if st.button("Sair", use_container_width=True):
+            _cookies.remove(_COOKIE_NAME)
+            for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
+                st.session_state.pop(_k, None)
             st.rerun()
 
 with col_picker:
