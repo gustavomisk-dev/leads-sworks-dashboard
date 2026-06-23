@@ -623,7 +623,6 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
         yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
         margin=dict(t=50, b=20, l=20, r=60), height=h,
-        uniformtext_minsize=11, uniformtext_mode="hide",
     )
     return fig
 
@@ -1368,6 +1367,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if fig:
             fig.update_traces(textfont=_TV_TXT)
             fig.update_layout(
+                uniformtext_minsize=22, uniformtext_mode="show",
                 height=620,
                 title=dict(text="", font=_TV_TF),
                 xaxis=dict(tickfont=_TV_AF),
