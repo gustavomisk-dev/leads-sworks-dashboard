@@ -721,14 +721,14 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         ("Aprovação",           []),
     ]
 
-    _BOX_W = "min-width:54px;max-width:70px;line-height:1.3;white-space:normal;"
+    _BOX_W = "min-width:58px;max-width:78px;line-height:1.35;white-space:normal;"
     _S_OK  = ("background:#1a3560;border:1px solid rgba(96,165,250,0.25);"
-               f"color:#93c5fd;border-radius:7px;padding:5px 7px;"
-               f"font-size:10px;font-weight:500;text-align:center;{_BOX_W}")
+               f"color:#93c5fd;border-radius:8px;padding:6px 10px;"
+               f"font-size:11px;font-weight:500;text-align:center;{_BOX_W}")
     _S_REJ = ("background:#431407;border:1.5px solid #f97316;"
-               f"color:#fed7aa;border-radius:7px;padding:5px 7px;"
-               f"font-size:10px;font-weight:500;text-align:center;{_BOX_W}")
-    _ARR   = '<div style="padding:8px 3px 0;color:#374151;font-size:11px;flex-shrink:0;">&#9654;</div>'
+               f"color:#fed7aa;border-radius:8px;padding:6px 10px;"
+               f"font-size:11px;font-weight:500;text-align:center;{_BOX_W}")
+    _ARR   = '<div style="padding:9px 4px 0;color:#374151;font-size:12px;flex-shrink:0;">&#9654;</div>'
 
     def _unit(name, etapa_keys):
         count = sum(etapas.get(e, 0) for e in etapa_keys)
@@ -1103,9 +1103,9 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         if fig:
             fig.update_layout(
                 height=650, title=dict(text=""),
-                margin=dict(t=50, b=20, l=10, r=10),
-                legend=dict(orientation="h", y=1.0, x=0.5,
-                            xanchor="center", yanchor="bottom"),
+                margin=dict(t=20, b=20, l=10, r=130),
+                legend=dict(orientation="v", x=1.02, y=1,
+                            xanchor="left", yanchor="top"),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
