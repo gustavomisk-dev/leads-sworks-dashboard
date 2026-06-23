@@ -4,6 +4,7 @@ Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
 import json
+import time
 import requests
 import streamlit as st
 import plotly.graph_objects as go
@@ -1048,10 +1049,6 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     </style>
     """, unsafe_allow_html=True)
 
-    if st.button("✕ Sair do TV", key="tv_exit"):
-        st.query_params.clear()
-        st.rerun()
-
     if slide == 0:
         _tv_h("KPIs · Distribuição por Status · Funil de Conversão", _periodo)
         taxa  = f"{_f['taxa_aprovacao']:.1f}%" if _f.get("terminais") else "—"
@@ -1310,7 +1307,7 @@ if st.query_params.get("tv", "0") == "1":
     except ValueError:
         _d_ini_tv = _default_d_ini
 
-    _cp1, _cp2, _cp3 = st.columns([1, 2, 5])
+    _cp1, _cp2, _cp3, _cp4 = st.columns([1, 2, 4, 2])
     with _cp1:
         st.markdown(
             "<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 Desde:</p>",
@@ -1324,6 +1321,10 @@ if st.query_params.get("tv", "0") == "1":
         )
     with _cp3:
         st.empty()
+    with _cp4:
+        if st.button("Sair do modo TV", key="tv_exit", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
 
     if _new_ini != _d_ini_tv:
         st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
@@ -1347,18 +1348,9 @@ if st.query_params.get("tv", "0") == "1":
         _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
         len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
     )
-    # Auto-avanço via JS setTimeout — o script encerra aqui (st.stop),
-    # o spinner some, e o JS navega para o próximo slide após o intervalo.
-    _next_slide = (_tv_slide + 1) % _TV_N_SLIDES
-    _tv_ini_raw2 = st.query_params.get("tv_ini", "")
-    _ini_p2 = f"&tv_ini={_tv_ini_raw2}" if _tv_ini_raw2 else ""
-    _next_url = f"?tv=1&slide={_next_slide}{_ini_p2}"
-    st.components.v1.html(
-        f"<script>setTimeout(()=>{{window.parent.location.href='{_next_url}'}},"
-        f"{_TV_INTERVAL_S * 1000})</script>",
-        height=0,
-    )
-    st.stop()
+    time.sleep(_TV_INTERVAL_S)
+    st.query_params["slide"] = str((_tv_slide + 1) % _TV_N_SLIDES)
+    st.rerun()
 
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
