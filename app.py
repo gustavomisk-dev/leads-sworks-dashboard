@@ -609,75 +609,79 @@ def _merge_motivos_det(d: dict) -> dict:
     return out
 
 
-# ── Mapa coroplético — UF dos Reprovados ──────────────────────────────────────
-
-_UF_IBGE_CODE = {
-    "RO": "11", "AC": "12", "AM": "13", "RR": "14", "PA": "15",
-    "AP": "16", "TO": "17", "MA": "21", "PI": "22", "CE": "23",
-    "RN": "24", "PB": "25", "PE": "26", "AL": "27", "SE": "28",
-    "BA": "29", "MG": "31", "ES": "32", "RJ": "33", "SP": "35",
-    "PR": "41", "SC": "42", "RS": "43", "MS": "50", "MT": "51",
-    "GO": "52", "DF": "53",
+# ── Mapa de bolhas — UF dos Reprovados ───────────────────────────────────────
+# Centroides aproximados de cada estado brasileiro (lat, lon)
+_UF_CENTROIDS = {
+    "AC": (-9.02, -70.81), "AL": (-9.57, -36.78), "AM": (-3.47, -65.10),
+    "AP": (0.90,  -52.00), "BA": (-12.97,-41.75), "CE": (-5.20, -39.53),
+    "DF": (-15.78,-47.93), "ES": (-19.19,-40.34), "GO": (-15.98,-49.86),
+    "MA": (-5.42, -45.44), "MG": (-18.10,-44.38), "MS": (-20.51,-54.54),
+    "MT": (-12.64,-55.42), "PA": (-3.79, -52.48), "PB": (-7.28, -36.72),
+    "PE": (-8.38, -37.86), "PI": (-7.72, -42.73), "PR": (-24.89,-51.55),
+    "RJ": (-22.25,-42.66), "RN": (-5.81, -36.59), "RO": (-10.83,-63.34),
+    "RR": (1.99,  -61.33), "RS": (-30.17,-53.50), "SC": (-27.45,-50.95),
+    "SE": (-10.57,-37.45), "SP": (-22.19,-48.79), "TO": (-10.18,-48.33),
 }
 
 
-@st.cache_data(ttl=86400 * 30, show_spinner=False)
-def _load_brazil_geojson():
-    try:
-        r = requests.get(
-            "https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR"
-            "?formato=application/vnd.geo+json&qualidade=minima&divisao=estado",
-            timeout=15,
-        )
-        r.raise_for_status()
-        gj = r.json()
-        for f in gj.get("features", []):
-            raw = f.get("id") or f.get("properties", {}).get("codarea", "")
-            f["id"] = str(raw)
-        return gj
-    except Exception:
-        return None
-
-
 def _fig_mapa_ufs(ufs: dict):
-    geojson = _load_brazil_geojson()
-    if not geojson or not ufs:
+    if not ufs:
         return None
-    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_IBGE_CODE]
+    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_CENTROIDS]
     if not pairs:
         return None
-    locations = [_UF_IBGE_CODE[uf] for uf, _ in pairs]
-    z_vals    = [v for _, v in pairs]
-    labels    = [f"{uf}: {v:,}" for uf, v in pairs]
-    fig = go.Figure(go.Choroplethmapbox(
-        geojson=geojson,
-        locations=locations,
-        z=z_vals,
-        featureidkey="id",
-        colorscale=[[0, "rgba(30,58,138,0.25)"], [0.4, "rgba(96,165,250,0.60)"], [1, "#93c5fd"]],
-        text=labels,
-        hovertemplate="%{text}<extra></extra>",
-        marker_line_color="rgba(255,255,255,0.12)",
-        marker_line_width=0.8,
-        showscale=True,
-        colorbar=dict(
-            title=dict(text="Leads", font=dict(color="#94a3b8", size=14)),
-            tickfont=dict(color="#94a3b8", size=13),
-            bgcolor="rgba(13,12,10,0.7)",
-            outlinecolor="rgba(255,255,255,0.1)",
-            outlinewidth=1,
-            thickness=16,
+    pairs_sorted = sorted(pairs, key=lambda x: -x[1])
+    max_v = pairs_sorted[0][1]
+
+    lats   = [_UF_CENTROIDS[uf][0] for uf, _ in pairs_sorted]
+    lons   = [_UF_CENTROIDS[uf][1] for uf, _ in pairs_sorted]
+    vals   = [v for _, v in pairs_sorted]
+    siglas = [uf for uf, _ in pairs_sorted]
+    hovers = [f"<b>{uf}</b>: {v:,} leads" for uf, v in pairs_sorted]
+    sizes  = [max(18, 60 * v / max_v) for v in vals]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scattermapbox(
+        lat=lats, lon=lons,
+        mode="markers+text",
+        text=siglas,
+        textposition="middle center",
+        textfont=dict(size=11, color="#0d0c0a", family="Arial Black"),
+        customdata=hovers,
+        hovertemplate="%{customdata}<extra></extra>",
+        marker=dict(
+            size=sizes,
+            sizemode="diameter",
+            color=vals,
+            colorscale=[
+                [0.0, "rgba(30,58,138,0.50)"],
+                [0.4, "rgba(96,165,250,0.80)"],
+                [1.0, "#93c5fd"],
+            ],
+            showscale=True,
+            colorbar=dict(
+                title=dict(text="Leads", font=dict(color="#94a3b8", size=13)),
+                tickfont=dict(color="#94a3b8", size=12),
+                bgcolor="rgba(13,12,10,0.7)",
+                outlinecolor="rgba(255,255,255,0.1)",
+                outlinewidth=1,
+                thickness=14,
+                x=1.01,
+            ),
+            cmin=0,
+            cmax=max_v,
+            line=dict(color="#0d0c0a", width=1),
         ),
-        zmin=0,
     ))
     fig.update_layout(
         mapbox=dict(
             style="carto-darkmatter",
-            center={"lat": -14.5, "lon": -52.0},
-            zoom=2.8,
+            center={"lat": -15.0, "lon": -53.0},
+            zoom=3.3,
         ),
         paper_bgcolor=_BG,
         margin=dict(t=0, b=0, l=0, r=0),
+        showlegend=False,
     )
     return fig
 
