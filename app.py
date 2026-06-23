@@ -6,6 +6,7 @@ Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 import hashlib
 import hmac
 import json
+import statistics
 import time
 import bcrypt
 import requests
@@ -254,6 +255,24 @@ _AF       = dict(size=13, color="#94a3b8")
 _TV_N_SLIDES   = 12
 _TV_INTERVAL_S = 15  # seconds per slide
 
+_TV_CSS = """<style>
+body,html{background:#0f0e0b!important}
+body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
+    overflow:hidden!important;height:100vh!important;background:#0f0e0b!important}
+header[data-testid="stHeader"]{display:none!important}
+footer{display:none!important}
+#MainMenu{display:none!important}
+[data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
+section.main>.block-container{
+    padding:0 1.5rem 2rem!important;max-width:100%!important;
+    max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
+[data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
+iframe{height:0!important;min-height:0!important;overflow:hidden!important}
+.js-plotly-plot .legend text,.js-plotly-plot .legendtext{
+    font-size:14px!important}
+section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
+</style>"""
+
 # ── GitHub API ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
@@ -430,21 +449,30 @@ def _fig_donut(d_status: dict):
         labels=labels, values=values,
         marker=dict(colors=colors, line=dict(color="#0d0c0a", width=2)),
         hole=0.46,
-        textinfo="label+percent",
+        textinfo="percent",          # only % on slices (no label — cleaner)
+        domain=dict(x=[0, 0.60]),   # pie in left 60%
         textfont=dict(size=11, color="#e2e8f0"),
         hovertemplate="%{label}: <b>%{value:,}</b> (%{percent})<extra></extra>",
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Distribuição por Status", font=_TF),
-        legend=dict(font=dict(size=12, color="#94a3b8"),
-                    bgcolor="rgba(13,12,10,0.85)",
-                    bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
-                    orientation="v", x=0.58, y=0.50,
-                    xanchor="left", yanchor="middle"),
+        legend=dict(
+            font=dict(size=12, color="#94a3b8"),
+            bgcolor="rgba(13,12,10,0.85)",
+            bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
+            orientation="v",
+            x=0.64, y=0.50,         # starts at 64%, well outside the pie
+            xanchor="left", yanchor="middle",
+        ),
         margin=dict(t=50, b=10, l=10, r=10), height=360,
-        annotations=[dict(text=f"<b>{total:,}</b><br><span style='font-size:10px'>leads</span>",
-                          x=0.5, y=0.5, font=dict(size=14, color="#e2e8f0"), showarrow=False)],
+        annotations=[dict(
+            text=f"<b>{total:,}</b><br>leads",
+            x=0.30,                  # center of pie domain [0, 0.60]
+            y=0.5,
+            font=dict(size=14, color="#e2e8f0"),
+            showarrow=False,
+        )],
     )
     return fig
 
@@ -592,9 +620,8 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
 def _fig_histograma(valores: list):
     if len(valores) < 3:
         return None
-    import statistics as _st
-    mediana = _st.median(valores)
-    media   = _st.mean(valores)
+    mediana = statistics.median(valores)
+    media   = statistics.mean(valores)
     fig = go.Figure(go.Histogram(
         x=valores, nbinsx=35,
         marker=dict(color="#3b82f6", opacity=0.8, line=dict(color="#0d0c0a", width=0.5)),
@@ -1169,47 +1196,29 @@ def _tv_h(titulo: str, periodo: str = "") -> None:
     )
 
 
-def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _periodo):
-    n_rep = _f.get("reprovados", 0)
-    n_ap  = _f.get("aprovados", 0)
-
-    st.markdown("""
-    <style>
-    body,html{background:#0f0e0b!important}
-    body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
-        overflow:hidden!important;height:100vh!important;background:#0f0e0b!important}
-    header[data-testid="stHeader"]{display:none!important}
-    footer{display:none!important}
-    #MainMenu{display:none!important}
-    [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
-    section.main>.block-container{
-        padding:0 1.5rem 2rem!important;max-width:100%!important;
-        max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
-    [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
-    iframe{height:0!important;min-height:0!important;overflow:hidden!important}
-    .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
-        font-size:14px!important}
-    section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
-    </style>
-    """, unsafe_allow_html=True)
+def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
+                     n_dias: int, dias_raw: list, datas_sel: list, periodo: str):
+    # _TV_CSS is emitted once by the caller before invoking this function.
+    n_rep = funil.get("reprovados", 0)
+    n_ap  = funil.get("aprovados", 0)
 
     if slide == 0:
-        _tv_h("KPIs · Distribuição por Status · Funil de Conversão", _periodo)
-        taxa  = f"{_f['taxa_aprovacao']:.1f}%" if _f.get("terminais") else "—"
-        vol   = _fin.get("ValorContratacao", {})
+        _tv_h("KPIs · Distribuição por Status · Funil de Conversão", periodo)
+        taxa  = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
+        vol   = fin.get("ValorContratacao", {})
         vol_s = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
-        ag    = _agg.get("aguardando", 0)
+        ag    = agg.get("aguardando", 0)
         st.markdown(f"""
         <div class="kpi-row">
           <div class="kpi-card"><div class="kpi-label">Total de leads</div>
-            <div class="kpi-value">{_f['total']:,}</div><div class="kpi-sub">{_periodo}</div></div>
+            <div class="kpi-value">{funil['total']:,}</div><div class="kpi-sub">{periodo}</div></div>
           <div class="kpi-card"><div class="kpi-label">Aprovados</div>
-            <div class="kpi-value">{_f['aprovados']:,}</div><div class="kpi-sub">taxa: {taxa}</div></div>
+            <div class="kpi-value">{funil['aprovados']:,}</div><div class="kpi-sub">taxa: {taxa}</div></div>
           <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
-            <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_f['terminais']:,} finalizados</div></div>
+            <div class="kpi-value">{taxa}</div><div class="kpi-sub">{funil['terminais']:,} finalizados</div></div>
           <div class="kpi-card"><div class="kpi-label">Reprovados</div>
-            <div class="kpi-value">{_f['reprovados']:,}</div>
-            <div class="kpi-sub">{_f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
+            <div class="kpi-value">{funil['reprovados']:,}</div>
+            <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
           <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
             <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
           <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
@@ -1218,19 +1227,19 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         """, unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            fig = _fig_donut(_f.get("_d_status", {}))
+            fig = _fig_donut(funil.get("_d_status", {}))
             if fig:
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
         with c2:
-            fig = _fig_funil_rico(_f)
+            fig = _fig_funil_rico(funil)
             if fig:
                 fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 1:
-        _tv_h("Evolução Temporal", _periodo)
-        fig = _fig_evolucao(_agg, _n_dias, dias_raw=_dias_raw, datas_sel=_datas_sel)
+        _tv_h("Evolução Temporal", periodo)
+        fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
         if fig:
             fig.update_layout(
                 height=650, title=dict(text=""),
@@ -1245,21 +1254,21 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 2:
-        _tv_h("Estatísticas Financeiras dos Aprovados · Distribuição do Valor Contratado", _periodo)
+        _tv_h("Estatísticas Financeiras dos Aprovados · Distribuição do Valor Contratado", periodo)
         c1, c2 = st.columns(2)
         with c1:
-            html = _html_tabela_financeira(_fin)
+            html = _html_tabela_financeira(fin)
             if html:
                 st.markdown(html, unsafe_allow_html=True)
         with c2:
-            fig = _fig_histograma(_agg.get("valores_contratacao", []))
+            fig = _fig_histograma(agg.get("valores_contratacao", []))
             if fig:
                 fig.update_layout(height=430)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 3:
-        _tv_h("Etapas de Reprovação · Visão Detalhada", _periodo)
-        etapas_d = _agg.get("etapas", {})
+        _tv_h("Etapas de Reprovação · Visão Detalhada", periodo)
+        etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
             html_d = _html_diagrama(etapas_d, n_rep)
             if html_d:
@@ -1273,8 +1282,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de etapas.")
 
     elif slide == 4:
-        _tv_h("Etapas de Reprovação · Visão de Funil", _periodo)
-        etapas_d = _agg.get("etapas", {})
+        _tv_h("Etapas de Reprovação · Visão de Funil", periodo)
+        etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
             html_d = _html_diagrama(etapas_d, n_rep)
             if html_d:
@@ -1296,10 +1305,10 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de etapas.")
 
     elif slide == 5:
-        _tv_h("Motivos de Reprovação — Alto Nível e Detalhado", _periodo)
+        _tv_h("Motivos de Reprovação — Alto Nível e Detalhado", periodo)
         c1, c2 = st.columns(2)
         with c1:
-            fig = _fig_barras_h(_agg.get("top_motivos", {}),
+            fig = _fig_barras_h(agg.get("top_motivos", {}),
                                 "Motivo — Alto Nível", "#ef4444", pct_base=n_rep)
             if fig:
                 fig.update_layout(height=500)
@@ -1307,7 +1316,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             else:
                 st.info("Sem dados de motivos.")
         with c2:
-            mot_det = _agg.get("top_motivos_det", {})
+            mot_det = agg.get("top_motivos_det", {})
             if mot_det:
                 n_det = sum(mot_det.values())
                 fig = _fig_barras_h(mot_det, "Motivo — Detalhado", "#f97316", pct_base=n_det)
@@ -1318,8 +1327,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
                 st.info("Sem dados de motivos detalhados.")
 
     elif slide == 6:
-        _tv_h("Leads com Bloqueio por Tipo", _periodo)
-        fig = _fig_bloqueios(_agg.get("bloqueios", {}), n_rep=n_rep)
+        _tv_h("Leads com Bloqueio por Tipo", periodo)
+        fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
         if fig:
             fig.update_layout(height=500, margin=dict(t=40, b=40, l=80, r=80))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1327,10 +1336,10 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de bloqueios.")
 
     elif slide == 7:
-        _tv_h("Top Empregadores dos Reprovados · UF dos Reprovados", _periodo)
+        _tv_h("Top Empregadores dos Reprovados · UF dos Reprovados", periodo)
         c1, c2 = st.columns(2)
         with c1:
-            emp_rep = _agg.get("top_emp_rep", {})
+            emp_rep = agg.get("top_emp_rep", {})
             if emp_rep:
                 fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep)
                 if fig:
@@ -1339,7 +1348,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             else:
                 st.info("Sem dados de empregadores dos reprovados.")
         with c2:
-            ufs = _agg.get("top_ufs", {})
+            ufs = agg.get("top_ufs", {})
             if ufs:
                 n_ufs = sum(ufs.values())
                 fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=10, pct_base=n_ufs)
@@ -1350,8 +1359,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
                 st.info("Sem dados de UF.")
 
     elif slide == 8:
-        _tv_h("CNAEs Bloqueados dos Reprovados", _periodo)
-        cnaes = _agg.get("top_cnaes", {})
+        _tv_h("CNAEs Bloqueados dos Reprovados", periodo)
+        cnaes = agg.get("top_cnaes", {})
         if cnaes:
             n_cnae = sum(cnaes.values())
             c1, c2 = st.columns(2)
@@ -1369,8 +1378,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de CNAE bloqueado.")
 
     elif slide == 9:
-        _tv_h("CBOs Bloqueados dos Reprovados", _periodo)
-        cbos_rep = _agg.get("top_cbos_rep", {})
+        _tv_h("CBOs Bloqueados dos Reprovados", periodo)
+        cbos_rep = agg.get("top_cbos_rep", {})
         if cbos_rep:
             n_cbo_r = sum(cbos_rep.values())
             c1, c2 = st.columns(2)
@@ -1388,8 +1397,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de CBO dos reprovados.")
 
     elif slide == 10:
-        _tv_h("Top Empregadores dos Aprovados", _periodo)
-        emp_ap = _agg.get("top_empregadores", {})
+        _tv_h("Top Empregadores dos Aprovados", periodo)
+        emp_ap = agg.get("top_empregadores", {})
         if emp_ap:
             c1, c2 = st.columns(2)
             with c1:
@@ -1405,8 +1414,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de empregadores dos aprovados.")
 
     elif slide == 11:
-        _tv_h("Top CBOs dos Aprovados", _periodo)
-        cbos_ap = _agg.get("top_cbos", {})
+        _tv_h("Top CBOs dos Aprovados", periodo)
+        cbos_ap = agg.get("top_cbos", {})
         if cbos_ap:
             c1, c2 = st.columns(2)
             with c1:
@@ -1486,23 +1495,7 @@ if st.query_params.get("tv", "0") == "1":
     _tv_next   = (_tv_slide + 1) % _TV_N_SLIDES
 
     # CSS TV antecipado (evita flash antes de _render_tv_slide)
-    st.markdown("""<style>
-    body,html{background:#0f0e0b!important}
-    body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
-        overflow:hidden!important;height:100vh!important;background:#0f0e0b!important}
-    header[data-testid="stHeader"]{display:none!important}
-    footer{display:none!important}
-    #MainMenu{display:none!important}
-    [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
-    section.main>.block-container{
-        padding:0 1.5rem 2rem!important;max-width:100%!important;
-        max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
-    [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
-    iframe{height:0!important;min-height:0!important;overflow:hidden!important}
-    .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
-        font-size:14px!important}
-    section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
-    </style>""", unsafe_allow_html=True)
+    st.markdown(_TV_CSS, unsafe_allow_html=True)
 
     # Tela cheia automática (melhor esforço — pode ser bloqueado sem gesto do usuário)
     components.html("""
@@ -1621,7 +1614,7 @@ with col_title:
             '100.939Z" fill="#FEC52E"/>'
             '</svg>'
             '<span style="font-size:28px;font-weight:700;line-height:1;'
-            'color:#e2e8f0;letter-spacing:-0.5px">ilieads</span>'
+            'color:#e2e8f0;letter-spacing:-0.5px">ileads</span>'
             '</div>',
             unsafe_allow_html=True,
         )
