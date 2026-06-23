@@ -720,13 +720,13 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
         shapes=shapes,
         legend=dict(
             orientation="h",
-            x=0.5, y=-0.10,
+            x=0.5, y=-0.18,
             xanchor="center", yanchor="top",
             font=dict(size=13, color="#94a3b8"),
             bgcolor="rgba(13,12,10,0.85)",
             bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
         ),
-        margin=dict(t=50, b=65, l=20, r=40), height=bar_h,
+        margin=dict(t=50, b=90, l=20, r=40), height=bar_h,
     )
     return fig
 
