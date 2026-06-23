@@ -1107,9 +1107,12 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         if fig:
             fig.update_layout(
                 height=650, title=dict(text=""),
-                margin=dict(t=20, b=20, l=10, r=210),
-                legend=dict(orientation="v", x=1.02, y=1,
-                            xanchor="left", yanchor="top"),
+                margin=dict(t=20, b=20, l=10, r=20),
+                legend=dict(orientation="v", x=0.79, y=1,
+                            xanchor="left", yanchor="top",
+                            bgcolor="rgba(15,14,11,0.75)",
+                            bordercolor="rgba(255,255,255,0.08)",
+                            borderwidth=1),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
