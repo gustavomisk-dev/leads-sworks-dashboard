@@ -713,7 +713,7 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         ("Cálculo Proposta",    ["Cálculo de Proposta"]),
         ("Proposta Leilão",     []),
         ("Cadastro Proposta",   []),
-        ("Formalização",        []),
+        ("Formalização",        [], True),
         ("Obter CCB",           []),
         ("Averbação Dataprev",  []),
         ("Antifraude",          []),
@@ -730,10 +730,13 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
                f"font-size:11px;font-weight:500;text-align:center;{_BOX_W}")
     _ARR   = '<div style="padding:9px 4px 0;color:#374151;font-size:12px;flex-shrink:0;">&#9654;</div>'
 
-    def _unit(name, etapa_keys):
+    def _unit(name, etapa_keys, nowrap=False):
         count = sum(etapas.get(e, 0) for e in etapa_keys)
         pct   = 100 * count / n_rep if n_rep and count else 0
-        box   = f'<div style="{_S_REJ if count else _S_OK}">{name}</div>'
+        _s = _S_REJ if count else _S_OK
+        if nowrap:
+            _s = _s.replace("max-width:78px;", "").replace("white-space:normal;", "white-space:nowrap;")
+        box   = f'<div style="{_s}">{name}</div>'
         below = ""
         if count:
             sub = "".join(
@@ -789,8 +792,9 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     )
 
     post_html = ""
-    for name, etapa_keys in _POST:
-        post_html += _ARR + _unit(name, etapa_keys)
+    for _entry in _POST:
+        _nm, _ek = _entry[0], _entry[1]
+        post_html += _ARR + _unit(_nm, _ek, _entry[2] if len(_entry) > 2 else False)
 
     fim_html = (
         _ARR
@@ -1103,7 +1107,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         if fig:
             fig.update_layout(
                 height=650, title=dict(text=""),
-                margin=dict(t=20, b=20, l=10, r=130),
+                margin=dict(t=20, b=20, l=10, r=210),
                 legend=dict(orientation="v", x=1.02, y=1,
                             xanchor="left", yanchor="top"),
             )
@@ -1131,7 +1135,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
                 st.markdown(html_d, unsafe_allow_html=True)
             fig_d = _fig_etapas_split(etapas_d, n_rep)
             if fig_d:
-                fig_d.update_layout(height=320)
+                fig_d.update_traces(textposition="outside", cliponaxis=False)
+                fig_d.update_layout(height=320, margin=dict(r=160))
                 st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
@@ -1146,7 +1151,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             result_f = _fig_funil_etapa(etapas_d, n_rep)
             if result_f:
                 fig_f, _ = result_f
-                fig_f.update_layout(height=430)
+                fig_f.update_layout(height=430, margin=dict(b=100))
                 st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
