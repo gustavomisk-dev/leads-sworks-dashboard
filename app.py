@@ -591,7 +591,7 @@ def _sem_codigo(d: dict) -> dict:
 
 
 def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0,
-                  show_abs: bool = False):
+                  show_abs: bool = False, show_pct: bool = True):
     items = list(data_dict.items())[:n]
     if not items:
         return None
@@ -600,7 +600,9 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
     max_v  = max(values) if values else 1
     if pct_base > 0:
         shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in values]
-        if show_abs:
+        if not show_pct:
+            texts = [f"{v:,}" for v in values]
+        elif show_abs:
             texts = [f"{v:,}  |  {100*v/pct_base:.1f}%" for v in values]
         else:
             texts  = [f"{100*v/pct_base:.1f}%" for v in values]
@@ -1437,7 +1439,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _tv_h("Top Empregadores dos Reprovados", periodo)
         emp_rep = agg.get("top_emp_rep", {})
         if emp_rep:
-            fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep)
+            fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep, show_pct=False)
             if fig:
                 fig.update_traces(textfont=_TV_TXT)
                 fig.update_layout(
@@ -1987,7 +1989,7 @@ col_s1, col_s2 = st.columns(2)
 with col_s1:
     emp_rep = agg.get("top_emp_rep", {})
     if emp_rep:
-        fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep)
+        fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         tbl = _html_tabela_ranking(emp_rep, "Razão Social", n_rep)
