@@ -1108,11 +1108,12 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             fig.update_layout(
                 height=650, title=dict(text=""),
                 margin=dict(t=20, b=20, l=10, r=20),
-                legend=dict(orientation="v", x=0.79, y=1,
+                legend=dict(orientation="v", x=0.70, y=1,
                             xanchor="left", yanchor="top",
-                            bgcolor="rgba(15,14,11,0.75)",
+                            bgcolor="rgba(15,14,11,0.80)",
                             bordercolor="rgba(255,255,255,0.08)",
-                            borderwidth=1),
+                            borderwidth=1,
+                            font=dict(size=14)),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
