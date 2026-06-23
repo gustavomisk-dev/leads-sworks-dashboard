@@ -655,8 +655,6 @@ def _fig_mapa_ufs(ufs: dict):
         return None
     pairs = sorted(pairs, key=lambda x: -x[1])
 
-    TOP_N = 15  # estados com label + leader line; restantes só ponto
-
     line_lats: list = []
     line_lons: list = []
     lbl_lats:  list = []
@@ -666,12 +664,11 @@ def _fig_mapa_ufs(ufs: dict):
     dot_lats:  list = []
     dot_lons:  list = []
 
-    for i, (uf, v) in enumerate(pairs):
+    for uf, v in pairs:
         clat, clon = _UF_CENTROIDS[uf]
+        pct = round(100 * v / total, 1)
         dot_lats.append(clat)
         dot_lons.append(clon)
-        if i >= TOP_N:
-            continue
         llat, llon = _label_pos(clat, clon)
         # Linha em L: horizontal do centroide até a coluna do label,
         # depois vertical até o label
@@ -679,8 +676,8 @@ def _fig_mapa_ufs(ufs: dict):
         line_lons.extend([clon, llon, llon, None])
         lbl_lats.append(llat)
         lbl_lons.append(llon)
-        lbl_texts.append(f"{uf}  {v:,}")
-        lbl_hov.append(f"<b>{uf}</b>: {v:,} leads ({100*v/total:.1f}%)")
+        lbl_texts.append(f"{uf}  {v:,}  {pct:.0f}%")
+        lbl_hov.append(f"<b>{uf}</b>: {v:,} leads ({pct:.1f}%)")
 
     fig = go.Figure()
 
@@ -707,7 +704,7 @@ def _fig_mapa_ufs(ufs: dict):
         lat=lbl_lats, lon=lbl_lons,
         mode="text",
         text=lbl_texts,
-        textfont=dict(size=13, color="#f1f5f9"),
+        textfont=dict(size=15, color="#f1f5f9"),
         customdata=lbl_hov,
         hovertemplate="%{customdata}<extra></extra>",
         showlegend=False,
@@ -717,21 +714,21 @@ def _fig_mapa_ufs(ufs: dict):
         scope="south america",
         resolution=50,
         bgcolor=_BG,
-        landcolor=_BG,          # esconde todos os territórios; estados ficam
-        oceancolor=_BG,         # visíveis só pelas bordas (subunits + costa)
+        landcolor="#1c1a17",    # terra escura — contraste para as bordas dos estados
+        oceancolor=_BG,
         lakecolor=_BG,
         coastlinecolor="rgba(255,255,255,0.55)",
         coastlinewidth=1.5,
-        countrycolor=_BG,
-        countrywidth=0,
+        countrycolor="#1c1a17", # fronteiras de países da mesma cor da terra → invisíveis
+        countrywidth=1,
         showcoastlines=True,
         showland=True,
         showocean=True,
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.40)",
-        subunitwidth=0.8,
+        subunitcolor="rgba(255,255,255,0.45)",
+        subunitwidth=0.9,
         lataxis=dict(range=[_BR_LAT_MIN, _BR_LAT_MAX]),
         lonaxis=dict(range=[_BR_LON_MIN, _BR_LON_MAX]),
     )
