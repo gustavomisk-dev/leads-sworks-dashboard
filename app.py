@@ -1333,13 +1333,16 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     textfont=_TV_TXT,
                     textposition="outside",
                     cliponaxis=False,
+                    selector=dict(type="bar"),
                 )
                 fig_d.update_layout(
                     height=580,
-                    title=dict(font=_TV_TF),
+                    title=dict(text=""),
+                    uniformtext_minsize=22, uniformtext_mode="show",
                     xaxis=dict(tickfont=_TV_AF),
                     yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=60, b=20, l=20, r=200),
+                    legend=dict(font=dict(size=22, color="#94a3b8")),
+                    margin=dict(t=10, b=80, l=20, r=40),
                 )
                 st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
