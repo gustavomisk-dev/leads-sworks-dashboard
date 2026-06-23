@@ -640,27 +640,26 @@ def _fig_mapa_ufs(ufs: dict):
     lons   = [_UF_CENTROIDS[uf][1] for uf, _ in pairs]
     vals   = [v for _, v in pairs]
     pcts   = [round(100 * v / total, 1) for _, v in pairs]
-    # Texto: sigla + quantidade na bolha
-    labels = [f"{uf}<br>{v:,}" for (uf, v), _ in zip(pairs, pcts)]
+    labels = [f"{uf}  {v:,}" for (uf, v), _ in zip(pairs, pcts)]
     hovers = [f"<b>{uf}</b>: {v:,} leads ({p:.1f}%)"
               for (uf, v), p in zip(pairs, pcts)]
-    sizes  = [16 + 44 * v / max_v for v in vals]
+    sizes  = [28 + 62 * v / max_v for v in vals]
 
     fig = go.Figure(go.Scattergeo(
         lat=lats, lon=lons,
         mode="markers+text",
         text=labels,
         textposition="middle center",
-        textfont=dict(size=8, color="#0d0c0a"),
+        textfont=dict(size=13, color="#ffffff"),
         customdata=hovers,
         hovertemplate="%{customdata}<extra></extra>",
         marker=dict(
             size=sizes,
             color=vals,
             colorscale=[
-                [0.0, "rgba(30,58,138,0.45)"],
-                [0.4, "rgba(96,165,250,0.85)"],
-                [1.0, "#93c5fd"],
+                [0.0, "rgba(30,58,138,0.55)"],
+                [0.4, "rgba(59,130,246,0.85)"],
+                [1.0, "#3b82f6"],
             ],
             showscale=True,
             colorbar=dict(
@@ -673,7 +672,7 @@ def _fig_mapa_ufs(ufs: dict):
                 len=0.75,
                 x=1.0,
             ),
-            opacity=0.88,
+            opacity=0.85,
         ),
     ))
     fig.update_geos(
