@@ -609,9 +609,10 @@ def _merge_motivos_det(d: dict) -> dict:
     return out
 
 
-# ── Mapa de bolhas — UF dos Reprovados ───────────────────────────────────────
+# ── Mapa UF dos Reprovados — leader lines apontando para cada estado ─────────
 # go.Scattergeo usa dados Natural Earth embutidos no Plotly (zero rede).
 # showsubunits=True exibe bordas dos estados brasileiros sem GeoJSON externo.
+# Apenas Brasil visível: landcolor=_BG esconde outros países; bounds restritos.
 
 _UF_CENTROIDS = {
     "AC": (-9.02, -70.81), "AL": (-9.57, -36.78), "AM": (-3.47, -65.10),
@@ -625,6 +626,25 @@ _UF_CENTROIDS = {
     "SE": (-10.57,-37.45), "SP": (-22.19,-48.79), "TO": (-10.18,-48.33),
 }
 
+# Centro geográfico aproximado do Brasil e viewport
+_BR_CLAT, _BR_CLON   = -10.0, -53.0
+_BR_LAT_MIN, _BR_LAT_MAX = -35.5,  6.0
+_BR_LON_MIN, _BR_LON_MAX = -75.5, -30.0
+
+
+def _label_pos(clat: float, clon: float) -> tuple:
+    """Projeta o centroide em direção à borda do viewport (85% do caminho)."""
+    dlat = clat - _BR_CLAT
+    dlon = clon - _BR_CLON
+    if abs(dlat) < 0.1 and abs(dlon) < 0.1:
+        return _BR_LAT_MAX - 1.5, clon
+    t_lat = ((_BR_LAT_MAX - _BR_CLAT) / dlat) if dlat > 0 \
+        else ((_BR_LAT_MIN - _BR_CLAT) / dlat)
+    t_lon = ((_BR_LON_MAX - _BR_CLON) / dlon) if dlon > 0 \
+        else ((_BR_LON_MIN - _BR_CLON) / dlon)
+    t = min(t_lat, t_lon) * 0.85
+    return _BR_CLAT + dlat * t, _BR_CLON + dlon * t
+
 
 def _fig_mapa_ufs(ufs: dict):
     if not ufs:
@@ -634,67 +654,86 @@ def _fig_mapa_ufs(ufs: dict):
     if not pairs:
         return None
     pairs = sorted(pairs, key=lambda x: -x[1])
-    max_v = pairs[0][1]
 
-    lats   = [_UF_CENTROIDS[uf][0] for uf, _ in pairs]
-    lons   = [_UF_CENTROIDS[uf][1] for uf, _ in pairs]
-    vals   = [v for _, v in pairs]
-    pcts   = [round(100 * v / total, 1) for _, v in pairs]
-    labels = [f"{uf}  {v:,}" for (uf, v), _ in zip(pairs, pcts)]
-    hovers = [f"<b>{uf}</b>: {v:,} leads ({p:.1f}%)"
-              for (uf, v), p in zip(pairs, pcts)]
-    sizes  = [28 + 62 * v / max_v for v in vals]
+    TOP_N = 15  # estados com label + leader line; restantes só ponto
 
-    fig = go.Figure(go.Scattergeo(
-        lat=lats, lon=lons,
-        mode="markers+text",
-        text=labels,
-        textposition="middle center",
-        textfont=dict(size=13, color="#ffffff"),
-        customdata=hovers,
-        hovertemplate="%{customdata}<extra></extra>",
-        marker=dict(
-            size=sizes,
-            color=vals,
-            colorscale=[
-                [0.0, "rgba(30,58,138,0.55)"],
-                [0.4, "rgba(59,130,246,0.85)"],
-                [1.0, "#3b82f6"],
-            ],
-            showscale=True,
-            colorbar=dict(
-                title=dict(text="Leads", font=dict(color="#94a3b8", size=13)),
-                tickfont=dict(color="#94a3b8", size=12),
-                bgcolor="rgba(13,12,10,0.7)",
-                outlinecolor="rgba(255,255,255,0.1)",
-                outlinewidth=1,
-                thickness=14,
-                len=0.75,
-                x=1.0,
-            ),
-            opacity=0.85,
-        ),
+    line_lats: list = []
+    line_lons: list = []
+    lbl_lats:  list = []
+    lbl_lons:  list = []
+    lbl_texts: list = []
+    lbl_hov:   list = []
+    dot_lats:  list = []
+    dot_lons:  list = []
+
+    for i, (uf, v) in enumerate(pairs):
+        clat, clon = _UF_CENTROIDS[uf]
+        dot_lats.append(clat)
+        dot_lons.append(clon)
+        if i >= TOP_N:
+            continue
+        llat, llon = _label_pos(clat, clon)
+        # Linha em L: horizontal do centroide até a coluna do label,
+        # depois vertical até o label
+        line_lats.extend([clat, clat, llat, None])
+        line_lons.extend([clon, llon, llon, None])
+        lbl_lats.append(llat)
+        lbl_lons.append(llon)
+        lbl_texts.append(f"{uf}  {v:,}")
+        lbl_hov.append(f"<b>{uf}</b>: {v:,} leads ({100*v/total:.1f}%)")
+
+    fig = go.Figure()
+
+    # Leader lines
+    fig.add_trace(go.Scattergeo(
+        lat=line_lats, lon=line_lons,
+        mode="lines",
+        line=dict(color="rgba(148,163,184,0.50)", width=1),
+        hoverinfo="skip",
+        showlegend=False,
     ))
+
+    # Ponto no centroide de cada estado
+    fig.add_trace(go.Scattergeo(
+        lat=dot_lats, lon=dot_lons,
+        mode="markers",
+        marker=dict(size=6, color="#60a5fa", symbol="circle"),
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
+    # Texto dos labels (sigla + quantidade)
+    fig.add_trace(go.Scattergeo(
+        lat=lbl_lats, lon=lbl_lons,
+        mode="text",
+        text=lbl_texts,
+        textfont=dict(size=13, color="#f1f5f9"),
+        customdata=lbl_hov,
+        hovertemplate="%{customdata}<extra></extra>",
+        showlegend=False,
+    ))
+
     fig.update_geos(
         scope="south america",
-        fitbounds="locations",
         resolution=50,
         bgcolor=_BG,
-        landcolor="#1c1a17",
-        oceancolor=_BG,
+        landcolor=_BG,          # esconde todos os territórios; estados ficam
+        oceancolor=_BG,         # visíveis só pelas bordas (subunits + costa)
         lakecolor=_BG,
-        coastlinecolor="rgba(255,255,255,0.20)",
-        coastlinewidth=1.0,
-        countrycolor="rgba(255,255,255,0.30)",
-        countrywidth=1.2,
+        coastlinecolor="rgba(255,255,255,0.55)",
+        coastlinewidth=1.5,
+        countrycolor=_BG,
+        countrywidth=0,
         showcoastlines=True,
         showland=True,
         showocean=True,
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.30)",
-        subunitwidth=1.0,
+        subunitcolor="rgba(255,255,255,0.40)",
+        subunitwidth=0.8,
+        lataxis=dict(range=[_BR_LAT_MIN, _BR_LAT_MAX]),
+        lonaxis=dict(range=[_BR_LON_MIN, _BR_LON_MAX]),
     )
     fig.update_layout(
         paper_bgcolor=_BG,
