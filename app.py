@@ -686,22 +686,12 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
         texts.append(f"{v:,} ({pct:.1f}%)")
         hovers.append(f"<b>{name}</b><br>{v:,} leads · {pct:.2f}% {gl}")
     n_dep = len(depois_sorted)
-    n_ant = len(antes_sorted)
     shapes = [
         dict(type="line", x0=0, x1=1, xref="paper", y0=n_dep-0.5, y1=n_dep-0.5, yref="y",
              line=dict(color="rgba(255,255,255,0.10)", width=1, dash="dot")),
         dict(type="line", x0=0, x1=1, xref="paper", y0=n_dep+0.5, y1=n_dep+0.5, yref="y",
              line=dict(color="rgba(255,255,255,0.10)", width=1, dash="dot")),
     ]
-    annotations = []
-    if n_ant > 0:
-        annotations.append(dict(xref="paper", yref="y", x=1.02, y=n_dep+1+(n_ant-1)/2,
-            text="<b>Antes<br>do clique</b>", showarrow=False, xanchor="left",
-            font=dict(size=12, color="#fb923c"), align="left"))
-    if n_dep > 0:
-        annotations.append(dict(xref="paper", yref="y", x=1.02, y=(n_dep-1)/2,
-            text="<b>Depois<br>do clique</b>", showarrow=False, xanchor="left",
-            font=dict(size=12, color="#60a5fa"), align="left"))
     bar_h = max(360, len(all_items) * 34 + 90)
     fig = go.Figure(go.Bar(
         x=x_vals, y=y_labs, orientation="h",
@@ -709,6 +699,17 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
         text=texts, textposition="inside", insidetextanchor="end",
         textfont=dict(size=13, color="rgba(255,255,255,0.85)"),
         hovertemplate="%{customdata}<extra></extra>", customdata=hovers,
+        showlegend=False,
+    ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode="markers",
+        marker=dict(color="rgba(251,146,60,0.85)", symbol="square", size=14),
+        name=f"Antes do clique ({n_antes:,})",
+    ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode="markers",
+        marker=dict(color="rgba(96,165,250,0.85)", symbol="square", size=14),
+        name=f"Depois do clique ({n_corte:,})",
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
@@ -716,8 +717,16 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
         xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
         yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), automargin=True, zeroline=False),
         uniformtext_minsize=11, uniformtext_mode="hide",
-        shapes=shapes, annotations=annotations,
-        margin=dict(t=50, b=30, l=20, r=110), height=bar_h,
+        shapes=shapes,
+        legend=dict(
+            orientation="h",
+            x=0.5, y=-0.10,
+            xanchor="center", yanchor="top",
+            font=dict(size=13, color="#94a3b8"),
+            bgcolor="rgba(13,12,10,0.85)",
+            bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
+        ),
+        margin=dict(t=50, b=65, l=20, r=40), height=bar_h,
     )
     return fig
 
@@ -1409,10 +1418,10 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig.update_traces(textfont=dict(size=25, color="#e2e8f0"))
             fig.update_layout(
                 height=520,
-                title=dict(font=_TV_TF),
+                title=dict(text=""),
                 xaxis=dict(tickfont=dict(size=25, color="#cbd5e1")),
                 yaxis=dict(tickfont=_TV_AF),
-                margin=dict(t=60, b=40, l=80, r=80),
+                margin=dict(t=10, b=40, l=80, r=80),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
