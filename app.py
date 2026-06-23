@@ -626,24 +626,14 @@ _UF_CENTROIDS = {
     "SE": (-10.57,-37.45), "SP": (-22.19,-48.79), "TO": (-10.18,-48.33),
 }
 
-# Centro geográfico aproximado do Brasil e viewport
-_BR_CLAT, _BR_CLON   = -10.0, -53.0
-_BR_LAT_MIN, _BR_LAT_MAX = -35.5,  6.0
-_BR_LON_MIN, _BR_LON_MAX = -75.5, -30.0
-
-
-def _label_pos(clat: float, clon: float) -> tuple:
-    """Projeta o centroide em direção à borda do viewport (85% do caminho)."""
-    dlat = clat - _BR_CLAT
-    dlon = clon - _BR_CLON
-    if abs(dlat) < 0.1 and abs(dlon) < 0.1:
-        return _BR_LAT_MAX - 1.5, clon
-    t_lat = ((_BR_LAT_MAX - _BR_CLAT) / dlat) if dlat > 0 \
-        else ((_BR_LAT_MIN - _BR_CLAT) / dlat)
-    t_lon = ((_BR_LON_MAX - _BR_CLON) / dlon) if dlon > 0 \
-        else ((_BR_LON_MIN - _BR_CLON) / dlon)
-    t = min(t_lat, t_lon) * 0.85
-    return _BR_CLAT + dlat * t, _BR_CLON + dlon * t
+# Lado fixo para cada estado (define em qual borda do mapa fica o label)
+_UF_SIDE = {
+    "AC": "W", "AM": "W", "RO": "W", "MT": "W",
+    "RR": "N", "AP": "N", "PA": "N", "TO": "N", "MA": "N", "PI": "N",
+    "CE": "E", "RN": "E", "PB": "E", "PE": "E", "AL": "E", "SE": "E",
+    "BA": "E", "ES": "E", "RJ": "E", "MG": "E", "GO": "E", "DF": "E",
+    "MS": "S", "SP": "S", "PR": "S", "SC": "S", "RS": "S",
+}
 
 
 def _fig_mapa_ufs(ufs: dict):
@@ -654,6 +644,45 @@ def _fig_mapa_ufs(ufs: dict):
     if not pairs:
         return None
     pairs = sorted(pairs, key=lambda x: -x[1])
+
+    # Viewport (com margem para labels fora do Brasil)
+    VP_LAT_MIN, VP_LAT_MAX = -38.0,  9.0
+    VP_LON_MIN, VP_LON_MAX = -79.0, -25.0
+
+    # Posição fixa das linhas de label em cada borda
+    LN, LS =  7.5, -36.5    # lat norte / sul
+    LE, LW = -27.0, -77.0   # lon leste / oeste
+
+    # Faixas de distribuição dos labels ao longo de cada borda
+    N_LO, N_HI = -73.0, -36.0
+    S_LO, S_HI = -73.0, -36.0
+    E_LO, E_HI = -33.0,   5.5   # lat (sul → norte)
+    W_LO, W_HI = -33.0,   5.5
+
+    def _spread(n, lo, hi):
+        if n == 1:
+            return [(lo + hi) / 2]
+        return [lo + i * (hi - lo) / (n - 1) for i in range(n)]
+
+    # Agrupar UFs com dados por borda, ordenando para minimizar cruzamentos
+    groups: dict = {"N": [], "S": [], "E": [], "W": []}
+    for uf, v in pairs:
+        groups[_UF_SIDE.get(uf, "E")].append((uf, v))
+
+    groups["N"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])        # lon crescente W→E
+    groups["S"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])
+    groups["E"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])       # lat decrescente N→S
+    groups["W"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])
+
+    lbl_pos: dict = {}
+    for (uf, _), c in zip(groups["N"], _spread(len(groups["N"]), N_LO, N_HI)):
+        lbl_pos[uf] = (LN, c)
+    for (uf, _), c in zip(groups["S"], _spread(len(groups["S"]), S_LO, S_HI)):
+        lbl_pos[uf] = (LS, c)
+    for (uf, _), c in zip(groups["E"], _spread(len(groups["E"]), E_LO, E_HI)):
+        lbl_pos[uf] = (c, LE)
+    for (uf, _), c in zip(groups["W"], _spread(len(groups["W"]), W_LO, W_HI)):
+        lbl_pos[uf] = (c, LW)
 
     line_lats: list = []
     line_lons: list = []
@@ -669,9 +698,8 @@ def _fig_mapa_ufs(ufs: dict):
         pct = round(100 * v / total, 1)
         dot_lats.append(clat)
         dot_lons.append(clon)
-        llat, llon = _label_pos(clat, clon)
-        # Linha em L: horizontal do centroide até a coluna do label,
-        # depois vertical até o label
+        llat, llon = lbl_pos[uf]
+        # L-shape: horizontal até coluna do label, depois vertical até lat do label
         line_lats.extend([clat, clat, llat, None])
         line_lons.extend([clon, llon, llon, None])
         lbl_lats.append(llat)
@@ -681,30 +709,23 @@ def _fig_mapa_ufs(ufs: dict):
 
     fig = go.Figure()
 
-    # Leader lines
     fig.add_trace(go.Scattergeo(
         lat=line_lats, lon=line_lons,
         mode="lines",
-        line=dict(color="rgba(148,163,184,0.50)", width=1),
-        hoverinfo="skip",
-        showlegend=False,
+        line=dict(color="rgba(148,163,184,0.55)", width=1),
+        hoverinfo="skip", showlegend=False,
     ))
-
-    # Ponto no centroide de cada estado
     fig.add_trace(go.Scattergeo(
         lat=dot_lats, lon=dot_lons,
         mode="markers",
-        marker=dict(size=6, color="#60a5fa", symbol="circle"),
-        hoverinfo="skip",
-        showlegend=False,
+        marker=dict(size=7, color="#60a5fa", symbol="circle"),
+        hoverinfo="skip", showlegend=False,
     ))
-
-    # Texto dos labels (sigla + quantidade)
     fig.add_trace(go.Scattergeo(
         lat=lbl_lats, lon=lbl_lons,
         mode="text",
         text=lbl_texts,
-        textfont=dict(size=15, color="#f1f5f9"),
+        textfont=dict(size=14, color="#f1f5f9"),
         customdata=lbl_hov,
         hovertemplate="%{customdata}<extra></extra>",
         showlegend=False,
@@ -714,12 +735,12 @@ def _fig_mapa_ufs(ufs: dict):
         scope="south america",
         resolution=50,
         bgcolor=_BG,
-        landcolor="#1c1a17",    # terra escura — contraste para as bordas dos estados
+        landcolor="#1c1a17",
         oceancolor=_BG,
         lakecolor=_BG,
-        coastlinecolor="rgba(255,255,255,0.55)",
-        coastlinewidth=1.5,
-        countrycolor="#1c1a17", # fronteiras de países da mesma cor da terra → invisíveis
+        coastlinecolor="rgba(255,255,255,0.65)",
+        coastlinewidth=1.8,
+        countrycolor="#1c1a17",  # mesma cor da terra → fronteiras invisíveis
         countrywidth=1,
         showcoastlines=True,
         showland=True,
@@ -727,10 +748,10 @@ def _fig_mapa_ufs(ufs: dict):
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.45)",
-        subunitwidth=0.9,
-        lataxis=dict(range=[_BR_LAT_MIN, _BR_LAT_MAX]),
-        lonaxis=dict(range=[_BR_LON_MIN, _BR_LON_MAX]),
+        subunitcolor="rgba(255,255,255,0.55)",
+        subunitwidth=1.2,
+        lataxis=dict(range=[VP_LAT_MIN, VP_LAT_MAX]),
+        lonaxis=dict(range=[VP_LON_MIN, VP_LON_MAX]),
     )
     fig.update_layout(
         paper_bgcolor=_BG,
