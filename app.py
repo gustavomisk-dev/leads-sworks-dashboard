@@ -623,32 +623,36 @@ _UF_IBGE_CODE = {
 }
 
 
+_IBGE_TO_UF = {v: k for k, v in _UF_IBGE_CODE.items()}
+
+
 @st.cache_data(ttl=86400 * 30, show_spinner=False)
 def _load_brazil_geojson():
-    urls = [
-        ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR"
-         "?formato=application/vnd.geo+json&qualidade=minima&divisao=estado"),
-        ("https://servicodados.ibge.gov.br/api/v2/malhas/estados"
-         "?resolucao=5&formato=application/vnd.geo+json"),
-    ]
-    for url in urls:
-        try:
-            r = requests.get(url, timeout=15)
-            r.raise_for_status()
-            gj = r.json()
-            if gj.get("features"):
-                # Normaliza id de cada feature para o código de 2 dígitos
-                for f in gj["features"]:
-                    props = f.get("properties", {})
-                    raw = (f.get("id")
-                           or props.get("codarea")
-                           or props.get("codigo")
-                           or "")
-                    f["id"] = str(raw).lstrip("0") or str(raw)
-                return gj
-        except Exception:
-            continue
-    return None
+    url = ("https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR"
+           "?formato=application/vnd.geo+json&qualidade=minima&divisao=estado")
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status()
+        gj = r.json()
+        features = gj.get("features", [])
+        # GeoJSON de estados deve ter exatamente 27 features
+        if len(features) < 25 or len(features) > 30:
+            return None
+        for f in features:
+            props = f.get("properties") or {}
+            # Extrai o código numérico do estado (2 dígitos IBGE)
+            raw = f.get("id") or props.get("codarea") or props.get("codigo") or ""
+            try:
+                code = str(int(str(raw)))   # "011" → "11",  11 → "11"
+            except (ValueError, TypeError):
+                code = str(raw)
+            if f.get("properties") is None:
+                f["properties"] = {}
+            f["properties"]["codarea"] = code
+            f["properties"]["sigla"] = _IBGE_TO_UF.get(code, "")
+        return gj
+    except Exception:
+        return None
 
 
 def _fig_mapa_ufs(ufs: dict):
@@ -663,7 +667,7 @@ def _fig_mapa_ufs(ufs: dict):
     if not pairs:
         return None
 
-    locations = [_UF_IBGE_CODE[uf] for uf, _ in pairs]
+    locations = [uf for uf, _ in pairs]           # siglas 2 letras
     z_pct     = [round(100 * v / total, 1) for _, v in pairs]
     hovers    = [f"<b>{uf}</b><br>{v:,} leads ({100*v/total:.1f}%)"
                  for uf, v in pairs]
@@ -672,7 +676,7 @@ def _fig_mapa_ufs(ufs: dict):
         geojson=geojson,
         locations=locations,
         z=z_pct,
-        featureidkey="id",
+        featureidkey="properties.sigla",   # campo que nós mesmos setamos
         colorscale=[
             [0.0, "rgba(30,58,138,0.20)"],
             [0.3, "rgba(96,165,250,0.65)"],
@@ -696,7 +700,7 @@ def _fig_mapa_ufs(ufs: dict):
     ))
     fig.update_geos(
         fitbounds="locations",
-        visible=False,           # sem fundo de continentes/oceano
+        visible=False,
         bgcolor=_BG,
     )
     fig.update_layout(
