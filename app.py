@@ -110,6 +110,9 @@ _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=11, color="#94a3b8")
 
+_TV_N_SLIDES   = 12
+_TV_INTERVAL_S = 15  # seconds per slide
+
 # ── GitHub API ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
@@ -966,6 +969,283 @@ def _html_tabela_financeira(fin: dict) -> str:
     )
 
 
+# ── Modo TV ───────────────────────────────────────────────────────────────────
+import streamlit.components.v1 as _stcmp
+
+
+def _tv_nav(slide: int) -> None:
+    """Barra de progresso + indicadores + auto-avanço JS."""
+    prox = (slide + 1) % _TV_N_SLIDES
+    dots = "".join(
+        f'<div style="width:8px;height:8px;border-radius:50%;background:'
+        f'{"#FEC52E" if i == slide else "#2a2820"};flex-shrink:0"></div>'
+        for i in range(_TV_N_SLIDES)
+    )
+    _stcmp.html(f"""
+    <style>@keyframes tv_prog{{from{{width:0%}}to{{width:100%}}}}</style>
+    <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#111;z-index:9999">
+      <div style="height:100%;background:#FEC52E;
+           animation:tv_prog {_TV_INTERVAL_S}s linear forwards"></div>
+    </div>
+    <div style="position:fixed;bottom:9px;left:50%;transform:translateX(-50%);
+         display:flex;gap:6px;z-index:9999">{dots}</div>
+    <div style="position:fixed;top:8px;right:60px;color:#475569;
+         font-size:11px;font-family:monospace;z-index:9999">
+      {slide+1}/{_TV_N_SLIDES}</div>
+    <script>
+    setTimeout(function(){{
+      var p=new URLSearchParams(window.parent.location.search);
+      p.set('tv','1');p.set('slide','{prox}');
+      window.parent.location.search=p.toString();
+    }},{_TV_INTERVAL_S*1000});
+    </script>
+    """, height=0)
+
+
+def _tv_h(titulo: str, periodo: str = "") -> None:
+    sub = f'<span style="color:#475569;font-size:13px;margin-left:12px">{periodo}</span>' if periodo else ""
+    st.markdown(
+        f'<div style="color:#FEC52E;font-size:17px;font-weight:700;'
+        f'border-bottom:1px solid #272420;padding-bottom:8px;margin-bottom:14px">'
+        f'{titulo}{sub}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _periodo):
+    n_rep = _f.get("reprovados", 0)
+    n_ap  = _f.get("aprovados", 0)
+
+    st.markdown("""
+    <style>
+    header[data-testid="stHeader"]{display:none!important}
+    footer{display:none!important}
+    #MainMenu{display:none!important}
+    [data-testid="stDeployButton"]{display:none!important}
+    section.main>.block-container{padding:.5rem 1.5rem 2.5rem!important;max-width:100%!important}
+    </style>
+    """, unsafe_allow_html=True)
+
+    if st.button("✕ Sair do TV", key="tv_exit"):
+        st.query_params.clear()
+        st.rerun()
+
+    if slide == 0:
+        _tv_h("KPIs · Distribuição por Status · Funil de Conversão", _periodo)
+        taxa  = f"{_f['taxa_aprovacao']:.1f}%" if _f.get("terminais") else "—"
+        vol   = _fin.get("ValorContratacao", {})
+        vol_s = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
+        ag    = _agg.get("aguardando", 0)
+        st.markdown(f"""
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-label">Total de leads</div>
+            <div class="kpi-value">{_f['total']:,}</div><div class="kpi-sub">{_periodo}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Aprovados</div>
+            <div class="kpi-value">{_f['aprovados']:,}</div><div class="kpi-sub">taxa: {taxa}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
+            <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_f['terminais']:,} finalizados</div></div>
+          <div class="kpi-card"><div class="kpi-label">Reprovados</div>
+            <div class="kpi-value">{_f['reprovados']:,}</div>
+            <div class="kpi-sub">{_f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
+          <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
+            <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
+          <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
+            <div class="kpi-value">{ag:,}</div><div class="kpi-sub">BLOQUEIO_TEMPORARIO</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            fig = _fig_donut(_f.get("_d_status", {}))
+            if fig:
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        with c2:
+            fig = _fig_funil_rico(_f)
+            if fig:
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    elif slide == 1:
+        _tv_h("Evolução Temporal", _periodo)
+        fig = _fig_evolucao(_agg, _n_dias, dias_raw=_dias_raw, datas_sel=_datas_sel)
+        if fig:
+            fig.update_layout(height=650, margin=dict(t=50, b=80, l=10, r=10))
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    elif slide == 2:
+        _tv_h("Estatísticas Financeiras dos Aprovados · Distribuição do Valor Contratado", _periodo)
+        c1, c2 = st.columns(2)
+        with c1:
+            html = _html_tabela_financeira(_fin)
+            if html:
+                st.markdown(html, unsafe_allow_html=True)
+        with c2:
+            fig = _fig_histograma(_agg.get("valores_contratacao", []))
+            if fig:
+                fig.update_layout(height=430)
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    elif slide == 3:
+        _tv_h("Etapas de Reprovação · Visão Detalhada", _periodo)
+        etapas_d = _agg.get("etapas", {})
+        em_d     = _agg.get("etapa_motivos", {})
+        if etapas_d and n_rep > 0:
+            html_d = _html_diagrama(etapas_d, n_rep)
+            if html_d:
+                st.markdown(html_d, unsafe_allow_html=True)
+            tbl = _html_tabela_etapa_motivo(em_d, etapas_d, n_rep)
+            if tbl:
+                st.markdown(tbl, unsafe_allow_html=True)
+        else:
+            st.info("Sem dados de etapas.")
+
+    elif slide == 4:
+        _tv_h("Etapas de Reprovação · Visão de Funil", _periodo)
+        etapas_d = _agg.get("etapas", {})
+        if etapas_d and n_rep > 0:
+            html_d = _html_diagrama(etapas_d, n_rep)
+            if html_d:
+                st.markdown(html_d, unsafe_allow_html=True)
+            result_f = _fig_funil_etapa(etapas_d, n_rep)
+            if result_f:
+                fig_f, _ = result_f
+                fig_f.update_layout(height=430)
+                st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de etapas.")
+
+    elif slide == 5:
+        _tv_h("Motivos de Reprovação — Alto Nível e Detalhado", _periodo)
+        c1, c2 = st.columns(2)
+        with c1:
+            fig = _fig_barras_h(_agg.get("top_motivos", {}),
+                                "Motivo — Alto Nível", "#ef4444", pct_base=n_rep)
+            if fig:
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                st.info("Sem dados de motivos.")
+        with c2:
+            mot_det = _agg.get("top_motivos_det", {})
+            if mot_det:
+                n_det = sum(mot_det.values())
+                fig = _fig_barras_h(mot_det, "Motivo — Detalhado", "#f97316", pct_base=n_det)
+                if fig:
+                    fig.update_layout(height=500)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                st.info("Sem dados de motivos detalhados.")
+
+    elif slide == 6:
+        _tv_h("Leads com Bloqueio por Tipo", _periodo)
+        fig = _fig_bloqueios(_agg.get("bloqueios", {}), n_rep=n_rep)
+        if fig:
+            _, cc, _ = st.columns([1, 2, 1])
+            with cc:
+                fig.update_layout(height=400, margin=dict(t=60, b=30, l=10, r=10))
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de bloqueios.")
+
+    elif slide == 7:
+        _tv_h("Top Empregadores dos Reprovados · UF dos Reprovados", _periodo)
+        c1, c2 = st.columns(2)
+        with c1:
+            emp_rep = _agg.get("top_emp_rep", {})
+            if emp_rep:
+                fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep)
+                if fig:
+                    fig.update_layout(height=480)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                st.info("Sem dados de empregadores dos reprovados.")
+        with c2:
+            ufs = _agg.get("top_ufs", {})
+            if ufs:
+                n_ufs = sum(ufs.values())
+                fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=10, pct_base=n_ufs)
+                if fig:
+                    fig.update_layout(height=480)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                st.info("Sem dados de UF.")
+
+    elif slide == 8:
+        _tv_h("CNAEs Bloqueados dos Reprovados", _periodo)
+        cnaes = _agg.get("top_cnaes", {})
+        if cnaes:
+            n_cnae = sum(cnaes.values())
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = _fig_barras_h(cnaes, "Top CNAEs Bloqueados", "#eab308", pct_base=n_cnae)
+                if fig:
+                    fig.update_layout(height=500)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            with c2:
+                tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae,
+                                           code_col_title="Código CNAE")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+        else:
+            st.info("Sem dados de CNAE bloqueado.")
+
+    elif slide == 9:
+        _tv_h("CBOs Bloqueados dos Reprovados", _periodo)
+        cbos_rep = _agg.get("top_cbos_rep", {})
+        if cbos_rep:
+            n_cbo_r = sum(cbos_rep.values())
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = _fig_barras_h(cbos_rep, "Top CBOs Bloqueados", "#a855f7", pct_base=n_cbo_r)
+                if fig:
+                    fig.update_layout(height=500)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            with c2:
+                tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r,
+                                           code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+        else:
+            st.info("Sem dados de CBO dos reprovados.")
+
+    elif slide == 10:
+        _tv_h("Top Empregadores dos Aprovados", _periodo)
+        emp_ap = _agg.get("top_empregadores", {})
+        if emp_ap:
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+                if fig:
+                    fig.update_layout(height=500)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            with c2:
+                tbl = _html_tabela_ranking(emp_ap, "Razão Social", n_ap)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+        else:
+            st.info("Sem dados de empregadores dos aprovados.")
+
+    elif slide == 11:
+        _tv_h("Top CBOs dos Aprovados", _periodo)
+        cbos_ap = _agg.get("top_cbos", {})
+        if cbos_ap:
+            c1, c2 = st.columns(2)
+            with c1:
+                fig = _fig_barras_h(cbos_ap, "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+                if fig:
+                    fig.update_layout(height=500)
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            with c2:
+                tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap,
+                                           code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+        else:
+            st.info("Sem dados de CBO dos aprovados.")
+
+    _tv_nav(slide)
+
+
 # ── Carrega datas disponiveis ─────────────────────────────────────────────────
 
 datas = listar_datas()
@@ -977,17 +1257,47 @@ data_min = datetime.strptime(datas[0],  "%Y%m%d").date()
 data_max = datetime.strptime(datas[-1], "%Y%m%d").date()
 d_ini_default = max(data_min, data_max - timedelta(days=1))
 
+# ── Modo TV: atalho completo ──────────────────────────────────────────────────
+if st.query_params.get("tv", "0") == "1":
+    _tv_slide = int(st.query_params.get("slide", "0")) % _TV_N_SLIDES
+    _d_ini_tv = max(data_min, data_max - timedelta(days=1))
+    _datas_sel_tv = [d for d in datas
+                     if _d_ini_tv <= datetime.strptime(d, "%Y%m%d").date() <= data_max]
+    with st.spinner("Carregando..."):
+        _dias_raw_tv = [d for d in [carregar_dia(d) for d in _datas_sel_tv] if d]
+    if not _dias_raw_tv:
+        st.warning("Sem dados para ontem/hoje.")
+        st.stop()
+    _agg_tv = agregar(_dias_raw_tv)
+    _periodo_tv = (
+        _d_ini_tv.strftime("%d/%m/%Y") if _d_ini_tv == data_max
+        else f"{_d_ini_tv.strftime('%d/%m/%Y')} — {data_max.strftime('%d/%m/%Y')}"
+    )
+    _render_tv_slide(
+        _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
+        len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
+    )
+    st.stop()
+
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
 col_title, col_picker = st.columns([1, 1])
 
 with col_title:
-    st.markdown("## Leads SWorks")
-    st.markdown(
-        f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
-        f'até {data_max.strftime("%d/%m/%Y")}</div>',
-        unsafe_allow_html=True,
-    )
+    _c_tit, _c_tv = st.columns([3, 1])
+    with _c_tit:
+        st.markdown("## Leads SWorks")
+        st.markdown(
+            f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
+            f'até {data_max.strftime("%d/%m/%Y")}</div>',
+            unsafe_allow_html=True,
+        )
+    with _c_tv:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if st.button("📺 Modo TV", use_container_width=True):
+            st.query_params["tv"] = "1"
+            st.query_params["slide"] = "0"
+            st.rerun()
 
 with col_picker:
     intervalo = st.date_input(
