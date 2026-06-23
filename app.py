@@ -982,42 +982,46 @@ def _html_tabela_financeira(fin: dict) -> str:
 # ── Modo TV ───────────────────────────────────────────────────────────────────
 
 def _tv_nav(slide: int) -> None:
-    """Barra de progresso dourada + dots + setas de navegação (todos position:fixed)."""
-    prev_s = (slide - 1) % _TV_N_SLIDES
-    next_s = (slide + 1) % _TV_N_SLIDES
-    tv_ini = st.query_params.get("tv_ini", "")
-    _ini_param = f"&tv_ini={tv_ini}" if tv_ini else ""
-    prev_url = f"?tv=1&slide={prev_s}{_ini_param}"
-    next_url = f"?tv=1&slide={next_s}{_ini_param}"
-
+    """Barra de progresso dourada + dots (position:fixed). Setas ficam em _tv_ctrl."""
     dots = "".join(
         f'<div style="width:8px;height:8px;border-radius:50%;background:'
         f'{"#FEC52E" if i == slide else "#2a2820"};flex-shrink:0"></div>'
         for i in range(_TV_N_SLIDES)
     )
-    arrow = (
-        "color:#FEC52E;text-decoration:none;font-size:16px;"
-        "opacity:0.55;line-height:1;user-select:none"
-    )
     st.markdown(f"""
-    <style>
-      @keyframes tv_prog{{from{{width:0%}}to{{width:100%}}}}
-      a.tv-arr:hover{{opacity:1!important}}
-    </style>
+    <style>@keyframes tv_prog{{from{{width:0%}}to{{width:100%}}}}</style>
     <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#1a1814;z-index:9999">
       <div style="height:100%;background:#FEC52E;
            animation:tv_prog {_TV_INTERVAL_S}s linear forwards"></div>
     </div>
     <div style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
-         display:flex;gap:6px;align-items:center;z-index:9999">
-      <a href="{prev_url}" class="tv-arr" style="{arrow}">‹</a>
-      {dots}
-      <a href="{next_url}" class="tv-arr" style="{arrow}">›</a>
-    </div>
+         display:flex;gap:6px;align-items:center;z-index:9999">{dots}</div>
     <div style="position:fixed;top:10px;right:16px;color:#475569;
          font-size:11px;font-family:monospace;z-index:9999">
       {slide+1}/{_TV_N_SLIDES}</div>
     """, unsafe_allow_html=True)
+
+
+def _tv_ctrl(slide: int) -> None:
+    """Setas ‹ › como st.button — rerun via WebSocket, sem reload de página."""
+    st.markdown("""<style>
+    .tv-ctrl button{background:transparent!important;border:none!important;
+      color:#FEC52E!important;opacity:.55;font-size:18px!important;
+      padding:0 6px!important;min-height:0!important;height:28px!important}
+    .tv-ctrl button:hover{opacity:1!important}
+    .tv-ctrl{display:flex;justify-content:flex-end;gap:4px;
+             margin-bottom:4px}
+    </style>
+    <div class="tv-ctrl" id="tv-ctrl-anchor"></div>""", unsafe_allow_html=True)
+    _, c_prev, c_next = st.columns([20, 1, 1])
+    with c_prev:
+        if st.button("‹", key="_tv_prev", help="Slide anterior"):
+            st.query_params["slide"] = str((slide - 1) % _TV_N_SLIDES)
+            st.rerun()
+    with c_next:
+        if st.button("›", key="_tv_next", help="Próximo slide"):
+            st.query_params["slide"] = str((slide + 1) % _TV_N_SLIDES)
+            st.rerun()
 
 
 def _tv_h(titulo: str, periodo: str = "") -> None:
@@ -1265,6 +1269,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             st.info("Sem dados de CBO dos aprovados.")
 
     _tv_nav(slide)
+    _tv_ctrl(slide)
 
 
 # ── Carrega datas disponiveis ─────────────────────────────────────────────────
