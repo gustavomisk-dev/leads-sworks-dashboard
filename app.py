@@ -273,7 +273,7 @@ section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!i
 .kpi-label{font-size:21px!important;letter-spacing:.06em}
 .kpi-sub{font-size:18px!important}
 .dtbl{font-size:25px!important;width:100%}
-.dtbl th,.dtbl td{padding:12px 18px!important}
+.dtbl th,.dtbl td{padding:12px 18px!important;font-size:25px!important}
 .dtbl-title{display:none!important}
 </style>"""
 
