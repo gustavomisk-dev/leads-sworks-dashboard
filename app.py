@@ -971,28 +971,26 @@ def _html_tabela_financeira(fin: dict) -> str:
 
 
 # ── Modo TV ───────────────────────────────────────────────────────────────────
-import streamlit.components.v1 as _stcmp
-
 
 def _tv_nav(slide: int) -> None:
-    """Barra de progresso + indicadores de slide (sem JS — avanço via time.sleep+rerun)."""
+    """Barra de progresso dourada + dots — injetado no DOM principal via st.markdown."""
     dots = "".join(
         f'<div style="width:8px;height:8px;border-radius:50%;background:'
         f'{"#FEC52E" if i == slide else "#2a2820"};flex-shrink:0"></div>'
         for i in range(_TV_N_SLIDES)
     )
-    _stcmp.html(f"""
+    st.markdown(f"""
     <style>@keyframes tv_prog{{from{{width:0%}}to{{width:100%}}}}</style>
-    <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#111;z-index:9999">
+    <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#1a1814;z-index:9999">
       <div style="height:100%;background:#FEC52E;
            animation:tv_prog {_TV_INTERVAL_S}s linear forwards"></div>
     </div>
-    <div style="position:fixed;bottom:9px;left:50%;transform:translateX(-50%);
+    <div style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
          display:flex;gap:6px;z-index:9999">{dots}</div>
-    <div style="position:fixed;top:8px;right:60px;color:#475569;
+    <div style="position:fixed;top:10px;right:16px;color:#475569;
          font-size:11px;font-family:monospace;z-index:9999">
       {slide+1}/{_TV_N_SLIDES}</div>
-    """, height=0)
+    """, unsafe_allow_html=True)
 
 
 def _tv_h(titulo: str, periodo: str = "") -> None:
