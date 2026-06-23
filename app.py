@@ -1280,7 +1280,7 @@ if st.query_params.get("tv", "0") == "1":
     _cp1, _cp2, _cp3 = st.columns([1, 2, 5])
     with _cp1:
         st.markdown(
-            "<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 De:</p>",
+            "<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 Desde:</p>",
             unsafe_allow_html=True,
         )
     with _cp2:
