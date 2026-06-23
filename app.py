@@ -4,7 +4,6 @@ Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
 import json
-import time
 import requests
 import streamlit as st
 import plotly.graph_objects as go
@@ -1343,9 +1342,18 @@ if st.query_params.get("tv", "0") == "1":
         _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
         len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
     )
-    time.sleep(_TV_INTERVAL_S)
-    st.query_params["slide"] = str((_tv_slide + 1) % _TV_N_SLIDES)
-    st.rerun()
+    # Auto-avanço via JS setTimeout — o script encerra aqui (st.stop),
+    # o spinner some, e o JS navega para o próximo slide após o intervalo.
+    _next_slide = (_tv_slide + 1) % _TV_N_SLIDES
+    _tv_ini_raw2 = st.query_params.get("tv_ini", "")
+    _ini_p2 = f"&tv_ini={_tv_ini_raw2}" if _tv_ini_raw2 else ""
+    _next_url = f"?tv=1&slide={_next_slide}{_ini_p2}"
+    st.components.v1.html(
+        f"<script>setTimeout(()=>{{window.parent.location.href='{_next_url}'}},"
+        f"{_TV_INTERVAL_S * 1000})</script>",
+        height=0,
+    )
+    st.stop()
 
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
