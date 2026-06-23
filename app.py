@@ -1155,7 +1155,15 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             result_f = _fig_funil_etapa(etapas_d, n_rep)
             if result_f:
                 fig_f, _ = result_f
-                fig_f.update_layout(height=430, margin=dict(b=100))
+                fig_f.update_layout(
+                    height=430,
+                    legend=dict(orientation="v", x=0.82, y=0.04,
+                                xanchor="left", yanchor="bottom",
+                                bgcolor="rgba(15,14,11,0.80)",
+                                bordercolor="rgba(255,255,255,0.08)",
+                                borderwidth=1, font=dict(size=13)),
+                    margin=dict(b=50),
+                )
                 st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
