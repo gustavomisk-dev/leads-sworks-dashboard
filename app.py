@@ -437,8 +437,11 @@ def _fig_donut(d_status: dict):
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Distribuição por Status", font=_TF),
-        legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
-                    orientation="v", x=1.02, y=0.5),
+        legend=dict(font=dict(size=12, color="#94a3b8"),
+                    bgcolor="rgba(13,12,10,0.85)",
+                    bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
+                    orientation="v", x=0.58, y=0.50,
+                    xanchor="left", yanchor="middle"),
         margin=dict(t=50, b=10, l=10, r=10), height=360,
         annotations=[dict(text=f"<b>{total:,}</b><br><span style='font-size:10px'>leads</span>",
                           x=0.5, y=0.5, font=dict(size=14, color="#e2e8f0"), showarrow=False)],
@@ -1130,31 +1133,18 @@ def _html_tabela_financeira(fin: dict) -> str:
 # ── Modo TV ───────────────────────────────────────────────────────────────────
 
 def _tv_nav(slide: int) -> None:
-    """Barra de progresso dourada + dots + setas ‹ › ao redor (todos position:fixed)."""
-    prev_s = (slide - 1) % _TV_N_SLIDES
-    next_s = (slide + 1) % _TV_N_SLIDES
-    tv_ini = st.query_params.get("tv_ini", "")
-    _ini_param = f"&tv_ini={tv_ini}" if tv_ini else ""
-    prev_url = f"?tv=1&slide={prev_s}{_ini_param}"
-    next_url = f"?tv=1&slide={next_s}{_ini_param}"
-
+    """Barra de progresso dourada + dots (position:fixed). Setas ‹ › ficam na barra de controles do topo."""
     dots = "".join(
         f'<div style="width:8px;height:8px;border-radius:50%;background:'
         f'{"#FEC52E" if i == slide else "#2a2820"};flex-shrink:0"></div>'
         for i in range(_TV_N_SLIDES)
     )
-    arrow = (
-        "color:#FEC52E;text-decoration:none;font-size:18px;"
-        "opacity:0.5;line-height:1;user-select:none"
-    )
-    # Nome único por slide: força o browser a reiniciar a animação em cada slide
-    _ap = f"tvp{slide}"   # progress bar
-    _af = f"tvf{slide}"   # fade-in do conteúdo
+    _ap = f"tvp{slide}"
+    _af = f"tvf{slide}"
     st.markdown(f"""
     <style>
       @keyframes {_ap}{{from{{width:0%}}to{{width:100%}}}}
       @keyframes {_af}{{from{{opacity:0}}to{{opacity:1}}}}
-      a.tv-arr:hover{{opacity:1!important}}
       body,html{{background:#0f0e0b!important}}
       section.main>.block-container{{animation:{_af} .4s ease}}
     </style>
@@ -1164,13 +1154,8 @@ def _tv_nav(slide: int) -> None:
     </div>
     <div style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
          display:flex;gap:6px;align-items:center;z-index:9999">
-      <a href="{prev_url}" class="tv-arr" style="{arrow}" target="_self">‹</a>
       {dots}
-      <a href="{next_url}" class="tv-arr" style="{arrow}" target="_self">›</a>
     </div>
-    <div style="position:fixed;top:10px;right:16px;color:#475569;
-         font-size:11px;font-family:monospace;z-index:9999">
-      {slide+1}/{_TV_N_SLIDES}</div>
     """, unsafe_allow_html=True)
 
 
@@ -1493,7 +1478,12 @@ d_ini_default = max(data_min, data_max - timedelta(days=1))
 
 # ── Modo TV: atalho completo ──────────────────────────────────────────────────
 if st.query_params.get("tv", "0") == "1":
-    _tv_slide = int(st.query_params.get("slide", "0")) % _TV_N_SLIDES
+    # Slide via session_state (não URL) → rerun via WebSocket, sem page reload, sem perder fullscreen
+    if "tv_slide" not in st.session_state:
+        st.session_state["tv_slide"] = int(st.query_params.get("slide", "0")) % _TV_N_SLIDES
+    _tv_slide  = st.session_state["tv_slide"]
+    _tv_prev   = (_tv_slide - 1) % _TV_N_SLIDES
+    _tv_next   = (_tv_slide + 1) % _TV_N_SLIDES
 
     # CSS TV antecipado (evita flash antes de _render_tv_slide)
     st.markdown("""<style>
@@ -1514,54 +1504,18 @@ if st.query_params.get("tv", "0") == "1":
     section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
     </style>""", unsafe_allow_html=True)
 
-    # Tela cheia + interceptor de navegação entre slides (mantém fullscreen)
+    # Tela cheia automática (melhor esforço — pode ser bloqueado sem gesto do usuário)
     components.html("""
     <script>
-    (function(){
-      var doc = parent.document, win = parent.window;
-
-      // 1. Tenta fullscreen ao carregar
-      try {
-        var el = doc.documentElement;
+    try {
+        var el = parent.document.documentElement;
         var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
         if (fn) fn.call(el);
-      } catch(e) {}
-
-      // 2. Intercepta cliques nas setas de slide para usar pushState (sem page reload)
-      //    Isso preserva o fullscreen entre slides
-      function patchNavLinks() {
-        doc.querySelectorAll('a.tv-arr').forEach(function(a) {
-          if (a._tvPatched) return;
-          a._tvPatched = true;
-          a.addEventListener('click', function(e) {
-            e.preventDefault();
-            var href = this.getAttribute('href');
-            win.history.pushState(null, '', href);
-            win.dispatchEvent(new PopStateEvent('popstate', {state: null}));
-          });
-        });
-      }
-      patchNavLinks();
-      setTimeout(patchNavLinks, 800);
-
-      // 3. Detecta saída do modo TV (URL muda, tv!=1) e sai do fullscreen
-      var lastSearch = win.location.search;
-      setInterval(function() {
-        if (win.location.search === lastSearch) return;
-        lastSearch = win.location.search;
-        var params = new URLSearchParams(win.location.search);
-        if (params.get('tv') !== '1') {
-          try {
-            var ef = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen;
-            if (ef) ef.call(doc);
-          } catch(e2) {}
-        }
-      }, 300);
-    })();
+    } catch(e) {}
     </script>
     """, height=0)
 
-    # Seletor de período
+    # Seletor de período + navegação de slides na mesma barra
     _default_d_ini = max(data_min, data_max - timedelta(days=1))
     _tv_ini_raw = st.query_params.get("tv_ini", "")
     try:
@@ -1571,28 +1525,39 @@ if st.query_params.get("tv", "0") == "1":
     except ValueError:
         _d_ini_tv = _default_d_ini
 
-    _cp1, _cp2, _cp3, _cp4 = st.columns([1, 2, 4, 2])
-    with _cp1:
-        st.markdown(
-            "<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 Desde:</p>",
-            unsafe_allow_html=True,
-        )
-    with _cp2:
+    _cp_prev, _cp_lbl, _cp_date, _cp_info, _cp_next, _cp_exit = st.columns([1, 1, 2, 2, 1, 2])
+    with _cp_prev:
+        if st.button("‹", key="tv_prev", use_container_width=True):
+            st.session_state["tv_slide"] = _tv_prev
+            st.rerun()
+    with _cp_lbl:
+        st.markdown("<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 Desde:</p>",
+                    unsafe_allow_html=True)
+    with _cp_date:
         _new_ini = st.date_input(
             "", value=_d_ini_tv,
             min_value=data_min, max_value=data_max,
             key="tv_ini_picker", label_visibility="collapsed",
         )
-    with _cp3:
-        st.empty()
-    with _cp4:
+    with _cp_info:
+        st.markdown(
+            f"<p style='text-align:center;margin:8px 0;color:#64748b;"
+            f"font-size:12px;font-family:monospace'>{_tv_slide+1} / {_TV_N_SLIDES}</p>",
+            unsafe_allow_html=True,
+        )
+    with _cp_next:
+        if st.button("›", key="tv_next", use_container_width=True):
+            st.session_state["tv_slide"] = _tv_next
+            st.rerun()
+    with _cp_exit:
         if st.button("Sair do modo TV", key="tv_exit", use_container_width=True):
+            st.session_state.pop("tv_slide", None)
             st.query_params.clear()
             st.rerun()
 
     if _new_ini != _d_ini_tv:
         st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
-        st.query_params["slide"] = "0"
+        st.session_state["tv_slide"] = 0
         st.rerun()
     _d_ini_tv = _new_ini
 
@@ -1613,8 +1578,20 @@ if st.query_params.get("tv", "0") == "1":
         len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
     )
     time.sleep(_TV_INTERVAL_S)
-    st.query_params["slide"] = str((_tv_slide + 1) % _TV_N_SLIDES)
+    st.session_state["tv_slide"] = (_tv_slide + 1) % _TV_N_SLIDES
     st.rerun()
+
+# ── Saída de modo TV: sai do fullscreen via JS ────────────────────────────────
+else:
+    components.html("""
+    <script>
+    try {
+        var doc = parent.document;
+        var ef = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen;
+        if (ef && (doc.fullscreenElement || doc.webkitFullscreenElement)) ef.call(doc);
+    } catch(e) {}
+    </script>
+    """, height=0)
 
 # ── Header + seletor ──────────────────────────────────────────────────────────
 
@@ -1656,8 +1633,8 @@ with col_title:
     with _c_tv:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
         if st.button("📺 Modo TV", use_container_width=True):
+            st.session_state["tv_slide"] = 0
             st.query_params["tv"] = "1"
-            st.query_params["slide"] = "0"
             st.rerun()
     with _c_out:
         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
