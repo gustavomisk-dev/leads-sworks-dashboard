@@ -268,7 +268,6 @@ section.main>.block-container{
     max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
 [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
 iframe{height:0!important;min-height:0!important;overflow:hidden!important}
-.js-plotly-plot .legend text,.js-plotly-plot .legendtext{font-size:25px!important}
 section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
 .kpi-value{font-size:40px!important}
 .kpi-label{font-size:18px!important;letter-spacing:.06em}
@@ -1247,7 +1246,10 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if fig:
             fig.update_traces(textfont=dict(size=18))
             fig.update_annotations(font_size=25)
-            fig.update_layout(height=430)
+            fig.update_layout(
+                height=430,
+                legend=dict(font=dict(size=20, color="#94a3b8")),
+            )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 1:
