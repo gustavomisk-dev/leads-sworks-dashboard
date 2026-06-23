@@ -1337,8 +1337,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             if fig_d:
                 fig_d.update_traces(
                     textfont=_TV_TXT,
-                    textposition="outside",
-                    cliponaxis=False,
+                    textposition="inside",
                     selector=dict(type="bar"),
                 )
                 fig_d.update_layout(
