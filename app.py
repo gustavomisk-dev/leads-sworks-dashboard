@@ -467,10 +467,10 @@ def _fig_donut(d_status: dict):
             bgcolor="rgba(13,12,10,0.85)",
             bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
             orientation="v",
-            x=1.0, y=0.50,
-            xanchor="right", yanchor="middle",
+            x=0.60, y=0.50,
+            xanchor="left", yanchor="middle",
         ),
-        margin=dict(t=50, b=10, l=10, r=10), height=360,
+        margin=dict(t=50, b=10, l=10, r=200), height=360,
         annotations=[dict(
             text=f"<b>{total:,}</b><br>leads",
             x=0.275,                 # center of pie domain [0, 0.55]
@@ -501,14 +501,16 @@ def _fig_funil_rico(funil: dict):
         y=list(labels), x=list(values),
         marker=dict(color=list(colors), line=dict(color="#0d0c0a", width=1.5)),
         texttemplate="%{value:,}<br>%{percentInitial:.1%}",
-        textfont=dict(size=12, color="#e2e8f0"),
+        textfont=dict(size=14, color="#e2e8f0"),
         connector=dict(line=dict(color="rgba(255,255,255,0.2)", width=1)),
         hovertemplate="<b>%{y}</b><br>%{x:,} leads · %{percentInitial:.2%}<extra></extra>",
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Funil de Conversão", font=_TF),
-        margin=dict(t=50, b=10, l=140, r=40), height=360,
+        xaxis=dict(tickfont=_AF),
+        yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), automargin=True),
+        margin=dict(t=50, b=10, l=160, r=40), height=360,
     )
     return fig
 
@@ -1254,7 +1256,13 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(_kpi_html, unsafe_allow_html=True)
         fig = _fig_funil_rico(funil)
         if fig:
-            fig.update_layout(height=430)
+            fig.update_traces(textfont=dict(size=25, color="#e2e8f0"))
+            fig.update_layout(
+                height=450,
+                xaxis=dict(tickfont=_TV_AF),
+                yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                margin=dict(t=10, b=20, l=220, r=40),
+            )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 2:
