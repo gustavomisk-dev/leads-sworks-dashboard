@@ -467,9 +467,8 @@ def _fig_donut(d_status: dict):
             bgcolor="rgba(13,12,10,0.85)",
             bordercolor="rgba(255,255,255,0.10)", borderwidth=1,
             orientation="v",
-            x=0.58, y=0.50,
-            xanchor="left", yanchor="middle",
-            automargin=True,
+            x=1.0, y=0.50,
+            xanchor="right", yanchor="middle",
         ),
         margin=dict(t=50, b=10, l=10, r=10), height=360,
         annotations=[dict(
