@@ -581,11 +581,13 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
     return fig
 
 
-def _sem_codigo(d: dict) -> dict:
-    """Remove 'CODIGO — ' prefix das chaves, mantendo só a descrição."""
+def _sem_codigo(d: dict, max_chars: int = 50) -> dict:
+    """Remove 'CODIGO — ' prefix das chaves, trunca para max_chars."""
     out: dict = {}
     for k, v in d.items():
         label = k.split(" — ", 1)[1] if " — " in k else k
+        if len(label) > max_chars:
+            label = label[:max_chars - 1].rstrip() + "…"
         out[label] = out.get(label, 0) + v
     return out
 
