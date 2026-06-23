@@ -10,6 +10,7 @@ import time
 import bcrypt
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -67,6 +68,12 @@ st.markdown("""
 .dtbl tbody td.wrap { white-space: normal; word-break: break-word; }
 .dtbl tbody td.r { text-align: right; }
 .dtbl tbody td.c { text-align: center; }
+
+/* Reset login-form styling so it doesn't bleed into the dashboard */
+div[data-testid="stForm"]{background:transparent!important;border:none!important;
+    border-radius:0!important;padding:0!important}
+/* Hide CookieController iframe — it's JS-only, visibility doesn't affect function */
+iframe{height:0!important;min-height:0!important;display:none!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -159,18 +166,20 @@ def _login_page(cookies: CookieController) -> None:
     body,[data-testid="stAppViewContainer"]{background:#0a0908!important}
     [data-testid="stHeader"],footer,#MainMenu{display:none!important}
     [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
-    div[data-testid="stForm"]{background:#141210;border:1px solid #272420;
-        border-radius:12px;padding:28px 24px}
+    div[data-testid="stForm"]{background:#141210!important;border:1px solid #272420!important;
+        border-radius:12px!important;padding:28px 24px!important}
     </style>""", unsafe_allow_html=True)
 
     _, col, _ = st.columns([1, 1.1, 1])
     with col:
+        _svg_inline = _SVG_Z.replace("margin:0 auto 4px", "margin:0")
         st.markdown(
             f'<div style="text-align:center;margin:56px 0 28px">'
-            f'{_SVG_Z}'
-            f'<div style="font-size:28px;font-weight:700;color:#e2e8f0;'
-            f'letter-spacing:-0.5px;margin-top:6px">ilieads</div>'
-            f'<div style="font-size:13px;color:#475569;margin-top:4px">Dashboard de Leads</div>'
+            f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px">'
+            f'{_svg_inline}'
+            f'<div style="font-size:32px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px">ileads</div>'
+            f'</div>'
+            f'<div style="font-size:13px;color:#475569">Dashboard de Leads</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1183,17 +1192,19 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     <style>
     body,html{background:#0f0e0b!important}
     body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
-        overflow:hidden!important;height:100vh!important}
+        overflow:hidden!important;height:100vh!important;background:#0f0e0b!important}
     header[data-testid="stHeader"]{display:none!important}
     footer{display:none!important}
     #MainMenu{display:none!important}
-    [data-testid="stDeployButton"]{display:none!important}
-    [data-testid="stStatusWidget"]{display:none!important}
+    [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
     section.main>.block-container{
-        padding:.5rem 1.5rem 2.5rem!important;max-width:100%!important;
-        max-height:100vh!important;overflow:hidden!important}
+        padding:0 1.5rem 2rem!important;max-width:100%!important;
+        max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
+    [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
+    iframe{height:0!important;min-height:0!important;display:none!important}
     .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
         font-size:14px!important}
+    section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
     </style>
     """, unsafe_allow_html=True)
 
@@ -1325,10 +1336,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         _tv_h("Leads com Bloqueio por Tipo", _periodo)
         fig = _fig_bloqueios(_agg.get("bloqueios", {}), n_rep=n_rep)
         if fig:
-            _, cc, _ = st.columns([1, 2, 1])
-            with cc:
-                fig.update_layout(height=400, margin=dict(t=60, b=30, l=10, r=10))
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            fig.update_layout(height=500, margin=dict(t=40, b=40, l=80, r=80))
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de bloqueios.")
 
@@ -1490,18 +1499,31 @@ if st.query_params.get("tv", "0") == "1":
     st.markdown("""<style>
     body,html{background:#0f0e0b!important}
     body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
-        overflow:hidden!important;height:100vh!important}
+        overflow:hidden!important;height:100vh!important;background:#0f0e0b!important}
     header[data-testid="stHeader"]{display:none!important}
     footer{display:none!important}
     #MainMenu{display:none!important}
-    [data-testid="stDeployButton"]{display:none!important}
-    [data-testid="stStatusWidget"]{display:none!important}
+    [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
     section.main>.block-container{
-        padding:.3rem 1.5rem 2rem!important;max-width:100%!important;
-        max-height:100vh!important;overflow:hidden!important}
+        padding:0 1.5rem 2rem!important;max-width:100%!important;
+        max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
+    [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
+    iframe{height:0!important;min-height:0!important;display:none!important}
     .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
         font-size:14px!important}
+    section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
     </style>""", unsafe_allow_html=True)
+
+    # Tela cheia automática (melhor esforço — bloqueado se não houver gesto do usuário)
+    components.html("""
+    <script>
+    try {
+        var el = parent.document.documentElement;
+        var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+        if (fn) fn.call(el);
+    } catch(e) {}
+    </script>
+    """, height=0)
 
     # Seletor de período
     _default_d_ini = max(data_min, data_max - timedelta(days=1))
