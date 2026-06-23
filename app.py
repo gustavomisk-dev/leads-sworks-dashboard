@@ -646,18 +646,22 @@ def _fig_mapa_ufs(ufs: dict):
     pairs = sorted(pairs, key=lambda x: -x[1])
 
     # Viewport (com margem para labels fora do Brasil)
-    VP_LAT_MIN, VP_LAT_MAX = -38.0,  9.0
-    VP_LON_MIN, VP_LON_MAX = -79.0, -25.0
+    # center+projection_scale é o jeito correto de dar zoom em geo Plotly.
+    # lataxis/lonaxis desenha um retângulo visível em vez de recortar o mapa.
+    # Com scale=1.75 centrado em (-13,-52) o Brasil quase preenche a tela;
+    # área visível aprox.: lat[-35,+9]  lon[-70,-34].
+    GEO_CENTER = dict(lat=-13, lon=-52)
+    GEO_SCALE  = 1.75
 
-    # Posição fixa das linhas de label em cada borda
-    LN, LS =  7.5, -36.5    # lat norte / sul
-    LE, LW = -27.0, -77.0   # lon leste / oeste
+    # Linhas de label em cada borda (dentro do viewport, fora do Brasil)
+    LN, LS =  7.5, -34.5    # lat norte / sul
+    LE, LW = -35.0, -69.0   # lon leste / oeste
 
-    # Faixas de distribuição dos labels ao longo de cada borda
-    N_LO, N_HI = -73.0, -36.0
-    S_LO, S_HI = -73.0, -36.0
-    E_LO, E_HI = -33.0,   5.5   # lat (sul → norte)
-    W_LO, W_HI = -33.0,   5.5
+    # Faixas de distribuição ao longo de cada borda
+    N_LO, N_HI = -68.0, -36.0
+    S_LO, S_HI = -68.0, -36.0
+    E_LO, E_HI = -33.5,   7.0   # lat (sul → norte)
+    W_LO, W_HI = -33.5,   7.0
 
     def _spread(n, lo, hi):
         if n == 1:
@@ -748,10 +752,10 @@ def _fig_mapa_ufs(ufs: dict):
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.55)",
-        subunitwidth=1.2,
-        lataxis=dict(range=[VP_LAT_MIN, VP_LAT_MAX]),
-        lonaxis=dict(range=[VP_LON_MIN, VP_LON_MAX]),
+        subunitcolor="rgba(255,255,255,0.75)",
+        subunitwidth=1.8,
+        center=GEO_CENTER,
+        projection_scale=GEO_SCALE,
     )
     fig.update_layout(
         paper_bgcolor=_BG,
