@@ -668,9 +668,7 @@ def _fig_mapa_ufs(ufs: dict):
                 thickness=14,
                 x=1.01,
             ),
-            cmin=0,
-            cmax=max_v,
-            line=dict(color="#0d0c0a", width=1),
+            opacity=0.85,
         ),
     ))
     fig.update_layout(
