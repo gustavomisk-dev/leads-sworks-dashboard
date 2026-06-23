@@ -1091,7 +1091,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         _tv_h("Evolução Temporal", _periodo)
         fig = _fig_evolucao(_agg, _n_dias, dias_raw=_dias_raw, datas_sel=_datas_sel)
         if fig:
-            fig.update_layout(height=650, margin=dict(t=50, b=80, l=10, r=10))
+            fig.update_layout(height=650, title=dict(text=""), margin=dict(t=10, b=110, l=10, r=10))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 2:
