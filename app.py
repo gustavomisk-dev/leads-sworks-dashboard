@@ -639,15 +639,17 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
 
 def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
                           subtitulo: str = "",
-                          code_col_title: str = "Código") -> str:
+                          code_col_title: str = "Código",
+                          n: int = 15) -> str:
     """Tabela compacta de ranking: #, [código,] nome, leads, %.
     Se as chaves tiverem formato 'CODIGO — Descrição', exibe 2 colunas separadas."""
     if not data_dict:
         return ""
     _SEP = " — "
-    has_sep = any(_SEP in str(k) for k in list(data_dict.keys())[:5])
+    _items = list(data_dict.items())[:n]
+    has_sep = any(_SEP in str(k) for k, _ in _items[:5])
     rows_html = []
-    for i, (label, cnt) in enumerate(data_dict.items()):
+    for i, (label, cnt) in enumerate(_items):
         pct = f"{100*cnt/n_total:.1f}%" if n_total else "—"
         rc = "g0" if i % 2 == 0 else "g1"
         if has_sep and _SEP in str(label):
@@ -999,16 +1001,20 @@ def _tv_nav(slide: int) -> None:
         "color:#FEC52E;text-decoration:none;font-size:18px;"
         "opacity:0.5;line-height:1;user-select:none"
     )
+    # Nome único por slide: força o browser a reiniciar a animação em cada slide
+    _ap = f"tvp{slide}"   # progress bar
+    _af = f"tvf{slide}"   # fade-in do conteúdo
     st.markdown(f"""
     <style>
-      @keyframes tv_prog{{from{{width:0%}}to{{width:100%}}}}
-      @keyframes tv_fi{{from{{opacity:0}}to{{opacity:1}}}}
+      @keyframes {_ap}{{from{{width:0%}}to{{width:100%}}}}
+      @keyframes {_af}{{from{{opacity:0}}to{{opacity:1}}}}
       a.tv-arr:hover{{opacity:1!important}}
-      section.main>.block-container{{animation:tv_fi .35s ease}}
+      body,html{{background:#0f0e0b!important}}
+      section.main>.block-container{{animation:{_af} .4s ease}}
     </style>
     <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#1a1814;z-index:9999">
       <div style="height:100%;background:#FEC52E;
-           animation:tv_prog {_TV_INTERVAL_S}s linear forwards"></div>
+           animation:{_ap} {_TV_INTERVAL_S}s linear forwards"></div>
     </div>
     <div style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
          display:flex;gap:6px;align-items:center;z-index:9999">
@@ -1038,6 +1044,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
 
     st.markdown("""
     <style>
+    body,html{background:#0f0e0b!important}
     body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
         overflow:hidden!important;height:100vh!important}
     header[data-testid="stHeader"]{display:none!important}
@@ -1287,6 +1294,7 @@ if st.query_params.get("tv", "0") == "1":
 
     # CSS TV antecipado (evita flash antes de _render_tv_slide)
     st.markdown("""<style>
+    body,html{background:#0f0e0b!important}
     body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
         overflow:hidden!important;height:100vh!important}
     header[data-testid="stHeader"]{display:none!important}
