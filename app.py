@@ -402,6 +402,15 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
     return fig
 
 
+def _sem_codigo(d: dict) -> dict:
+    """Remove 'CODIGO — ' prefix das chaves, mantendo só a descrição."""
+    out: dict = {}
+    for k, v in d.items():
+        label = k.split(" — ", 1)[1] if " — " in k else k
+        out[label] = out.get(label, 0) + v
+    return out
+
+
 def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0):
     items = list(data_dict.items())[:n]
     if not items:
@@ -1189,7 +1198,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             n_cnae = sum(cnaes.values())
             c1, c2 = st.columns(2)
             with c1:
-                fig = _fig_barras_h(cnaes, "Top CNAEs Bloqueados", "#eab308", pct_base=n_cnae)
+                fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados", "#eab308", pct_base=n_cnae)
                 if fig:
                     fig.update_layout(height=500)
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1208,7 +1217,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
             n_cbo_r = sum(cbos_rep.values())
             c1, c2 = st.columns(2)
             with c1:
-                fig = _fig_barras_h(cbos_rep, "Top CBOs Bloqueados", "#a855f7", pct_base=n_cbo_r)
+                fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados", "#a855f7", pct_base=n_cbo_r)
                 if fig:
                     fig.update_layout(height=500)
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1243,7 +1252,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         if cbos_ap:
             c1, c2 = st.columns(2)
             with c1:
-                fig = _fig_barras_h(cbos_ap, "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+                fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
                 if fig:
                     fig.update_layout(height=500)
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1619,7 +1628,7 @@ with col_s3:
     cnaes = agg.get("top_cnaes", {})
     if cnaes:
         n_cnae = sum(cnaes.values())
-        fig = _fig_barras_h(cnaes, "Top CNAEs Bloqueados (Reprovados)", "#eab308",
+        fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
                             pct_base=n_cnae)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1633,7 +1642,7 @@ with col_s4:
     cbos_rep = agg.get("top_cbos_rep", {})
     if cbos_rep:
         n_cbo_r = sum(cbos_rep.values())
-        fig = _fig_barras_h(cbos_rep, "Top CBOs Bloqueados (Reprovados)", "#a855f7",
+        fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
                             pct_base=n_cbo_r)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1662,7 +1671,7 @@ with col_e:
 
 with col_c:
     cbos_ap = agg.get("top_cbos", {})
-    fig = _fig_barras_h(cbos_ap, "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+    fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
     if fig:
         st.plotly_chart(fig, use_container_width=True, config=_CONF)
     tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
