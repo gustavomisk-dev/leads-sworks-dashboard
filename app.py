@@ -1081,14 +1081,17 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     elif slide == 3:
         _tv_h("Etapas de Reprovação · Visão Detalhada", _periodo)
         etapas_d = _agg.get("etapas", {})
-        em_d     = _agg.get("etapa_motivos", {})
         if etapas_d and n_rep > 0:
-            html_d = _html_diagrama(etapas_d, n_rep)
-            if html_d:
-                st.markdown(html_d, unsafe_allow_html=True)
-            tbl = _html_tabela_etapa_motivo(em_d, etapas_d, n_rep)
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
+            c1, c2 = st.columns(2)
+            with c1:
+                html_d = _html_diagrama(etapas_d, n_rep)
+                if html_d:
+                    st.markdown(html_d, unsafe_allow_html=True)
+            with c2:
+                fig_d = _fig_etapas_split(etapas_d, n_rep)
+                if fig_d:
+                    fig_d.update_layout(height=540)
+                    st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
@@ -1253,13 +1256,55 @@ d_ini_default = max(data_min, data_max - timedelta(days=1))
 # ── Modo TV: atalho completo ──────────────────────────────────────────────────
 if st.query_params.get("tv", "0") == "1":
     _tv_slide = int(st.query_params.get("slide", "0")) % _TV_N_SLIDES
-    _d_ini_tv = max(data_min, data_max - timedelta(days=1))
+
+    # CSS TV antecipado (evita flash antes de _render_tv_slide)
+    st.markdown("""<style>
+    body,html{overflow:hidden!important;height:100vh!important}
+    header[data-testid="stHeader"]{display:none!important}
+    footer{display:none!important}
+    #MainMenu{display:none!important}
+    [data-testid="stDeployButton"]{display:none!important}
+    [data-testid="stStatusWidget"]{display:none!important}
+    section.main>.block-container{padding:.3rem 1.5rem 2rem!important;max-width:100%!important}
+    </style>""", unsafe_allow_html=True)
+
+    # Seletor de período
+    _default_d_ini = max(data_min, data_max - timedelta(days=1))
+    _tv_ini_raw = st.query_params.get("tv_ini", "")
+    try:
+        _d_ini_tv = (datetime.strptime(_tv_ini_raw, "%Y%m%d").date()
+                     if _tv_ini_raw else _default_d_ini)
+        _d_ini_tv = max(data_min, min(_d_ini_tv, data_max))
+    except ValueError:
+        _d_ini_tv = _default_d_ini
+
+    _cp1, _cp2, _cp3 = st.columns([1, 2, 5])
+    with _cp1:
+        st.markdown(
+            "<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 De:</p>",
+            unsafe_allow_html=True,
+        )
+    with _cp2:
+        _new_ini = st.date_input(
+            "", value=_d_ini_tv,
+            min_value=data_min, max_value=data_max,
+            key="tv_ini_picker", label_visibility="collapsed",
+        )
+    with _cp3:
+        st.empty()
+
+    if _new_ini != _d_ini_tv:
+        st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
+        st.query_params["slide"] = "0"
+        st.rerun()
+    _d_ini_tv = _new_ini
+
     _datas_sel_tv = [d for d in datas
                      if _d_ini_tv <= datetime.strptime(d, "%Y%m%d").date() <= data_max]
     with st.spinner("Carregando..."):
         _dias_raw_tv = [d for d in [carregar_dia(d) for d in _datas_sel_tv] if d]
     if not _dias_raw_tv:
-        st.warning("Sem dados para ontem/hoje.")
+        st.warning("Sem dados para o período selecionado.")
         st.stop()
     _agg_tv = agregar(_dias_raw_tv)
     _periodo_tv = (
