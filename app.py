@@ -1535,7 +1535,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if emp_rep:
             fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep, show_pct=False)
             if fig:
-                fig.update_traces(textfont=_TV_TXT)
+                fig.update_traces(textfont=_TV_TXT, textangle=0)
                 fig.update_layout(
                     height=620,
                     title=dict(text="", font=_TV_TF),
