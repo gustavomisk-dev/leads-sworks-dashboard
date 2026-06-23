@@ -721,13 +721,14 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         ("Aprovação",           []),
     ]
 
+    _BOX_W = "min-width:54px;max-width:70px;line-height:1.3;white-space:normal;"
     _S_OK  = ("background:#1a3560;border:1px solid rgba(96,165,250,0.25);"
-               "color:#93c5fd;border-radius:8px;padding:8px 13px;"
-               "font-size:11px;font-weight:500;text-align:center;white-space:nowrap;")
+               f"color:#93c5fd;border-radius:7px;padding:5px 7px;"
+               f"font-size:10px;font-weight:500;text-align:center;{_BOX_W}")
     _S_REJ = ("background:#431407;border:1.5px solid #f97316;"
-               "color:#fed7aa;border-radius:8px;padding:8px 13px;"
-               "font-size:11px;font-weight:500;text-align:center;white-space:nowrap;")
-    _ARR   = '<div style="padding:11px 5px 0;color:#374151;font-size:12px;flex-shrink:0;">&#9654;</div>'
+               f"color:#fed7aa;border-radius:7px;padding:5px 7px;"
+               f"font-size:10px;font-weight:500;text-align:center;{_BOX_W}")
+    _ARR   = '<div style="padding:8px 3px 0;color:#374151;font-size:11px;flex-shrink:0;">&#9654;</div>'
 
     def _unit(name, etapa_keys):
         count = sum(etapas.get(e, 0) for e in etapa_keys)
@@ -736,12 +737,13 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         below = ""
         if count:
             sub = "".join(
-                f'<div style="font-size:9px;color:#94a3b8;white-space:nowrap;">'
+                f'<div style="font-size:8px;color:#94a3b8;overflow:hidden;'
+                f'text-overflow:ellipsis;white-space:nowrap;max-width:70px;">'
                 f'&#8226; {e}: {etapas[e]:,}</div>'
                 for e in etapa_keys if etapas.get(e, 0)
             )
             below = (
-                f'<div style="font-size:10px;color:#f97316;margin-top:5px;'
+                f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
                 f'font-weight:700;white-space:nowrap;text-align:center;">'
                 f'&#11015; {count:,}&nbsp;({pct:.1f}%)</div>{sub}'
             )
@@ -777,7 +779,7 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     mc_flow = (
         '<div style="display:flex;align-items:flex-start;'
         'border:1px solid rgba(99,102,241,0.40);border-radius:10px;'
-        'padding:8px;background:rgba(99,102,241,0.06);">'
+        'padding:6px;background:rgba(99,102,241,0.06);">'
         + mc_inner + '</div>'
     )
     mc_html = (
@@ -1052,7 +1054,11 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
     #MainMenu{display:none!important}
     [data-testid="stDeployButton"]{display:none!important}
     [data-testid="stStatusWidget"]{display:none!important}
-    section.main>.block-container{padding:.5rem 1.5rem 2.5rem!important;max-width:100%!important}
+    section.main>.block-container{
+        padding:.5rem 1.5rem 2.5rem!important;max-width:100%!important;
+        max-height:100vh!important;overflow:hidden!important}
+    .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
+        font-size:14px!important}
     </style>
     """, unsafe_allow_html=True)
 
@@ -1302,7 +1308,11 @@ if st.query_params.get("tv", "0") == "1":
     #MainMenu{display:none!important}
     [data-testid="stDeployButton"]{display:none!important}
     [data-testid="stStatusWidget"]{display:none!important}
-    section.main>.block-container{padding:.3rem 1.5rem 2rem!important;max-width:100%!important}
+    section.main>.block-container{
+        padding:.3rem 1.5rem 2rem!important;max-width:100%!important;
+        max-height:100vh!important;overflow:hidden!important}
+    .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
+        font-size:14px!important}
     </style>""", unsafe_allow_html=True)
 
     # Seletor de período
