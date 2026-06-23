@@ -1011,6 +1011,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
 
     st.markdown("""
     <style>
+    body, html { overflow: hidden !important; height: 100vh !important; }
     header[data-testid="stHeader"]{display:none!important}
     footer{display:none!important}
     #MainMenu{display:none!important}
