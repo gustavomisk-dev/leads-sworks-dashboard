@@ -72,8 +72,8 @@ st.markdown("""
 /* Reset login-form styling so it doesn't bleed into the dashboard */
 div[data-testid="stForm"]{background:transparent!important;border:none!important;
     border-radius:0!important;padding:0!important}
-/* Hide CookieController iframe — it's JS-only, visibility doesn't affect function */
-iframe{height:0!important;min-height:0!important;display:none!important}
+/* Collapse CookieController iframe — JS still runs with height:0 (no display:none) */
+iframe{height:0!important;min-height:0!important;overflow:hidden!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1201,7 +1201,7 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
         padding:0 1.5rem 2rem!important;max-width:100%!important;
         max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
     [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
-    iframe{height:0!important;min-height:0!important;display:none!important}
+    iframe{height:0!important;min-height:0!important;overflow:hidden!important}
     .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
         font-size:14px!important}
     section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
@@ -1508,20 +1508,56 @@ if st.query_params.get("tv", "0") == "1":
         padding:0 1.5rem 2rem!important;max-width:100%!important;
         max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
     [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
-    iframe{height:0!important;min-height:0!important;display:none!important}
+    iframe{height:0!important;min-height:0!important;overflow:hidden!important}
     .js-plotly-plot .legend text,.js-plotly-plot .legendtext{
         font-size:14px!important}
     section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
     </style>""", unsafe_allow_html=True)
 
-    # Tela cheia automática (melhor esforço — bloqueado se não houver gesto do usuário)
+    # Tela cheia + interceptor de navegação entre slides (mantém fullscreen)
     components.html("""
     <script>
-    try {
-        var el = parent.document.documentElement;
+    (function(){
+      var doc = parent.document, win = parent.window;
+
+      // 1. Tenta fullscreen ao carregar
+      try {
+        var el = doc.documentElement;
         var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
         if (fn) fn.call(el);
-    } catch(e) {}
+      } catch(e) {}
+
+      // 2. Intercepta cliques nas setas de slide para usar pushState (sem page reload)
+      //    Isso preserva o fullscreen entre slides
+      function patchNavLinks() {
+        doc.querySelectorAll('a.tv-arr').forEach(function(a) {
+          if (a._tvPatched) return;
+          a._tvPatched = true;
+          a.addEventListener('click', function(e) {
+            e.preventDefault();
+            var href = this.getAttribute('href');
+            win.history.pushState(null, '', href);
+            win.dispatchEvent(new PopStateEvent('popstate', {state: null}));
+          });
+        });
+      }
+      patchNavLinks();
+      setTimeout(patchNavLinks, 800);
+
+      // 3. Detecta saída do modo TV (URL muda, tv!=1) e sai do fullscreen
+      var lastSearch = win.location.search;
+      setInterval(function() {
+        if (win.location.search === lastSearch) return;
+        lastSearch = win.location.search;
+        var params = new URLSearchParams(win.location.search);
+        if (params.get('tv') !== '1') {
+          try {
+            var ef = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen;
+            if (ef) ef.call(doc);
+          } catch(e2) {}
+        }
+      }, 300);
+    })();
     </script>
     """, height=0)
 
@@ -1550,24 +1586,9 @@ if st.query_params.get("tv", "0") == "1":
     with _cp3:
         st.empty()
     with _cp4:
-        components.html("""
-        <style>
-        #tv-exit{display:block;width:100%;padding:.35rem .5rem;background:#262523;
-          color:#e2e8f0;text-align:center;text-decoration:none;border-radius:4px;
-          font-size:14px;border:1px solid #3a3734;cursor:pointer;box-sizing:border-box;
-          font-family:sans-serif}
-        #tv-exit:hover{background:#333}
-        </style>
-        <a id="tv-exit" href="#">Sair do modo TV</a>
-        <script>
-        document.getElementById('tv-exit').onclick=function(e){
-          e.preventDefault();
-          try{var fn=parent.document.exitFullscreen||parent.document.webkitExitFullscreen
-                       ||parent.document.mozCancelFullScreen;if(fn)fn.call(parent.document);}catch(ex){}
-          parent.window.location.href='/';
-        };
-        </script>
-        """, height=36)
+        if st.button("Sair do modo TV", key="tv_exit", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
 
     if _new_ini != _d_ini_tv:
         st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
