@@ -109,7 +109,7 @@ _CONF     = {"displayModeBar": False, "responsive": True}
 _GRID     = "rgba(255,255,255,0.06)"
 _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
-_AF       = dict(size=11, color="#94a3b8")
+_AF       = dict(size=13, color="#94a3b8")
 
 _TV_N_SLIDES   = 12
 _TV_INTERVAL_S = 15  # seconds per slide
@@ -402,7 +402,7 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
     return fig
 
 
-def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 20, pct_base: int = 0):
+def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0):
     items = list(data_dict.items())[:n]
     if not items:
         return None
@@ -422,7 +422,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 20, pct_bas
         marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
         text=texts, textposition=tpos,
         insidetextanchor="end" if pct_base else None,
-        textfont=dict(size=10, color="rgba(255,255,255,0.85)" if pct_base else "#94a3b8"),
+        textfont=dict(size=13, color="rgba(255,255,255,0.85)" if pct_base else "#94a3b8"),
         hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
     ))
     h = max(280, len(items) * 34 + 80)
@@ -430,9 +430,9 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 20, pct_bas
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text=titulo, font=_TF),
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-        yaxis=dict(tickfont=dict(size=10, color="#cbd5e1"), autorange="reversed", automargin=True),
+        yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
         margin=dict(t=50, b=20, l=20, r=60), height=h,
-        uniformtext_minsize=9, uniformtext_mode="hide",
+        uniformtext_minsize=11, uniformtext_mode="hide",
     )
     return fig
 
@@ -509,25 +509,25 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
     if n_ant > 0:
         annotations.append(dict(xref="paper", yref="y", x=1.02, y=n_dep+1+(n_ant-1)/2,
             text="<b>Antes<br>do clique</b>", showarrow=False, xanchor="left",
-            font=dict(size=10, color="#fb923c"), align="left"))
+            font=dict(size=12, color="#fb923c"), align="left"))
     if n_dep > 0:
         annotations.append(dict(xref="paper", yref="y", x=1.02, y=(n_dep-1)/2,
             text="<b>Depois<br>do clique</b>", showarrow=False, xanchor="left",
-            font=dict(size=10, color="#60a5fa"), align="left"))
+            font=dict(size=12, color="#60a5fa"), align="left"))
     bar_h = max(360, len(all_items) * 34 + 90)
     fig = go.Figure(go.Bar(
         x=x_vals, y=y_labs, orientation="h",
         marker=dict(color=colors, line=dict(color="#0d0c0a", width=0.5)),
         text=texts, textposition="inside", insidetextanchor="end",
-        textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+        textfont=dict(size=13, color="rgba(255,255,255,0.85)"),
         hovertemplate="%{customdata}<extra></extra>", customdata=hovers,
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Reprovados por Etapa — Antes vs. Depois do Clique", font=_TF),
         xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
-        uniformtext_minsize=9, uniformtext_mode="hide",
+        yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), automargin=True, zeroline=False),
+        uniformtext_minsize=11, uniformtext_mode="hide",
         shapes=shapes, annotations=annotations,
         margin=dict(t=50, b=30, l=20, r=110), height=bar_h,
     )
@@ -572,7 +572,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         marker=dict(color=rej_colors, line=dict(color="#0d0c0a", width=0.5)),
         text=[f"{r['rejeitados']:,} ({r['pct']:.1f}%)" for r in rows_r],
         textposition="inside", insidetextanchor="middle",
-        textfont=dict(size=11, color="rgba(255,255,255,0.90)"),
+        textfont=dict(size=13, color="rgba(255,255,255,0.90)"),
         hovertemplate="%{customdata}<extra></extra>", customdata=rej_hover,
     ))
     fig.add_trace(go.Bar(
@@ -581,7 +581,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         marker=dict(color="rgba(255,255,255,0.07)", line=dict(color="#0d0c0a", width=0.5)),
         text=[f"{r['restante_apos']:,}" if r["restante_apos"] > 0 else "" for r in rows_r],
         textposition="inside", insidetextanchor="middle",
-        textfont=dict(size=10, color="rgba(255,255,255,0.35)"),
+        textfont=dict(size=12, color="rgba(255,255,255,0.35)"),
         hovertemplate="%{y}: %{x:,} avançaram<extra></extra>",
     ))
     fig.update_layout(
@@ -589,10 +589,10 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text="Funil de Reprovação por Etapa", font=_TF),
         xaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True),
-        legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
+        yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), automargin=True),
+        legend=dict(font=dict(size=12, color="#94a3b8"), bgcolor=_BG,
                     orientation="h", y=-0.10, x=0.5, xanchor="center"),
-        uniformtext_minsize=9, uniformtext_mode="hide",
+        uniformtext_minsize=11, uniformtext_mode="hide",
         margin=dict(t=50, b=60, l=20, r=40), height=bar_h,
     )
     return fig, rows  # retorna rows para a tabela resumo
@@ -1009,7 +1009,8 @@ def _render_tv_slide(slide, _agg, _f, _fin, _n_dias, _dias_raw, _datas_sel, _per
 
     st.markdown("""
     <style>
-    body, html { overflow: hidden !important; height: 100vh !important; }
+    body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
+        overflow:hidden!important;height:100vh!important}
     header[data-testid="stHeader"]{display:none!important}
     footer{display:none!important}
     #MainMenu{display:none!important}
@@ -1256,7 +1257,8 @@ if st.query_params.get("tv", "0") == "1":
 
     # CSS TV antecipado (evita flash antes de _render_tv_slide)
     st.markdown("""<style>
-    body,html{overflow:hidden!important;height:100vh!important}
+    body,html,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main{
+        overflow:hidden!important;height:100vh!important}
     header[data-testid="stHeader"]{display:none!important}
     footer{display:none!important}
     #MainMenu{display:none!important}
