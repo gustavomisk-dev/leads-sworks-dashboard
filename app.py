@@ -628,11 +628,16 @@ _UF_CENTROIDS = {
 
 # Lado fixo para cada estado (define em qual borda do mapa fica o label)
 _UF_SIDE = {
-    "AC": "W", "AM": "W", "RO": "W", "MT": "W",
-    "RR": "N", "AP": "N", "PA": "N", "TO": "N", "MA": "N", "PI": "N",
-    "CE": "E", "RN": "E", "PB": "E", "PE": "E", "AL": "E", "SE": "E",
-    "BA": "E", "ES": "E", "RJ": "E", "MG": "E", "GO": "E", "DF": "E",
-    "MS": "S", "SP": "S", "PR": "S", "SC": "S", "RS": "S",
+    # Oeste
+    "AC": "W",  "AM": "W",  "RO": "W",  "MT": "W",
+    # Norte (inclui TO, MA, PI que têm centróides nórdicos)
+    "RR": "N",  "AP": "N",  "PA": "N",  "MA": "N",  "PI": "N",  "TO": "N",
+    # Nordeste costeiro — coluna leste, faixa lat 0..8
+    "CE": "NE", "RN": "NE", "PB": "NE", "PE": "NE", "AL": "NE", "SE": "NE",
+    # Leste / Sudeste — coluna leste, faixa lat -25..-7
+    "BA": "E",  "MG": "E",  "ES": "E",  "RJ": "E",  "GO": "E",  "DF": "E",
+    # Sul
+    "MS": "S",  "SP": "S",  "PR": "S",  "SC": "S",  "RS": "S",
 }
 
 
@@ -653,39 +658,45 @@ def _fig_mapa_ufs(ufs: dict):
     GEO_CENTER = dict(lat=-13, lon=-52)
     GEO_SCALE  = 1.75
 
-    # Linhas de label em cada borda (dentro do viewport, fora do Brasil)
-    LN, LS =  7.5, -34.5    # lat norte / sul
-    LE, LW = -35.0, -69.0   # lon leste / oeste
+    # Posições das colunas de labels
+    LN  =  8.0    # lat topo (N)
+    LS  = -36.5   # lat base (S)
+    LE  = -34.5   # lon borda leste (NE e E compartilham, faixas lat separadas)
+    LW  = -71.0   # lon borda oeste
 
-    # Faixas de distribuição ao longo de cada borda
-    N_LO, N_HI = -68.0, -36.0
-    S_LO, S_HI = -68.0, -36.0
-    E_LO, E_HI = -33.5,   7.0   # lat (sul → norte)
-    W_LO, W_HI = -33.5,   7.0
+    # Faixas de distribuição — lat para N/S = lon axis; lat para E/W = lat axis
+    N_LO,  N_HI  = -65.0, -42.0   # lon W→E  (6 estados)
+    S_LO,  S_HI  = -58.0, -45.5   # lon W→E  (5 estados)
+    NE_LO, NE_HI =   0.5,   7.5   # lat S→N  (NE costeiro, acima do equador)
+    E_LO,  E_HI  = -25.0,  -7.5   # lat S→N  (SE/CO, abaixo do equador)
+    W_LO,  W_HI  = -13.0,  -2.0   # lat S→N  (W)
 
     def _spread(n, lo, hi):
         if n == 1:
             return [(lo + hi) / 2]
         return [lo + i * (hi - lo) / (n - 1) for i in range(n)]
 
-    # Agrupar UFs com dados por borda, ordenando para minimizar cruzamentos
-    groups: dict = {"N": [], "S": [], "E": [], "W": []}
+    # Agrupar por borda; NE e E são duas faixas distintas na mesma coluna lon
+    groups: dict = {"N": [], "NE": [], "E": [], "S": [], "W": []}
     for uf, v in pairs:
         groups[_UF_SIDE.get(uf, "E")].append((uf, v))
 
-    groups["N"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])        # lon crescente W→E
-    groups["S"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])
-    groups["E"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])       # lat decrescente N→S
-    groups["W"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])
+    groups["N"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])         # lon W→E
+    groups["S"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])         # lon W→E
+    groups["NE"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])       # lat N→S
+    groups["E"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])        # lat N→S
+    groups["W"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])        # lat N→S
 
     lbl_pos: dict = {}
-    for (uf, _), c in zip(groups["N"], _spread(len(groups["N"]), N_LO, N_HI)):
+    for (uf, _), c in zip(groups["N"],  _spread(len(groups["N"]),  N_LO,  N_HI)):
         lbl_pos[uf] = (LN, c)
-    for (uf, _), c in zip(groups["S"], _spread(len(groups["S"]), S_LO, S_HI)):
+    for (uf, _), c in zip(groups["S"],  _spread(len(groups["S"]),  S_LO,  S_HI)):
         lbl_pos[uf] = (LS, c)
-    for (uf, _), c in zip(groups["E"], _spread(len(groups["E"]), E_LO, E_HI)):
+    for (uf, _), c in zip(groups["NE"], _spread(len(groups["NE"]), NE_LO, NE_HI)):
         lbl_pos[uf] = (c, LE)
-    for (uf, _), c in zip(groups["W"], _spread(len(groups["W"]), W_LO, W_HI)):
+    for (uf, _), c in zip(groups["E"],  _spread(len(groups["E"]),  E_LO,  E_HI)):
+        lbl_pos[uf] = (c, LE)
+    for (uf, _), c in zip(groups["W"],  _spread(len(groups["W"]),  W_LO,  W_HI)):
         lbl_pos[uf] = (c, LW)
 
     line_lats: list = []
@@ -708,7 +719,7 @@ def _fig_mapa_ufs(ufs: dict):
         line_lons.extend([clon, llon, llon, None])
         lbl_lats.append(llat)
         lbl_lons.append(llon)
-        lbl_texts.append(f"{uf}  {v:,}  {pct:.0f}%")
+        lbl_texts.append(f"{uf} {pct:.0f}%")
         lbl_hov.append(f"<b>{uf}</b>: {v:,} leads ({pct:.1f}%)")
 
     fig = go.Figure()
@@ -1637,7 +1648,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if ufs:
             fig = _fig_mapa_ufs(ufs)
             if fig:
-                fig.update_layout(height=600)
+                fig.update_layout(height=750)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             else:
                 n_ufs = sum(ufs.values())
