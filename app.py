@@ -641,6 +641,7 @@ def _fig_mapa_ufs(ufs: dict):
         texttemplate="%{label} %{percent:.0%}",
         textfont=dict(size=45, color="#f1f5f9"),
         insidetextorientation="horizontal",
+        textposition="auto",
         hole=0.35,
         marker=dict(
             colors=[
@@ -655,14 +656,16 @@ def _fig_mapa_ufs(ufs: dict):
     fig.update_layout(
         template=_TEMPLATE,
         paper_bgcolor=_BG,
-        margin=dict(t=10, b=10, l=10, r=10),
-        height=620,
+        margin=dict(t=10, b=90, l=10, r=10),
+        height=680,
         showlegend=True,
         legend=dict(
-            font=dict(size=39, color="#cbd5e1"),
+            font=dict(size=28, color="#cbd5e1"),
             bgcolor="rgba(0,0,0,0)",
-            orientation="v",
-            x=1.02, y=0.5,
+            orientation="h",
+            x=0.5, xanchor="center",
+            y=-0.02, yanchor="top",
+            tracegroupgap=0,
         ),
     )
     return fig
