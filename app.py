@@ -633,6 +633,12 @@ def _fig_mapa_ufs(ufs: dict):
     customdata = [f"<b>{lbl}</b>: {val:,} leads ({100*val/total:.1f}%)"
                   for lbl, val in zip(labels, values)]
 
+    _COLORS = [
+        "#3b82f6","#6366f1","#8b5cf6","#a78bfa",
+        "#60a5fa","#38bdf8","#34d399","#4ade80",
+        "#facc15","#fb923c","#f87171","#f472b6","#94a3b8",
+    ]
+
     fig = go.Figure(go.Pie(
         labels=labels,
         values=values,
@@ -643,15 +649,8 @@ def _fig_mapa_ufs(ufs: dict):
         insidetextorientation="horizontal",
         textposition="inside",
         hole=0.15,
-        domain=dict(x=[0, 0.52], y=[0, 1]),
-        marker=dict(
-            colors=[
-                "#3b82f6","#6366f1","#8b5cf6","#a78bfa",
-                "#60a5fa","#38bdf8","#34d399","#4ade80",
-                "#facc15","#fb923c","#f87171","#f472b6","#94a3b8",
-            ],
-            line=dict(color=_BG, width=2),
-        ),
+        domain=dict(x=[0, 0.50], y=[0, 1]),
+        marker=dict(colors=_COLORS, line=dict(color=_BG, width=2)),
         sort=False,
     ))
     fig.update_layout(
@@ -659,16 +658,41 @@ def _fig_mapa_ufs(ufs: dict):
         paper_bgcolor=_BG,
         margin=dict(t=10, b=10, l=10, r=10),
         height=700,
-        showlegend=True,
-        legend=dict(
-            font=dict(size=42, color="#cbd5e1"),
-            bgcolor="rgba(0,0,0,0)",
-            orientation="h",
-            x=0.55, xanchor="left",
-            y=0.95, yanchor="top",
-            tracegroupgap=0,
-        ),
+        showlegend=False,
     )
+
+    # Legenda manual em 2 colunas à direita do gráfico
+    n = len(labels)
+    split = (n + 1) // 2          # col1 tem ceil(n/2) itens
+    col1 = list(zip(labels[:split],  _COLORS[:split]))
+    col2 = list(zip(labels[split:n], _COLORS[split:n]))
+    n_rows = split
+
+    y_top, y_bot = 0.88, 0.12
+    y_step = (y_top - y_bot) / max(n_rows - 1, 1)
+    bw, bh = 0.028, 0.050          # largura/altura da caixa em paper coords
+
+    for (x_box, x_lbl), items in [
+        ((0.54, 0.585), col1),
+        ((0.77, 0.815), col2),
+    ]:
+        for i, (lbl, clr) in enumerate(items):
+            y = y_top - i * y_step
+            fig.add_shape(
+                type="rect", xref="paper", yref="paper",
+                x0=x_box, x1=x_box + bw,
+                y0=y - bh / 2, y1=y + bh / 2,
+                fillcolor=clr, line=dict(width=0),
+            )
+            fig.add_annotation(
+                xref="paper", yref="paper",
+                x=x_lbl, y=y,
+                text=lbl,
+                showarrow=False,
+                font=dict(size=42, color="#cbd5e1"),
+                xanchor="left", yanchor="middle",
+            )
+
     return fig
 
 
