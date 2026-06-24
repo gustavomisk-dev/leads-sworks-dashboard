@@ -656,54 +656,29 @@ def _fig_mapa_ufs(ufs: dict):
     GEO_CENTER = dict(lat=-14, lon=-51)
     GEO_SCALE  = 1.5
 
-    # Zigzag duplo-track: cada grupo alterna entre 2 posições paralelas
-    # → labels nunca ficam em fileira perfeitamente horizontal ou vertical.
-    # N/S: eixo principal = lon; N_LAT_A/B são dois tracks de lat (topo/base).
-    # NE/E/W: eixo principal = lat; _LON_A/B são dois tracks de lon (lateral).
-    N_LAT_A,  N_LAT_B  =  9.0,  5.5    # 3.5° separação → acima de todos os N
-    S_LAT_A,  S_LAT_B  = -30.0, -33.5  # 3.5° separação → abaixo de todos os S
-    NE_LON_A, NE_LON_B = -33.0, -36.5  # 3.5° separação → leste (Atlântico)
-    E_LON_A,  E_LON_B  = -38.5, -42.5  # 4.0° separação → leste do Brasil
-    W_LON_A,  W_LON_B  = -65.5, -68.5  # 3.0° separação → oeste
-
-    # Faixas de distribuição ao longo do eixo principal (espaço entre labels)
-    N_LO,  N_HI  = -66.0, -41.0   # lon W→E  (25° para 6 estados — 5°/estado)
-    S_LO,  S_HI  = -62.0, -43.0   # lon W→E  (19° para 5 estados — 4.75°/estado)
-    NE_LO, NE_HI = -11.0,   8.0   # lat S→N  (19° para 6 estados — 3.8°/estado)
-    E_LO,  E_HI  = -25.0,  -5.0   # lat S→N  (20° para 6 estados — 4°/estado)
-    W_LO,  W_HI  = -12.0,  -3.0   # lat S→N  (9° para 4 estados — 3°/estado)
-
-    def _spread(n, lo, hi):
-        if n == 1:
-            return [(lo + hi) / 2]
-        return [lo + i * (hi - lo) / (n - 1) for i in range(n)]
-
-    # Agrupar por borda; NE e E são duas faixas distintas na mesma coluna lon
-    groups: dict = {"N": [], "NE": [], "E": [], "S": [], "W": []}
-    for uf, v in pairs:
-        groups[_UF_SIDE.get(uf, "E")].append((uf, v))
-
-    # Ordenar S→N (lat crescente) para E/NE/W garante que linha reta de centróide
-    # ao label nunca cruza outra linha do mesmo grupo (matching sem cruzamento).
-    groups["N"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][1])   # lon W→E
-    groups["S"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][1])   # lon W→E
-    groups["NE"].sort(key=lambda x: _UF_CENTROIDS[x[0]][0])   # lat S→N
-    groups["E"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][0])   # lat S→N
-    groups["W"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][0])   # lat S→N
-
-    lbl_pos: dict = {}
-    # Horizontal zigzag (N/S): lon distribuído uniformemente, lat alterna A/B
-    for i, ((uf, _), lon) in enumerate(zip(groups["N"], _spread(len(groups["N"]), N_LO, N_HI))):
-        lbl_pos[uf] = (N_LAT_A if i % 2 == 0 else N_LAT_B, lon)
-    for i, ((uf, _), lon) in enumerate(zip(groups["S"], _spread(len(groups["S"]), S_LO, S_HI))):
-        lbl_pos[uf] = (S_LAT_A if i % 2 == 0 else S_LAT_B, lon)
-    # Vertical zigzag (NE/E/W): lat distribuída uniformemente, lon alterna A/B
-    for i, ((uf, _), lat) in enumerate(zip(groups["NE"], _spread(len(groups["NE"]), NE_LO, NE_HI))):
-        lbl_pos[uf] = (lat, NE_LON_A if i % 2 == 0 else NE_LON_B)
-    for i, ((uf, _), lat) in enumerate(zip(groups["E"], _spread(len(groups["E"]), E_LO, E_HI))):
-        lbl_pos[uf] = (lat, E_LON_A if i % 2 == 0 else E_LON_B)
-    for i, ((uf, _), lat) in enumerate(zip(groups["W"], _spread(len(groups["W"]), W_LO, W_HI))):
-        lbl_pos[uf] = (lat, W_LON_A if i % 2 == 0 else W_LON_B)
+    # Posições fixas: usa espaço total do canvas, não apenas bordas do mapa
+    # Norte e Sul: dois tracks de lat alternados para quebrar a fileira única
+    # Nordeste e Leste: duas colunas lon separadas (NE=Atlântico, E=interior)
+    # Oeste: coluna única lon=-66.5 (leste o bastante para não cortar labels)
+    _fp = {
+        # Norte — lat alterna 9.0 / 5.5
+        "RR": ( 9.0, -67.0), "PA": ( 5.5, -62.0), "AP": ( 9.0, -56.0),
+        "TO": ( 5.5, -49.5), "MA": ( 9.0, -44.0), "PI": ( 5.5, -41.0),
+        # Oeste — lon=-66.5
+        "MT": (-16.5, -66.5), "RO": (-12.5, -66.5),
+        "AC": ( -8.5, -66.5), "AM": ( -4.0, -66.5),
+        # Nordeste — lon=-34, lat 2.5 → -12.5 (step 3°)
+        "CE": (  2.5, -34.0), "RN": (-0.5, -34.0), "PB": (-3.5, -34.0),
+        "PE": ( -6.5, -34.0), "AL": (-9.5, -34.0), "SE": (-12.5,-34.0),
+        # Leste — lon=-41, lat -7 → -23.5 (step 3.3°)
+        "BA": ( -7.0, -41.0), "DF": (-10.3, -41.0), "GO": (-13.6, -41.0),
+        "MG": (-16.9, -41.0), "ES": (-20.2, -41.0), "RJ": (-23.5, -41.0),
+        # Sul — lat alterna -27.5 / -32.0
+        "MS": (-27.5, -60.0), "RS": (-32.0, -56.5),
+        "PR": (-27.5, -51.5), "SC": (-32.0, -47.0),
+        "SP": (-27.5, -43.5),
+    }
+    lbl_pos = {uf: _fp.get(uf, (0.0, 0.0)) for uf, _ in pairs}
 
     line_lats: list = []
     line_lons: list = []
