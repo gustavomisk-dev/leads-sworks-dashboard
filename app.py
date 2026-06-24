@@ -656,19 +656,22 @@ def _fig_mapa_ufs(ufs: dict):
     GEO_CENTER = dict(lat=-14, lon=-51)
     GEO_SCALE  = 1.5
 
-    # Posições das colunas/linhas de labels (todas dentro do viewport)
-    LN  =  7.5    # lat topo  — N states
-    LS  = -33.5   # lat base  — S states  (limite sul viewport ≈ -34)
-    LNE = -33.5   # lon leste — NE states (coluna Atlântica dedicada)
-    LE  = -38.5   # lon leste — E states  (coluna separada, mais a oeste)
-    LW  = -67.0   # lon oeste — W states   (limite oeste viewport ≈ -70)
+    # Zigzag duplo-track: cada grupo alterna entre 2 posições paralelas
+    # → labels nunca ficam em fileira perfeitamente horizontal ou vertical.
+    # N/S: eixo principal = lon; N_LAT_A/B são dois tracks de lat (topo/base).
+    # NE/E/W: eixo principal = lat; _LON_A/B são dois tracks de lon (lateral).
+    N_LAT_A,  N_LAT_B  =  9.0,  5.5    # 3.5° separação → acima de todos os N
+    S_LAT_A,  S_LAT_B  = -30.0, -33.5  # 3.5° separação → abaixo de todos os S
+    NE_LON_A, NE_LON_B = -33.0, -36.5  # 3.5° separação → leste (Atlântico)
+    E_LON_A,  E_LON_B  = -38.5, -42.5  # 4.0° separação → leste do Brasil
+    W_LON_A,  W_LON_B  = -65.5, -68.5  # 3.0° separação → oeste
 
-    # Faixas de distribuição ao longo de cada borda
-    N_LO,  N_HI  = -66.0, -41.0   # lon W→E  (6 estados N — 25° = ~4.2°/estado)
-    S_LO,  S_HI  = -62.0, -43.0   # lon W→E  (5 estados S — 19° = ~3.8°/estado)
-    NE_LO, NE_HI =  -2.0,   8.0   # lat S→N  (6 NE — 10° = ~2°/estado)
-    E_LO,  E_HI  = -23.0,  -7.0   # lat S→N  (6 estados E/SE — abaixo do equador)
-    W_LO,  W_HI  = -12.0,  -3.0   # lat S→N  (4 estados W)
+    # Faixas de distribuição ao longo do eixo principal (espaço entre labels)
+    N_LO,  N_HI  = -66.0, -41.0   # lon W→E  (25° para 6 estados — 5°/estado)
+    S_LO,  S_HI  = -62.0, -43.0   # lon W→E  (19° para 5 estados — 4.75°/estado)
+    NE_LO, NE_HI = -11.0,   8.0   # lat S→N  (19° para 6 estados — 3.8°/estado)
+    E_LO,  E_HI  = -25.0,  -5.0   # lat S→N  (20° para 6 estados — 4°/estado)
+    W_LO,  W_HI  = -12.0,  -3.0   # lat S→N  (9° para 4 estados — 3°/estado)
 
     def _spread(n, lo, hi):
         if n == 1:
@@ -689,16 +692,18 @@ def _fig_mapa_ufs(ufs: dict):
     groups["W"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][0])   # lat S→N
 
     lbl_pos: dict = {}
-    for (uf, _), c in zip(groups["N"],  _spread(len(groups["N"]),  N_LO,  N_HI)):
-        lbl_pos[uf] = (LN, c)
-    for (uf, _), c in zip(groups["S"],  _spread(len(groups["S"]),  S_LO,  S_HI)):
-        lbl_pos[uf] = (LS, c)
-    for (uf, _), c in zip(groups["NE"], _spread(len(groups["NE"]), NE_LO, NE_HI)):
-        lbl_pos[uf] = (c, LNE)
-    for (uf, _), c in zip(groups["E"],  _spread(len(groups["E"]),  E_LO,  E_HI)):
-        lbl_pos[uf] = (c, LE)
-    for (uf, _), c in zip(groups["W"],  _spread(len(groups["W"]),  W_LO,  W_HI)):
-        lbl_pos[uf] = (c, LW)
+    # Horizontal zigzag (N/S): lon distribuído uniformemente, lat alterna A/B
+    for i, ((uf, _), lon) in enumerate(zip(groups["N"], _spread(len(groups["N"]), N_LO, N_HI))):
+        lbl_pos[uf] = (N_LAT_A if i % 2 == 0 else N_LAT_B, lon)
+    for i, ((uf, _), lon) in enumerate(zip(groups["S"], _spread(len(groups["S"]), S_LO, S_HI))):
+        lbl_pos[uf] = (S_LAT_A if i % 2 == 0 else S_LAT_B, lon)
+    # Vertical zigzag (NE/E/W): lat distribuída uniformemente, lon alterna A/B
+    for i, ((uf, _), lat) in enumerate(zip(groups["NE"], _spread(len(groups["NE"]), NE_LO, NE_HI))):
+        lbl_pos[uf] = (lat, NE_LON_A if i % 2 == 0 else NE_LON_B)
+    for i, ((uf, _), lat) in enumerate(zip(groups["E"], _spread(len(groups["E"]), E_LO, E_HI))):
+        lbl_pos[uf] = (lat, E_LON_A if i % 2 == 0 else E_LON_B)
+    for i, ((uf, _), lat) in enumerate(zip(groups["W"], _spread(len(groups["W"]), W_LO, W_HI))):
+        lbl_pos[uf] = (lat, W_LON_A if i % 2 == 0 else W_LON_B)
 
     line_lats: list = []
     line_lons: list = []
@@ -741,7 +746,7 @@ def _fig_mapa_ufs(ufs: dict):
         lat=lbl_lats, lon=lbl_lons,
         mode="text",
         text=lbl_texts,
-        textfont=dict(size=15, color="#f1f5f9", family="Arial Black"),
+        textfont=dict(size=36, color="#f1f5f9", family="Arial Black"),
         customdata=lbl_hov,
         hovertemplate="%{customdata}<extra></extra>",
         showlegend=False,
