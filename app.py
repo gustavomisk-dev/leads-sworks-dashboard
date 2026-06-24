@@ -1748,6 +1748,11 @@ if st.query_params.get("tv", "0") == "1":
     except ValueError:
         _d_ini_tv = _default_d_ini
 
+    # Se um botão de atalho disparou no run anterior, limpa o cache do widget
+    # antes de renderizá-lo (Streamlit não permite setar widget key após render)
+    if st.session_state.pop("_tv_ini_reset", False):
+        st.session_state.pop("tv_ini_picker", None)
+
     _cp_prev, _cp_lbl, _cp_date, _cp_7d, _cp_3d, _cp_1d, _cp_info, _cp_next, _cp_exit = \
         st.columns([1, 1, 2, 1.8, 1.8, 1.8, 1.5, 1, 2])
     with _cp_prev:
@@ -1766,21 +1771,21 @@ if st.query_params.get("tv", "0") == "1":
     with _cp_7d:
         if st.button("Últimos 7 dias", key="tv_7d", use_container_width=True):
             _nd = max(data_min, data_max - timedelta(days=6))
-            st.session_state["tv_ini_picker"] = _nd
+            st.session_state["_tv_ini_reset"] = True
             st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_3d:
         if st.button("Últimos 3 dias", key="tv_3d", use_container_width=True):
             _nd = max(data_min, data_max - timedelta(days=2))
-            st.session_state["tv_ini_picker"] = _nd
+            st.session_state["_tv_ini_reset"] = True
             st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_1d:
         if st.button("Desde Ontem", key="tv_1d", use_container_width=True):
             _nd = max(data_min, data_max - timedelta(days=1))
-            st.session_state["tv_ini_picker"] = _nd
+            st.session_state["_tv_ini_reset"] = True
             st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
