@@ -582,14 +582,15 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
 
 
 def _sem_codigo(d: dict, max_chars: int = 50) -> dict:
-    """Remove 'CODIGO — ' prefix das chaves, trunca para max_chars."""
+    """Remove 'CODIGO — ' prefix das chaves, trunca para max_chars.
+    Re-ordena por valor desc após mesclar rótulos duplicados."""
     out: dict = {}
     for k, v in d.items():
         label = k.split(" — ", 1)[1] if " — " in k else k
         if len(label) > max_chars:
             label = label[:max_chars - 1].rstrip() + "…"
         out[label] = out.get(label, 0) + v
-    return out
+    return dict(sorted(out.items(), key=lambda x: -x[1]))
 
 
 # CNAE_BLOCKLIST e CNAE_RED sempre disparam juntos; idem CBO — junta em um só rótulo.
@@ -633,11 +634,19 @@ def _fig_mapa_ufs(ufs: dict):
     customdata = [f"<b>{lbl}</b>: {val:,} leads ({100*val/total:.1f}%)"
                   for lbl, val in zip(labels, values)]
 
-    _COLORS = [
-        "#3b82f6","#6366f1","#8b5cf6","#a78bfa",
-        "#60a5fa","#38bdf8","#34d399","#4ade80",
-        "#facc15","#fb923c","#f87171","#f472b6","#94a3b8",
-    ]
+    # Gradiente vermelho → azul; "Outros" fica cinza
+    _RED, _BLUE = (239, 68, 68), (59, 130, 246)
+    n_real = len(labels) - (1 if labels and labels[-1] == "Outros" else 0)
+    _COLORS = []
+    for _i in range(n_real):
+        _t = _i / max(n_real - 1, 1)
+        _COLORS.append("#{:02x}{:02x}{:02x}".format(
+            int(_RED[0] + (_BLUE[0] - _RED[0]) * _t),
+            int(_RED[1] + (_BLUE[1] - _RED[1]) * _t),
+            int(_RED[2] + (_BLUE[2] - _RED[2]) * _t),
+        ))
+    if labels and labels[-1] == "Outros":
+        _COLORS.append("#64748b")
 
     fig = go.Figure(go.Pie(
         labels=labels,
@@ -1317,7 +1326,7 @@ def _tv_nav(slide: int) -> None:
 def _tv_h(titulo: str, periodo: str = "") -> None:
     sub = f'<span style="color:#475569;font-size:23px;margin-left:12px">{periodo}</span>' if periodo else ""
     st.markdown(
-        f'<div style="color:#FEC52E;font-size:28px;font-weight:700;'
+        f'<div style="color:#FEC52E;font-size:42px;font-weight:700;'
         f'border-bottom:1px solid #272420;padding-bottom:8px;margin-bottom:14px">'
         f'{titulo}{sub}</div>',
         unsafe_allow_html=True,
@@ -1401,12 +1410,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 yaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
                 legend=dict(
                     orientation="h",
-                    x=0.5, y=1.04,
+                    x=0.5, y=1.07,
                     xanchor="center", yanchor="bottom",
                     bgcolor="rgba(15,14,11,0.88)",
                     bordercolor="rgba(255,255,255,0.10)",
                     borderwidth=1,
-                    font=dict(size=28, color="#94a3b8"),
+                    font=dict(size=34, color="#94a3b8"),
                 ),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
@@ -1468,7 +1477,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             if result_f:
                 fig_f, _ = result_f
                 fig_f.update_traces(
-                    textfont=dict(size=28, color="rgba(255,255,255,0.92)"),
+                    textfont=dict(size=40, color="rgba(255,255,255,0.92)"),
                     selector=dict(type="bar"),
                 )
                 fig_f.update_layout(
@@ -1740,18 +1749,21 @@ if st.query_params.get("tv", "0") == "1":
 
     # Seletor de período + navegação de slides na mesma barra
     _default_d_ini = max(data_min, data_max - timedelta(days=1))
-    _tv_ini_raw = st.query_params.get("tv_ini", "")
-    try:
-        _d_ini_tv = (datetime.strptime(_tv_ini_raw, "%Y%m%d").date()
-                     if _tv_ini_raw else _default_d_ini)
-        _d_ini_tv = max(data_min, min(_d_ini_tv, data_max))
-    except ValueError:
-        _d_ini_tv = _default_d_ini
 
-    # Se um botão de atalho disparou no run anterior, limpa o cache do widget
-    # antes de renderizá-lo (Streamlit não permite setar widget key após render)
-    if st.session_state.pop("_tv_ini_reset", False):
-        st.session_state.pop("tv_ini_picker", None)
+    # session_state é a única fonte da data — mais confiável que query_params entre reruns.
+    if "_tv_date" not in st.session_state:
+        # Inicializa: tenta query_params, senão usa o padrão
+        _tv_ini_raw = st.query_params.get("tv_ini", "")
+        try:
+            _tv_date_init = (datetime.strptime(_tv_ini_raw, "%Y%m%d").date()
+                             if _tv_ini_raw else _default_d_ini)
+        except ValueError:
+            _tv_date_init = _default_d_ini
+        st.session_state["_tv_date"] = max(data_min, min(_tv_date_init, data_max))
+    if "_tv_picker_ver" not in st.session_state:
+        st.session_state["_tv_picker_ver"] = 0
+
+    _d_ini_tv = max(data_min, min(st.session_state["_tv_date"], data_max))
 
     _cp_prev, _cp_lbl, _cp_date, _cp_7d, _cp_3d, _cp_1d, _cp_info, _cp_next, _cp_exit = \
         st.columns([1, 1, 2, 1.8, 1.8, 1.8, 1.5, 1, 2])
@@ -1763,30 +1775,29 @@ if st.query_params.get("tv", "0") == "1":
         st.markdown("<p style='margin:6px 0 0;color:#94a3b8;font-size:13px'>📅 Desde:</p>",
                     unsafe_allow_html=True)
     with _cp_date:
+        # Versão no key garante widget novo a cada clique de atalho (sem cache stale)
         _new_ini = st.date_input(
             "", value=_d_ini_tv,
             min_value=data_min, max_value=data_max,
-            key="tv_ini_picker", label_visibility="collapsed",
+            key=f"tv_ini_picker_{st.session_state['_tv_picker_ver']}",
+            label_visibility="collapsed",
         )
     with _cp_7d:
         if st.button("Últimos 7 dias", key="tv_7d", use_container_width=True):
-            _nd = max(data_min, data_max - timedelta(days=6))
-            st.session_state["_tv_ini_reset"] = True
-            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
+            st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=6))
+            st.session_state["_tv_picker_ver"] += 1
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_3d:
         if st.button("Últimos 3 dias", key="tv_3d", use_container_width=True):
-            _nd = max(data_min, data_max - timedelta(days=2))
-            st.session_state["_tv_ini_reset"] = True
-            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
+            st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=2))
+            st.session_state["_tv_picker_ver"] += 1
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_1d:
         if st.button("Desde Ontem", key="tv_1d", use_container_width=True):
-            _nd = max(data_min, data_max - timedelta(days=1))
-            st.session_state["_tv_ini_reset"] = True
-            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
+            st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=1))
+            st.session_state["_tv_picker_ver"] += 1
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_info:
@@ -1806,7 +1817,7 @@ if st.query_params.get("tv", "0") == "1":
             st.rerun()
 
     if _new_ini != _d_ini_tv:
-        st.query_params["tv_ini"] = _new_ini.strftime("%Y%m%d")
+        st.session_state["_tv_date"] = _new_ini
         st.session_state["tv_slide"] = 0
         st.rerun()
     _d_ini_tv = _new_ini
