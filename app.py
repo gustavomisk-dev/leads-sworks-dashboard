@@ -1748,7 +1748,8 @@ if st.query_params.get("tv", "0") == "1":
     except ValueError:
         _d_ini_tv = _default_d_ini
 
-    _cp_prev, _cp_lbl, _cp_date, _cp_info, _cp_next, _cp_exit = st.columns([1, 1, 2, 2, 1, 2])
+    _cp_prev, _cp_lbl, _cp_date, _cp_7d, _cp_3d, _cp_1d, _cp_info, _cp_next, _cp_exit = \
+        st.columns([1, 1, 2, 1.8, 1.8, 1.8, 1.5, 1, 2])
     with _cp_prev:
         if st.button("‹", key="tv_prev", use_container_width=True):
             st.session_state["tv_slide"] = _tv_prev
@@ -1762,6 +1763,21 @@ if st.query_params.get("tv", "0") == "1":
             min_value=data_min, max_value=data_max,
             key="tv_ini_picker", label_visibility="collapsed",
         )
+    with _cp_7d:
+        if st.button("Últimos 7 dias", key="tv_7d", use_container_width=True):
+            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=6)).strftime("%Y%m%d")
+            st.session_state["tv_slide"] = 0
+            st.rerun()
+    with _cp_3d:
+        if st.button("Últimos 3 dias", key="tv_3d", use_container_width=True):
+            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=2)).strftime("%Y%m%d")
+            st.session_state["tv_slide"] = 0
+            st.rerun()
+    with _cp_1d:
+        if st.button("Desde Ontem", key="tv_1d", use_container_width=True):
+            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=1)).strftime("%Y%m%d")
+            st.session_state["tv_slide"] = 0
+            st.rerun()
     with _cp_info:
         st.markdown(
             f"<p style='text-align:center;margin:8px 0;color:#64748b;"
