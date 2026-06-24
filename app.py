@@ -749,7 +749,7 @@ def _fig_mapa_ufs(ufs: dict):
 
     fig.update_geos(
         scope="south america",
-        resolution=10,                        # 10m Natural Earth — garante bordas estaduais
+        resolution=50,                        # único valor suportado além de 110 pelo Plotly
         bgcolor=_BG,
         landcolor="#0d1b2e",                  # navy muito escuro para contraste máximo
         oceancolor=_BG,
