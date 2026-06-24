@@ -1319,7 +1319,7 @@ def _tv_nav(slide: int) -> None:
 
 
 def _tv_h(titulo: str, periodo: str = "") -> None:
-    sub = f'<span style="color:#475569;font-size:23px;margin-left:12px">{periodo}</span>' if periodo else ""
+    sub = f'<span style="color:#475569;font-size:42px;margin-left:12px">{periodo}</span>' if periodo else ""
     st.markdown(
         f'<div style="color:#FEC52E;font-size:42px;font-weight:700;'
         f'border-bottom:1px solid #272420;padding-bottom:8px;margin-bottom:14px">'
