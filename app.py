@@ -650,26 +650,24 @@ def _fig_mapa_ufs(ufs: dict):
         return None
     pairs = sorted(pairs, key=lambda x: -x[1])
 
-    # Viewport (com margem para labels fora do Brasil)
-    # center+projection_scale é o jeito correto de dar zoom em geo Plotly.
-    # lataxis/lonaxis desenha um retângulo visível em vez de recortar o mapa.
-    # Com scale=1.75 centrado em (-13,-52) o Brasil quase preenche a tela;
-    # área visível aprox.: lat[-35,+9]  lon[-70,-34].
-    GEO_CENTER = dict(lat=-13, lon=-52)
-    GEO_SCALE  = 1.75
+    # Viewport: scale 1.5 dá ~70° lon × 50° lat visíveis (menos zoom = menos corte).
+    # Centro deslocado 1° leste para caber mais Atlântico e não cortar labels E.
+    # Área visível aprox.: lat[-34, +9]  lon[-70, -32]
+    GEO_CENTER = dict(lat=-14, lon=-51)
+    GEO_SCALE  = 1.5
 
-    # Posições das colunas de labels
-    LN  =  8.0    # lat topo (N)
-    LS  = -36.5   # lat base (S)
-    LE  = -34.5   # lon borda leste (NE e E compartilham, faixas lat separadas)
-    LW  = -71.0   # lon borda oeste
+    # Posições das colunas/linhas de labels (todas dentro do viewport)
+    LN  =  7.5    # lat topo  — N states
+    LS  = -33.0   # lat base  — S states  (limite sul viewport ≈ -34)
+    LE  = -36.5   # lon leste — NE e E compartilham coluna, faixas lat separadas
+    LW  = -67.0   # lon oeste — W states   (limite oeste viewport ≈ -70)
 
-    # Faixas de distribuição — lat para N/S = lon axis; lat para E/W = lat axis
-    N_LO,  N_HI  = -65.0, -42.0   # lon W→E  (6 estados)
-    S_LO,  S_HI  = -58.0, -45.5   # lon W→E  (5 estados)
-    NE_LO, NE_HI =   0.5,   7.5   # lat S→N  (NE costeiro, acima do equador)
-    E_LO,  E_HI  = -25.0,  -7.5   # lat S→N  (SE/CO, abaixo do equador)
-    W_LO,  W_HI  = -13.0,  -2.0   # lat S→N  (W)
+    # Faixas de distribuição ao longo de cada borda
+    N_LO,  N_HI  = -65.0, -43.0   # lon W→E  (6 estados N)
+    S_LO,  S_HI  = -57.5, -46.0   # lon W→E  (5 estados S)
+    NE_LO, NE_HI =   1.0,   7.0   # lat S→N  (6 NE costeiros — acima do equador)
+    E_LO,  E_HI  = -22.5,  -8.0   # lat S→N  (6 estados E/SE — abaixo do equador)
+    W_LO,  W_HI  = -12.0,  -3.0   # lat S→N  (4 estados W)
 
     def _spread(n, lo, hi):
         if n == 1:
@@ -729,13 +727,13 @@ def _fig_mapa_ufs(ufs: dict):
     fig.add_trace(go.Scattergeo(
         lat=line_lats, lon=line_lons,
         mode="lines",
-        line=dict(color="rgba(148,163,184,0.55)", width=1),
+        line=dict(color="rgba(80,150,210,0.55)", width=1.2),
         hoverinfo="skip", showlegend=False,
     ))
     fig.add_trace(go.Scattergeo(
         lat=dot_lats, lon=dot_lons,
         mode="markers",
-        marker=dict(size=7, color="#60a5fa", symbol="circle"),
+        marker=dict(size=6, color="#60a5fa", symbol="circle"),
         hoverinfo="skip", showlegend=False,
     ))
     fig.add_trace(go.Scattergeo(
@@ -752,12 +750,12 @@ def _fig_mapa_ufs(ufs: dict):
         scope="south america",
         resolution=50,
         bgcolor=_BG,
-        landcolor="#1c1a17",
+        landcolor="#192840",          # navy escuro — contrasta com azuis das bordas
         oceancolor=_BG,
         lakecolor=_BG,
-        coastlinecolor="rgba(255,255,255,0.65)",
-        coastlinewidth=1.8,
-        countrycolor="#1c1a17",  # mesma cor da terra → fronteiras invisíveis
+        coastlinecolor="rgba(80,140,210,0.75)",
+        coastlinewidth=1.5,
+        countrycolor="#192840",       # igual ao land → fronteiras de países invisíveis
         countrywidth=1,
         showcoastlines=True,
         showland=True,
@@ -765,8 +763,8 @@ def _fig_mapa_ufs(ufs: dict):
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="rgba(255,255,255,0.75)",
-        subunitwidth=1.8,
+        subunitcolor="#3d7ab5",       # azul médio — visível sobre o navy escuro
+        subunitwidth=2.5,
         center=GEO_CENTER,
         projection_scale=GEO_SCALE,
     )
