@@ -656,27 +656,29 @@ def _fig_mapa_ufs(ufs: dict):
     GEO_CENTER = dict(lat=-14, lon=-51)
     GEO_SCALE  = 1.5
 
-    # Posições fixas: usa espaço total do canvas, não apenas bordas do mapa
-    # Norte e Sul: dois tracks de lat alternados para quebrar a fileira única
-    # Nordeste e Leste: duas colunas lon separadas (NE=Atlântico, E=interior)
-    # Oeste: coluna única lon=-66.5 (leste o bastante para não cortar labels)
+    # Posições fixas: ocupa as bordas do canvas em todas as direções
+    # W  → lon=-75 (espaço do Pacífico/esquerda)
+    # NE+E → lon=-27 (Atlântico/direita), coluna única ordenada S→N por centróide
+    # N  → lat=9 / 6 (topo do canvas)
+    # S  → lat=-31 / -33 (fundo do canvas)
     _fp = {
-        # Norte — lat alterna 9.0 / 5.5
-        "RR": ( 9.0, -67.0), "PA": ( 5.5, -62.0), "AP": ( 9.0, -56.0),
-        "TO": ( 5.5, -49.5), "MA": ( 9.0, -44.0), "PI": ( 5.5, -41.0),
-        # Oeste — lon=-66.5
-        "MT": (-16.5, -66.5), "RO": (-12.5, -66.5),
-        "AC": ( -8.5, -66.5), "AM": ( -4.0, -66.5),
-        # Nordeste — lon=-34, lat 2.5 → -12.5 (step 3°)
-        "CE": (  2.5, -34.0), "RN": (-0.5, -34.0), "PB": (-3.5, -34.0),
-        "PE": ( -6.5, -34.0), "AL": (-9.5, -34.0), "SE": (-12.5,-34.0),
-        # Leste — lon=-41, lat -7 → -23.5 (step 3.3°)
-        "BA": ( -7.0, -41.0), "DF": (-10.3, -41.0), "GO": (-13.6, -41.0),
-        "MG": (-16.9, -41.0), "ES": (-20.2, -41.0), "RJ": (-23.5, -41.0),
-        # Sul — lat alterna -27.5 / -32.0
-        "MS": (-27.5, -60.0), "RS": (-32.0, -56.5),
-        "PR": (-27.5, -51.5), "SC": (-32.0, -47.0),
-        "SP": (-27.5, -43.5),
+        # Norte — lat=9 / 6 (usa topo do canvas)
+        "RR": ( 9.0, -72.0), "AP": ( 9.0, -52.0), "MA": ( 9.0, -44.0),
+        "PA": ( 6.0, -61.0), "TO": ( 6.0, -48.0), "PI": ( 6.0, -41.0),
+        # Oeste — lon=-75 (bem à esquerda, Pacífico)
+        "AM": (-3.5, -75.0), "AC": (-8.5, -75.0),
+        "RO": (-13.5,-75.0), "MT": (-18.5,-75.0),
+        # Sul — lat=-31 / -33 (usa espaço de baixo)
+        "MS": (-31.0,-63.0), "RS": (-33.0,-55.0),
+        "PR": (-31.0,-48.0), "SC": (-33.0,-44.0),
+        "SP": (-31.0,-41.0),
+        # Direita — lon=-27 (Atlântico, bem à direita do Brasil)
+        # Ordenados S→N por centróide: RJ(-22), ES(-19), MG(-18), GO(-16),
+        # DF(-16), BA(-13), SE(-11), AL(-10), PE(-8), PB(-7), RN(-6), CE(-5)
+        "RJ": (-31.5,-27.0), "ES": (-28.3,-27.0), "MG": (-25.1,-27.0),
+        "GO": (-21.9,-27.0), "DF": (-18.7,-27.0), "BA": (-15.5,-27.0),
+        "SE": (-12.3,-27.0), "AL": (-9.1, -27.0), "PE": (-5.9, -27.0),
+        "PB": (-2.7, -27.0), "RN": ( 0.5, -27.0), "CE": ( 3.7, -27.0),
     }
     lbl_pos = {uf: _fp.get(uf, (0.0, 0.0)) for uf, _ in pairs}
 
