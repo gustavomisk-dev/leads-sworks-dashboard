@@ -638,9 +638,9 @@ def _fig_mapa_ufs(ufs: dict):
         values=values,
         customdata=customdata,
         hovertemplate="%{customdata}<extra></extra>",
-        textinfo="label+percent",
-        textfont=dict(size=15, color="#f1f5f9"),
-        insidetextorientation="radial",
+        texttemplate="%{label} %{percent:.0%}",
+        textfont=dict(size=45, color="#f1f5f9"),
+        insidetextorientation="horizontal",
         hole=0.35,
         marker=dict(
             colors=[
@@ -659,7 +659,7 @@ def _fig_mapa_ufs(ufs: dict):
         height=620,
         showlegend=True,
         legend=dict(
-            font=dict(size=13, color="#cbd5e1"),
+            font=dict(size=39, color="#cbd5e1"),
             bgcolor="rgba(0,0,0,0)",
             orientation="v",
             x=1.02, y=0.5,
