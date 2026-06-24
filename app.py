@@ -1765,17 +1765,23 @@ if st.query_params.get("tv", "0") == "1":
         )
     with _cp_7d:
         if st.button("Últimos 7 dias", key="tv_7d", use_container_width=True):
-            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=6)).strftime("%Y%m%d")
+            _nd = max(data_min, data_max - timedelta(days=6))
+            st.session_state["tv_ini_picker"] = _nd
+            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_3d:
         if st.button("Últimos 3 dias", key="tv_3d", use_container_width=True):
-            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=2)).strftime("%Y%m%d")
+            _nd = max(data_min, data_max - timedelta(days=2))
+            st.session_state["tv_ini_picker"] = _nd
+            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_1d:
         if st.button("Desde Ontem", key="tv_1d", use_container_width=True):
-            st.query_params["tv_ini"] = max(data_min, data_max - timedelta(days=1)).strftime("%Y%m%d")
+            _nd = max(data_min, data_max - timedelta(days=1))
+            st.session_state["tv_ini_picker"] = _nd
+            st.query_params["tv_ini"] = _nd.strftime("%Y%m%d")
             st.session_state["tv_slide"] = 0
             st.rerun()
     with _cp_info:
