@@ -658,15 +658,16 @@ def _fig_mapa_ufs(ufs: dict):
 
     # Posições das colunas/linhas de labels (todas dentro do viewport)
     LN  =  7.5    # lat topo  — N states
-    LS  = -33.0   # lat base  — S states  (limite sul viewport ≈ -34)
-    LE  = -36.5   # lon leste — NE e E compartilham coluna, faixas lat separadas
+    LS  = -33.5   # lat base  — S states  (limite sul viewport ≈ -34)
+    LNE = -33.5   # lon leste — NE states (coluna Atlântica dedicada)
+    LE  = -38.5   # lon leste — E states  (coluna separada, mais a oeste)
     LW  = -67.0   # lon oeste — W states   (limite oeste viewport ≈ -70)
 
     # Faixas de distribuição ao longo de cada borda
-    N_LO,  N_HI  = -65.0, -43.0   # lon W→E  (6 estados N)
-    S_LO,  S_HI  = -57.5, -46.0   # lon W→E  (5 estados S)
-    NE_LO, NE_HI =   1.0,   7.0   # lat S→N  (6 NE costeiros — acima do equador)
-    E_LO,  E_HI  = -22.5,  -8.0   # lat S→N  (6 estados E/SE — abaixo do equador)
+    N_LO,  N_HI  = -66.0, -41.0   # lon W→E  (6 estados N — 25° = ~4.2°/estado)
+    S_LO,  S_HI  = -62.0, -43.0   # lon W→E  (5 estados S — 19° = ~3.8°/estado)
+    NE_LO, NE_HI =  -2.0,   8.0   # lat S→N  (6 NE — 10° = ~2°/estado)
+    E_LO,  E_HI  = -23.0,  -7.0   # lat S→N  (6 estados E/SE — abaixo do equador)
     W_LO,  W_HI  = -12.0,  -3.0   # lat S→N  (4 estados W)
 
     def _spread(n, lo, hi):
@@ -693,7 +694,7 @@ def _fig_mapa_ufs(ufs: dict):
     for (uf, _), c in zip(groups["S"],  _spread(len(groups["S"]),  S_LO,  S_HI)):
         lbl_pos[uf] = (LS, c)
     for (uf, _), c in zip(groups["NE"], _spread(len(groups["NE"]), NE_LO, NE_HI)):
-        lbl_pos[uf] = (c, LE)
+        lbl_pos[uf] = (c, LNE)
     for (uf, _), c in zip(groups["E"],  _spread(len(groups["E"]),  E_LO,  E_HI)):
         lbl_pos[uf] = (c, LE)
     for (uf, _), c in zip(groups["W"],  _spread(len(groups["W"]),  W_LO,  W_HI)):
@@ -740,7 +741,7 @@ def _fig_mapa_ufs(ufs: dict):
         lat=lbl_lats, lon=lbl_lons,
         mode="text",
         text=lbl_texts,
-        textfont=dict(size=20, color="#f1f5f9", family="Arial Black"),
+        textfont=dict(size=15, color="#f1f5f9", family="Arial Black"),
         customdata=lbl_hov,
         hovertemplate="%{customdata}<extra></extra>",
         showlegend=False,
@@ -748,23 +749,23 @@ def _fig_mapa_ufs(ufs: dict):
 
     fig.update_geos(
         scope="south america",
-        resolution=50,
+        resolution=10,                        # 10m Natural Earth — garante bordas estaduais
         bgcolor=_BG,
-        landcolor="#192840",          # navy escuro — contrasta com azuis das bordas
+        landcolor="#0d1b2e",                  # navy muito escuro para contraste máximo
         oceancolor=_BG,
         lakecolor=_BG,
         coastlinecolor="rgba(80,140,210,0.75)",
         coastlinewidth=1.5,
-        countrycolor="#192840",       # igual ao land → fronteiras de países invisíveis
-        countrywidth=1,
+        countrycolor="rgba(60,110,180,0.4)",
+        countrywidth=0.8,
         showcoastlines=True,
         showland=True,
         showocean=True,
         showlakes=False,
         showrivers=False,
         showsubunits=True,
-        subunitcolor="#3d7ab5",       # azul médio — visível sobre o navy escuro
-        subunitwidth=2.5,
+        subunitcolor="rgba(100,175,255,0.85)", # azul claro sobre navy — alto contraste
+        subunitwidth=1.5,
         center=GEO_CENTER,
         projection_scale=GEO_SCALE,
     )
