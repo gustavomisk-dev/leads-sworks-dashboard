@@ -663,11 +663,10 @@ def _fig_mapa_ufs(ufs: dict):
         legend=dict(
             font=dict(size=42, color="#cbd5e1"),
             bgcolor="rgba(0,0,0,0)",
-            orientation="v",
+            orientation="h",
             x=0.55, xanchor="left",
-            y=0.5,  yanchor="middle",
+            y=0.95, yanchor="top",
             tracegroupgap=0,
-            ncols=2,
         ),
     )
     return fig
