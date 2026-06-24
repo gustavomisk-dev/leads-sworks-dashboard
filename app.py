@@ -609,153 +609,61 @@ def _merge_motivos_det(d: dict) -> dict:
     return out
 
 
-# ── Mapa UF dos Reprovados — leader lines apontando para cada estado ─────────
-# go.Scattergeo usa dados Natural Earth embutidos no Plotly (zero rede).
-# showsubunits=True exibe bordas dos estados brasileiros sem GeoJSON externo.
-# Apenas Brasil visível: landcolor=_BG esconde outros países; bounds restritos.
-
-_UF_CENTROIDS = {
-    "AC": (-9.02, -70.81), "AL": (-9.57, -36.78), "AM": (-3.47, -65.10),
-    "AP": (0.90,  -52.00), "BA": (-12.97,-41.75), "CE": (-5.20, -39.53),
-    "DF": (-15.78,-47.93), "ES": (-19.19,-40.34), "GO": (-15.98,-49.86),
-    "MA": (-5.42, -45.44), "MG": (-18.10,-44.38), "MS": (-20.51,-54.54),
-    "MT": (-12.64,-55.42), "PA": (-3.79, -52.48), "PB": (-7.28, -36.72),
-    "PE": (-8.38, -37.86), "PI": (-7.72, -42.73), "PR": (-24.89,-51.55),
-    "RJ": (-22.25,-42.66), "RN": (-5.81, -36.59), "RO": (-10.83,-63.34),
-    "RR": (1.99,  -61.33), "RS": (-30.17,-53.50), "SC": (-27.45,-50.95),
-    "SE": (-10.57,-37.45), "SP": (-22.19,-48.79), "TO": (-10.18,-48.33),
-}
-
-# Lado fixo para cada estado (define em qual borda do mapa fica o label)
-_UF_SIDE = {
-    # Oeste
-    "AC": "W",  "AM": "W",  "RO": "W",  "MT": "W",
-    # Norte (inclui TO, MA, PI que têm centróides nórdicos)
-    "RR": "N",  "AP": "N",  "PA": "N",  "MA": "N",  "PI": "N",  "TO": "N",
-    # Nordeste costeiro — coluna leste, faixa lat 0..8
-    "CE": "NE", "RN": "NE", "PB": "NE", "PE": "NE", "AL": "NE", "SE": "NE",
-    # Leste / Sudeste — coluna leste, faixa lat -25..-7
-    "BA": "E",  "MG": "E",  "ES": "E",  "RJ": "E",  "GO": "E",  "DF": "E",
-    # Sul
-    "MS": "S",  "SP": "S",  "PR": "S",  "SC": "S",  "RS": "S",
-}
-
+# ── Pizza UF dos leads ────────────────────────────────────────────────────────
 
 def _fig_mapa_ufs(ufs: dict):
     if not ufs:
         return None
-    total = sum(ufs.values()) or 1
-    pairs = [(uf, v) for uf, v in ufs.items() if uf in _UF_CENTROIDS]
+    pairs = sorted(ufs.items(), key=lambda x: -x[1])
     if not pairs:
         return None
-    pairs = sorted(pairs, key=lambda x: -x[1])
 
-    # Viewport: scale 1.5 dá ~70° lon × 50° lat visíveis (menos zoom = menos corte).
-    # Centro deslocado 1° leste para caber mais Atlântico e não cortar labels E.
-    # Área visível aprox.: lat[-34, +9]  lon[-70, -32]
-    GEO_CENTER = dict(lat=-14, lon=-51)
-    GEO_SCALE  = 1.5
+    # Agrupa estados pequenos em "Outros" para manter o gráfico legível
+    TOP_N = 12
+    if len(pairs) > TOP_N:
+        top   = pairs[:TOP_N]
+        resto = sum(v for _, v in pairs[TOP_N:])
+        labels = [uf for uf, _ in top] + ["Outros"]
+        values = [v  for _, v  in top] + [resto]
+    else:
+        labels = [uf for uf, _ in pairs]
+        values = [v  for _, v  in pairs]
 
-    # Posições fixas: ocupa as bordas do canvas em todas as direções
-    # W  → lon=-75 (espaço do Pacífico/esquerda)
-    # NE+E → lon=-27 (Atlântico/direita), coluna única ordenada S→N por centróide
-    # N  → lat=9 / 6 (topo do canvas)
-    # S  → lat=-31 / -33 (fundo do canvas)
-    _fp = {
-        # Norte — lat=9 / 6 (usa topo do canvas)
-        "RR": ( 9.0, -72.0), "AP": ( 9.0, -52.0), "MA": ( 9.0, -44.0),
-        "PA": ( 6.0, -61.0), "TO": ( 6.0, -48.0), "PI": ( 6.0, -41.0),
-        # Oeste — lon=-75 (bem à esquerda, Pacífico)
-        "AM": (-3.5, -75.0), "AC": (-8.5, -75.0),
-        "RO": (-13.5,-75.0), "MT": (-18.5,-75.0),
-        # Sul — lat=-31 / -33 (usa espaço de baixo)
-        "MS": (-31.0,-63.0), "RS": (-33.0,-55.0),
-        "PR": (-31.0,-48.0), "SC": (-33.0,-44.0),
-        "SP": (-31.0,-41.0),
-        # Direita — lon=-27 (Atlântico, bem à direita do Brasil)
-        # Ordenados S→N por centróide: RJ(-22), ES(-19), MG(-18), GO(-16),
-        # DF(-16), BA(-13), SE(-11), AL(-10), PE(-8), PB(-7), RN(-6), CE(-5)
-        "RJ": (-31.5,-27.0), "ES": (-28.3,-27.0), "MG": (-25.1,-27.0),
-        "GO": (-21.9,-27.0), "DF": (-18.7,-27.0), "BA": (-15.5,-27.0),
-        "SE": (-12.3,-27.0), "AL": (-9.1, -27.0), "PE": (-5.9, -27.0),
-        "PB": (-2.7, -27.0), "RN": ( 0.5, -27.0), "CE": ( 3.7, -27.0),
-    }
-    lbl_pos = {uf: _fp.get(uf, (0.0, 0.0)) for uf, _ in pairs}
+    total = sum(values) or 1
+    customdata = [f"<b>{lbl}</b>: {val:,} leads ({100*val/total:.1f}%)"
+                  for lbl, val in zip(labels, values)]
 
-    line_lats: list = []
-    line_lons: list = []
-    lbl_lats:  list = []
-    lbl_lons:  list = []
-    lbl_texts: list = []
-    lbl_hov:   list = []
-    dot_lats:  list = []
-    dot_lons:  list = []
-
-    for uf, v in pairs:
-        clat, clon = _UF_CENTROIDS[uf]
-        pct = round(100 * v / total, 1)
-        dot_lats.append(clat)
-        dot_lons.append(clon)
-        llat, llon = lbl_pos[uf]
-        # Linha reta centróide→label (não cruza outras linhas com ordenação S→N)
-        line_lats.extend([clat, llat, None])
-        line_lons.extend([clon, llon, None])
-        lbl_lats.append(llat)
-        lbl_lons.append(llon)
-        lbl_texts.append(f"{uf} {pct:.0f}%")
-        lbl_hov.append(f"<b>{uf}</b>: {v:,} leads ({pct:.1f}%)")
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scattergeo(
-        lat=line_lats, lon=line_lons,
-        mode="lines",
-        line=dict(color="rgba(80,150,210,0.55)", width=1.2),
-        hoverinfo="skip", showlegend=False,
-    ))
-    fig.add_trace(go.Scattergeo(
-        lat=dot_lats, lon=dot_lons,
-        mode="markers",
-        marker=dict(size=6, color="#60a5fa", symbol="circle"),
-        hoverinfo="skip", showlegend=False,
-    ))
-    fig.add_trace(go.Scattergeo(
-        lat=lbl_lats, lon=lbl_lons,
-        mode="text",
-        text=lbl_texts,
-        textfont=dict(size=36, color="#f1f5f9", family="Arial Black"),
-        customdata=lbl_hov,
+    fig = go.Figure(go.Pie(
+        labels=labels,
+        values=values,
+        customdata=customdata,
         hovertemplate="%{customdata}<extra></extra>",
-        showlegend=False,
+        textinfo="label+percent",
+        textfont=dict(size=15, color="#f1f5f9"),
+        insidetextorientation="radial",
+        hole=0.35,
+        marker=dict(
+            colors=[
+                "#3b82f6","#6366f1","#8b5cf6","#a78bfa",
+                "#60a5fa","#38bdf8","#34d399","#4ade80",
+                "#facc15","#fb923c","#f87171","#f472b6","#94a3b8",
+            ],
+            line=dict(color=_BG, width=2),
+        ),
+        sort=False,
     ))
-
-    fig.update_geos(
-        scope="south america",
-        resolution=50,                        # único valor suportado além de 110 pelo Plotly
-        bgcolor=_BG,
-        landcolor="#0d1b2e",                  # navy muito escuro para contraste máximo
-        oceancolor=_BG,
-        lakecolor=_BG,
-        coastlinecolor="rgba(80,140,210,0.75)",
-        coastlinewidth=1.5,
-        countrycolor="rgba(60,110,180,0.4)",
-        countrywidth=0.8,
-        showcoastlines=True,
-        showland=True,
-        showocean=True,
-        showlakes=False,
-        showrivers=False,
-        showsubunits=True,
-        subunitcolor="rgba(100,175,255,0.85)", # azul claro sobre navy — alto contraste
-        subunitwidth=1.5,
-        center=GEO_CENTER,
-        projection_scale=GEO_SCALE,
-    )
     fig.update_layout(
+        template=_TEMPLATE,
         paper_bgcolor=_BG,
-        geo=dict(bgcolor=_BG),
-        margin=dict(t=0, b=0, l=0, r=0),
-        showlegend=False,
+        margin=dict(t=10, b=10, l=10, r=10),
+        height=620,
+        showlegend=True,
+        legend=dict(
+            font=dict(size=13, color="#cbd5e1"),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="v",
+            x=1.02, y=0.5,
+        ),
     )
     return fig
 
