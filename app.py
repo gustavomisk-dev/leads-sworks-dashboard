@@ -637,7 +637,7 @@ def _fig_mapa_ufs(ufs: dict):
     # Arco-íris: vermelho (hue=0) → violeta (hue=270); "Outros" fica cinza
     n_real = len(labels) - (1 if labels and labels[-1] == "Outros" else 0)
     _COLORS = [
-        f"hsl({int(_i * 270 / max(n_real - 1, 1))}, 88%, 58%)"
+        f"hsl({int(_i * 270 / max(n_real - 1, 1))}, 82%, 42%)"
         for _i in range(n_real)
     ]
     if labels and labels[-1] == "Outros":
