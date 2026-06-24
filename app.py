@@ -634,17 +634,12 @@ def _fig_mapa_ufs(ufs: dict):
     customdata = [f"<b>{lbl}</b>: {val:,} leads ({100*val/total:.1f}%)"
                   for lbl, val in zip(labels, values)]
 
-    # Gradiente vermelho → azul; "Outros" fica cinza
-    _RED, _BLUE = (239, 68, 68), (59, 130, 246)
+    # Arco-íris: vermelho (hue=0) → violeta (hue=270); "Outros" fica cinza
     n_real = len(labels) - (1 if labels and labels[-1] == "Outros" else 0)
-    _COLORS = []
-    for _i in range(n_real):
-        _t = _i / max(n_real - 1, 1)
-        _COLORS.append("#{:02x}{:02x}{:02x}".format(
-            int(_RED[0] + (_BLUE[0] - _RED[0]) * _t),
-            int(_RED[1] + (_BLUE[1] - _RED[1]) * _t),
-            int(_RED[2] + (_BLUE[2] - _RED[2]) * _t),
-        ))
+    _COLORS = [
+        f"hsl({int(_i * 270 / max(n_real - 1, 1))}, 88%, 58%)"
+        for _i in range(n_real)
+    ]
     if labels and labels[-1] == "Outros":
         _COLORS.append("#64748b")
 
