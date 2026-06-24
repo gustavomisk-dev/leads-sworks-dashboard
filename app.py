@@ -681,11 +681,13 @@ def _fig_mapa_ufs(ufs: dict):
     for uf, v in pairs:
         groups[_UF_SIDE.get(uf, "E")].append((uf, v))
 
-    groups["N"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])         # lon W→E
-    groups["S"].sort(key=lambda x: _UF_CENTROIDS[x[0]][1])         # lon W→E
-    groups["NE"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])       # lat N→S
-    groups["E"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])        # lat N→S
-    groups["W"].sort(key=lambda x: -_UF_CENTROIDS[x[0]][0])        # lat N→S
+    # Ordenar S→N (lat crescente) para E/NE/W garante que linha reta de centróide
+    # ao label nunca cruza outra linha do mesmo grupo (matching sem cruzamento).
+    groups["N"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][1])   # lon W→E
+    groups["S"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][1])   # lon W→E
+    groups["NE"].sort(key=lambda x: _UF_CENTROIDS[x[0]][0])   # lat S→N
+    groups["E"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][0])   # lat S→N
+    groups["W"].sort(key=lambda x:  _UF_CENTROIDS[x[0]][0])   # lat S→N
 
     lbl_pos: dict = {}
     for (uf, _), c in zip(groups["N"],  _spread(len(groups["N"]),  N_LO,  N_HI)):
@@ -714,9 +716,9 @@ def _fig_mapa_ufs(ufs: dict):
         dot_lats.append(clat)
         dot_lons.append(clon)
         llat, llon = lbl_pos[uf]
-        # L-shape: horizontal até coluna do label, depois vertical até lat do label
-        line_lats.extend([clat, clat, llat, None])
-        line_lons.extend([clon, llon, llon, None])
+        # Linha reta centróide→label (não cruza outras linhas com ordenação S→N)
+        line_lats.extend([clat, llat, None])
+        line_lons.extend([clon, llon, None])
         lbl_lats.append(llat)
         lbl_lons.append(llon)
         lbl_texts.append(f"{uf} {pct:.0f}%")
@@ -740,7 +742,7 @@ def _fig_mapa_ufs(ufs: dict):
         lat=lbl_lats, lon=lbl_lons,
         mode="text",
         text=lbl_texts,
-        textfont=dict(size=14, color="#f1f5f9"),
+        textfont=dict(size=20, color="#f1f5f9", family="Arial Black"),
         customdata=lbl_hov,
         hovertemplate="%{customdata}<extra></extra>",
         showlegend=False,
