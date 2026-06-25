@@ -216,6 +216,14 @@ def _login_page(cookies: CookieController) -> None:
                     _login_attempts[email_in] = attempt
                     st.error("E-mail ou senha incorretos.")
 
+        st.markdown(
+            '<div style="text-align:center;margin-top:28px">'
+            '<a href="https://zileads.streamlit.app/?tv=AI4aFlb0RO9e7F3PRLr_fYr0X7hxiq8eiVj1zsyjsng" '
+            'style="font-size:12px;color:#475569;text-decoration:none">📺 Abrir modo TV</a>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
     st.stop()
 
 
