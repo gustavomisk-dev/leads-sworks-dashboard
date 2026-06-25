@@ -1668,6 +1668,23 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _tv_nav(slide)
 
 
+# ── TV auto-login via token na URL ───────────────────────────────────────────
+# URL: https://<app>/?tv=<tv_token configurado em secrets.toml>
+# Entra direto no modo TV sem login, sem cookie, sem interação.
+_tv_url_token = st.query_params.get("tv", "")
+_tv_secret    = st.secrets.get("auth", {}).get("tv_token", "")
+if _tv_url_token and _tv_secret and _tv_url_token == _tv_secret:
+    if not st.session_state.get("logged_in"):
+        st.session_state.update({
+            "logged_in":       True,
+            "user_email":      "tv",
+            "display_name":    "TV",
+            "_cookie_set":     True,
+            "_cookie_checked": True,
+        })
+    if "tv_slide" not in st.session_state:
+        st.session_state["tv_slide"] = 0
+
 # ── Autenticação ─────────────────────────────────────────────────────────────
 
 _cookies = CookieController()
