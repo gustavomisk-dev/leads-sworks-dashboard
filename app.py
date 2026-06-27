@@ -2055,7 +2055,7 @@ _prazo_d  = fin.get("Prazo", {})
 _taxa_d   = fin.get("Taxa", {})
 prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
 ticket_s = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
-taxa_s   = f"{_taxa_d['media']:.2f}% a.m.".replace(".", ",") if _taxa_d.get("media") else "—"
+taxa_s   = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
 
 st.markdown(f"""
 <div class="kpi-row">
