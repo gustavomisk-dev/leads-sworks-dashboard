@@ -1006,7 +1006,7 @@ def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
 
 
 def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 15) -> str:
-    """Tabela de empregadores reprovados com linha de motivos expansível por clique."""
+    """Tabela de empregadores reprovados com <details>/<summary> para motivos (sem JS, sem iframe)."""
     if not emp_rep:
         return ""
     _items = list(emp_rep.items())[:n]
@@ -1014,68 +1014,50 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
     for i, (emp, cnt) in enumerate(_items):
         pct  = f"{100*cnt/n_rep:.1f}%" if n_rep else "—"
         mots = emp_mot.get(emp, {})
-        rid  = f"r{i}"
-        bg   = "#131211" if i % 2 == 0 else "#0d0c0a"
-        toggle = (
-            f'<td class="tog" onclick="tgl(\'{rid}\')" id="b{rid}"><span>▶</span></td>'
-            if mots else '<td class="tog"></td>'
-        )
-        rows.append(
-            f'<tr style="background:{bg}">'
-            f'{toggle}'
-            f'<td class="num">{i+1}</td>'
-            f'<td class="nm">{emp}</td>'
-            f'<td class="rv">{cnt:,}</td>'
-            f'<td class="rp">{pct}</td>'
-            f'</tr>'
-        )
+        rc   = "g0" if i % 2 == 0 else "g1"
         if mots:
             total_emp = sum(mots.values())
             mrows = "".join(
-                f'<tr><td class="ml">{lbl}</td>'
-                f'<td class="mp">{v/total_emp*100:.1f}%</td>'
-                f'<td class="mn">{v}</td></tr>'
+                f'<tr>'
+                f'<td style="font-size:0.78em;color:#94a3b8;padding:2px 8px 2px 0;word-break:break-word">{lbl}</td>'
+                f'<td style="font-size:0.78em;color:#e2e8f0;font-weight:600;text-align:right;white-space:nowrap;padding:2px 0">{v/total_emp*100:.1f}%</td>'
+                f'<td style="font-size:0.78em;color:#64748b;text-align:right;padding:2px 0 2px 10px">{v}</td>'
+                f'</tr>'
                 for lbl, v in sorted(mots.items(), key=lambda x: -x[1])
             )
-            rows.append(
-                f'<tr id="{rid}" class="det" style="background:{bg}">'
-                f'<td colspan="2"></td>'
-                f'<td colspan="3">'
-                f'<table class="mt"><thead><tr>'
-                f'<th class="mth">Motivo</th><th class="mth" style="text-align:right">%</th><th class="mth" style="text-align:right">n</th>'
-                f'</tr></thead><tbody>{mrows}</tbody></table>'
-                f'</td></tr>'
+            name_cell = (
+                f'<details style="cursor:pointer">'
+                f'<summary style="list-style:none;display:flex;align-items:center;gap:6px">'
+                f'<span style="font-size:9px;color:#64748b">▶</span>{emp}'
+                f'</summary>'
+                f'<div style="margin:6px 0 4px 14px">'
+                f'<table style="width:100%;border-collapse:collapse">'
+                f'<thead><tr>'
+                f'<th style="font-size:0.75em;color:#475569;font-weight:normal;text-align:left;padding-bottom:3px">Motivo</th>'
+                f'<th style="font-size:0.75em;color:#475569;font-weight:normal;text-align:right;padding-bottom:3px">%</th>'
+                f'<th style="font-size:0.75em;color:#475569;font-weight:normal;text-align:right;padding-bottom:3px;padding-left:10px">n</th>'
+                f'</tr></thead>'
+                f'<tbody>{mrows}</tbody>'
+                f'</table></div>'
+                f'</details>'
             )
-    return f"""<style>
-body{{margin:0;padding:0;background:#0d0c0a;font-family:sans-serif}}
-.main{{width:100%;border-collapse:collapse;background:#0d0c0a}}
-.main thead tr{{border-bottom:1px solid #1e293b}}
-.main th{{font-size:9px;color:#475569;font-weight:normal;padding:5px 6px}}
-.main th:nth-child(4),.main th:nth-child(5){{text-align:right}}
-.tog{{width:18px;cursor:pointer;user-select:none;padding:5px 2px;text-align:center;font-size:9px;color:#64748b}}
-.num{{width:22px;text-align:center;font-size:10px;color:#64748b;padding:5px 4px}}
-.nm{{font-size:11px;color:#e2e8f0;padding:5px 8px}}
-.rv{{text-align:right;font-size:11px;color:#e2e8f0;padding:5px 8px}}
-.rp{{text-align:right;font-size:11px;color:#94a3b8;padding:5px 8px}}
-.det{{display:none}}.det td{{padding:2px 8px 8px 0}}
-.mt{{width:100%;border-collapse:collapse}}
-.mth{{font-size:9px;color:#475569;font-weight:normal;padding:0 0 3px}}
-.ml{{font-size:10px;color:#94a3b8;padding:2px 8px 2px 0;white-space:normal;word-break:break-word}}
-.mp{{font-size:10px;color:#e2e8f0;font-weight:600;text-align:right;padding:2px 0}}
-.mn{{font-size:10px;color:#64748b;text-align:right;padding:2px 0 2px 10px}}
-</style>
-<script>
-function tgl(id){{
-  var r=document.getElementById(id);
-  var b=document.getElementById('b'+id).querySelector('span');
-  if(r.style.display===''){{r.style.display='none';b.textContent='▶';b.style.color='#64748b';}}
-  else{{r.style.display='';b.textContent='▼';b.style.color='#ef4444';}}
-}}
-</script>
-<table class="main">
-<thead><tr><th></th><th>#</th><th style="text-align:left">Razão Social</th><th>Leads</th><th>%</th></tr></thead>
-<tbody>{"".join(rows)}</tbody>
-</table>"""
+        else:
+            name_cell = emp
+        rows.append(
+            f'<tr class="{rc}">'
+            f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
+            f'<td class="wrap">{name_cell}</td>'
+            f'<td class="r">{cnt:,}</td>'
+            f'<td class="r" style="color:#94a3b8">{pct}</td>'
+            f'</tr>'
+        )
+    thead = '<thead><tr><th class="c">#</th><th>Razão Social</th><th class="r">Leads</th><th class="r">%</th></tr></thead>'
+    return (
+        '<div class="dtbl-wrap"><table class="dtbl">'
+        + thead
+        + '<tbody>' + "".join(rows) + '</tbody>'
+        + '</table></div>'
+    )
 
 
 def _html_diagrama(etapas: dict, n_rep: int) -> str:
@@ -2279,9 +2261,7 @@ with col_s1:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
         if _tbl_html:
-            n_emp = min(len(emp_rep), 15)
-            _height = 44 + n_emp * 34
-            components.html(_tbl_html, height=_height, scrolling=True)
+            st.markdown(_tbl_html, unsafe_allow_html=True)
     else:
         st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
 
