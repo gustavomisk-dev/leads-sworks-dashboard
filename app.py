@@ -1345,10 +1345,16 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol      = fin.get("ValorContratacao", {})
-    vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
+    vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
     ag       = agg.get("aguardando", 0)
     ag_valor = agg.get("aguardando_valor", 0.0)
     ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
+    _prazo_d  = fin.get("Prazo", {})
+    _ticket_d = fin.get("ValorParcela", {})
+    _taxa_d   = fin.get("Taxa", {})
+    prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+    ticket_s = f"R$ {_ticket_d['media']:,.0f}".replace(",", ".") if _ticket_d.get("media") else "—"
+    taxa_s   = f"{_taxa_d['media']:.2f}% a.m.".replace(".", ",") if _taxa_d.get("media") else "—"
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1362,6 +1368,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
       <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
+      <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
+        <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ticket médio</div>
+        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor da parcela</div></div>
+      <div class="kpi-card"><div class="kpi-label">Taxa média</div>
+        <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
         <div class="kpi-value">{ag:,}</div><div class="kpi-sub">{ag_val_s}</div></div>
     </div>
@@ -1965,10 +1977,17 @@ periodo_label = (
 
 taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
 vol      = fin.get("ValorContratacao", {})
-vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
+vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
 ag       = agg.get("aguardando", 0)
 ag_valor = agg.get("aguardando_valor", 0.0)
 ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
+
+_prazo_d  = fin.get("Prazo", {})
+_ticket_d = fin.get("ValorParcela", {})
+_taxa_d   = fin.get("Taxa", {})
+prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+ticket_s = f"R$ {_ticket_d['media']:,.0f}".replace(",", ".") if _ticket_d.get("media") else "—"
+taxa_s   = f"{_taxa_d['media']:.2f}% a.m.".replace(".", ",") if _taxa_d.get("media") else "—"
 
 st.markdown(f"""
 <div class="kpi-row">
@@ -1996,6 +2015,21 @@ st.markdown(f"""
     <div class="kpi-label">Volume aprovado</div>
     <div class="kpi-value">{vol_s}</div>
     <div class="kpi-sub">valor contratado total</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Prazo médio</div>
+    <div class="kpi-value">{prazo_s}</div>
+    <div class="kpi-sub">contratos aprovados</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Ticket médio</div>
+    <div class="kpi-value">{ticket_s}</div>
+    <div class="kpi-sub">valor da parcela</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Taxa média</div>
+    <div class="kpi-value">{taxa_s}</div>
+    <div class="kpi-sub">contratos aprovados</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Aguardando 24h</div>
