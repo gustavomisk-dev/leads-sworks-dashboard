@@ -326,6 +326,7 @@ def agregar(dias_raw: list) -> dict:
     bloqueios    = defaultdict(int)
     etapas       = defaultdict(int)
     etapa_motivos = defaultdict(lambda: defaultdict(int))
+    emp_motivos   = defaultdict(lambda: defaultdict(int))
     valores_cont     = []
     aguardando       = 0
     aguardando_valor = 0.0
@@ -385,6 +386,10 @@ def agregar(dias_raw: list) -> dict:
             for label, cnt in mots.items():
                 etapa_motivos[etapa][label] += cnt
 
+        for emp, mots in d.get("emp_motivos", {}).items():
+            for label, cnt in mots.items():
+                emp_motivos[emp][label] += cnt
+
         valores_cont.extend(d.get("valores_contratacao", []))
         aguardando       += d.get("aguardando", 0)
         aguardando_valor += d.get("aguardando_valor", 0.0)
@@ -439,6 +444,7 @@ def agregar(dias_raw: list) -> dict:
         "bloqueios":         dict(bloqueios),
         "etapas":            dict(etapas),
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
+        "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
         "valores_contratacao": valores_cont,
         "aguardando":        aguardando,
         "aguardando_valor":  round(aguardando_valor, 2),
@@ -2193,6 +2199,7 @@ col_s1, col_s2 = st.columns(2)
 
 with col_s1:
     emp_rep = agg.get("top_emp_rep", {})
+    emp_mot = agg.get("emp_motivos", {})
     if emp_rep:
         fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
         if fig:
@@ -2200,6 +2207,27 @@ with col_s1:
         tbl = _html_tabela_ranking(emp_rep, "Razão Social", n_rep)
         if tbl:
             st.markdown(tbl, unsafe_allow_html=True)
+        for emp_nome in emp_rep:
+            mots = emp_mot.get(emp_nome, {})
+            if not mots:
+                continue
+            total_emp = sum(mots.values())
+            with st.expander(emp_nome):
+                rows = "".join(
+                    f"<tr><td style='padding:2px 8px 2px 0'>{lbl}</td>"
+                    f"<td style='text-align:right;padding:2px 0'>{v/total_emp*100:.1f}%</td>"
+                    f"<td style='text-align:right;padding:2px 0 2px 8px;color:#94a3b8'>{v}</td></tr>"
+                    for lbl, v in sorted(mots.items(), key=lambda x: -x[1])
+                )
+                st.markdown(
+                    f'<table style="width:100%;font-size:0.82em;border-collapse:collapse">'
+                    f'<thead><tr>'
+                    f'<th style="text-align:left;padding:2px 8px 4px 0;color:#64748b">Motivo</th>'
+                    f'<th style="text-align:right;padding:2px 0 4px;color:#64748b">%</th>'
+                    f'<th style="text-align:right;padding:2px 0 4px 8px;color:#64748b">n</th>'
+                    f'</tr></thead><tbody>{rows}</tbody></table>',
+                    unsafe_allow_html=True,
+                )
     else:
         st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
 
