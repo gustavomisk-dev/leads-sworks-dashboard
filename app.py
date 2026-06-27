@@ -308,11 +308,13 @@ def carregar_dia(dia_str: str) -> dict:
 
 def agregar(dias_raw: list) -> dict:
     d_status     = defaultdict(int)
-    fin_n        = defaultdict(int)
-    fin_total    = defaultdict(float)
-    fin_min      = {}
-    fin_max      = {}
-    fin_med_sum  = defaultdict(float)
+    fin_n            = defaultdict(int)
+    fin_total        = defaultdict(float)
+    fin_min          = {}
+    fin_max          = {}
+    fin_med_sum      = defaultdict(float)
+    fin_weighted_sum = defaultdict(float)
+    fin_weight_sum   = defaultdict(float)
     evolucao_d   = defaultdict(lambda: defaultdict(int))
     evolucao_h   = defaultdict(lambda: defaultdict(int))
     motivos      = defaultdict(int)
@@ -343,6 +345,9 @@ def agregar(dias_raw: list) -> dict:
                 fin_med_sum[campo] += s.get("mediana", 0.0) * n
                 fin_min[campo] = min(fin_min.get(campo, float("inf")),  s.get("min", float("inf")))
                 fin_max[campo] = max(fin_max.get(campo, float("-inf")), s.get("max", float("-inf")))
+                if "weighted_sum" in s:
+                    fin_weighted_sum[campo] += s["weighted_sum"]
+                    fin_weight_sum[campo]   += s["weight_sum"]
 
         for dt, cont in d.get("evolucao_diaria", {}).items():
             for sk, cnt in cont.items():
@@ -416,9 +421,13 @@ def agregar(dias_raw: list) -> dict:
     financeiro = {}
     for campo in fin_n:
         n = fin_n[campo]
+        if fin_weight_sum.get(campo):
+            media = fin_weighted_sum[campo] / fin_weight_sum[campo]
+        else:
+            media = fin_total[campo] / n
         financeiro[campo] = {
             "n":      n,
-            "media":  fin_total[campo] / n,
+            "media":  media,
             "mediana": fin_med_sum[campo] / n,
             "total":  fin_total[campo],
             "min":    fin_min[campo],
