@@ -87,8 +87,8 @@ except Exception:
     st.error("Secrets do GitHub não configurados. Adicione [github] token e repo em Settings > Secrets.")
     st.stop()
 
-_HEADERS_RAW  = {"Authorization": f"Bearer {_TOKEN}", "Accept": "application/vnd.github.v3.raw"}
-_HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}"}
+_HEADERS_RAW  = {"Authorization": f"Bearer {_TOKEN}", "Accept": "application/vnd.github.v3.raw", "Cache-Control": "no-cache"}
+_HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}", "Cache-Control": "no-cache"}
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -326,8 +326,9 @@ def agregar(dias_raw: list) -> dict:
     bloqueios    = defaultdict(int)
     etapas       = defaultdict(int)
     etapa_motivos = defaultdict(lambda: defaultdict(int))
-    valores_cont = []
-    aguardando   = 0
+    valores_cont     = []
+    aguardando       = 0
+    aguardando_valor = 0.0
 
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
@@ -385,7 +386,8 @@ def agregar(dias_raw: list) -> dict:
                 etapa_motivos[etapa][label] += cnt
 
         valores_cont.extend(d.get("valores_contratacao", []))
-        aguardando += d.get("aguardando", 0)
+        aguardando       += d.get("aguardando", 0)
+        aguardando_valor += d.get("aguardando_valor", 0.0)
 
     aprovados  = d_status.get(3, 0)
     reprovados = d_status.get(4, 0)
@@ -439,6 +441,7 @@ def agregar(dias_raw: list) -> dict:
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "valores_contratacao": valores_cont,
         "aguardando":        aguardando,
+        "aguardando_valor":  round(aguardando_valor, 2),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -1340,10 +1343,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _TV_TXT  = dict(size=28, color="rgba(255,255,255,0.92)")
     _TV_YTXT = dict(size=28, color="#cbd5e1")
 
-    taxa  = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
-    vol   = fin.get("ValorContratacao", {})
-    vol_s = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
-    ag    = agg.get("aguardando", 0)
+    taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
+    vol      = fin.get("ValorContratacao", {})
+    vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
+    ag       = agg.get("aguardando", 0)
+    ag_valor = agg.get("aguardando_valor", 0.0)
+    ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}" if ag_valor else "BLOQUEIO_TEMPORARIO"
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1358,7 +1363,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
-        <div class="kpi-value">{ag:,}</div><div class="kpi-sub">BLOQUEIO_TEMPORARIO</div></div>
+        <div class="kpi-value">{ag:,}</div><div class="kpi-sub">{ag_val_s}</div></div>
     </div>
     """
 
@@ -1734,7 +1739,7 @@ if not datas:
 
 data_min = datetime.strptime(datas[0],  "%Y%m%d").date()
 data_max = datetime.strptime(datas[-1], "%Y%m%d").date()
-d_ini_default = max(data_min, data_max - timedelta(days=1))
+d_ini_default = data_max
 
 # ── Modo TV: atalho completo ──────────────────────────────────────────────────
 if st.query_params.get("tv", "0") == "1":
@@ -1760,7 +1765,7 @@ if st.query_params.get("tv", "0") == "1":
     """, height=0)
 
     # Seletor de período + navegação de slides na mesma barra
-    _default_d_ini = max(data_min, data_max - timedelta(days=1))
+    _default_d_ini = data_max
 
     # session_state é a única fonte da data — mais confiável que query_params entre reruns.
     if "_tv_date" not in st.session_state:
@@ -1915,6 +1920,7 @@ with col_title:
             _cookies.remove(_COOKIE_NAME)
             for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
                 st.session_state.pop(_k, None)
+            st.session_state["_cookie_checked"] = True  # evita tela preta pós-logout
             st.rerun()
 
 with col_picker:
@@ -1957,10 +1963,12 @@ periodo_label = (
 
 # ── KPIs ──────────────────────────────────────────────────────────────────────
 
-taxa  = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
-vol   = fin.get("ValorContratacao", {})
-vol_s = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
-ag    = agg.get("aguardando", 0)
+taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
+vol      = fin.get("ValorContratacao", {})
+vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
+ag       = agg.get("aguardando", 0)
+ag_valor = agg.get("aguardando_valor", 0.0)
+ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}" if ag_valor else "BLOQUEIO_TEMPORARIO"
 
 st.markdown(f"""
 <div class="kpi-row">
@@ -1992,7 +2000,7 @@ st.markdown(f"""
   <div class="kpi-card">
     <div class="kpi-label">Aguardando 24h</div>
     <div class="kpi-value">{ag:,}</div>
-    <div class="kpi-sub">BLOQUEIO_TEMPORARIO</div>
+    <div class="kpi-sub">{ag_val_s}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
