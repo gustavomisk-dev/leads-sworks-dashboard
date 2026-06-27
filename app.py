@@ -1440,7 +1440,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
-        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor total do empréstimo</div></div>
+        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor a pagar pelo cliente</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
@@ -2092,7 +2092,7 @@ st.markdown(f"""
   <div class="kpi-card">
     <div class="kpi-label">Ticket médio do empréstimo</div>
     <div class="kpi-value">{ticket_s}</div>
-    <div class="kpi-sub">valor total do empréstimo</div>
+    <div class="kpi-sub">valor a pagar pelo cliente</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Taxa média</div>
