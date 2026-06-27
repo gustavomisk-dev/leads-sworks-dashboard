@@ -1348,7 +1348,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
     ag       = agg.get("aguardando", 0)
     ag_valor = agg.get("aguardando_valor", 0.0)
-    ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}" if ag_valor else "BLOQUEIO_TEMPORARIO"
+    ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1968,7 +1968,7 @@ vol      = fin.get("ValorContratacao", {})
 vol_s    = f"R$ {vol['total']:,.0f}" if vol.get("total") else "—"
 ag       = agg.get("aguardando", 0)
 ag_valor = agg.get("aguardando_valor", 0.0)
-ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}" if ag_valor else "BLOQUEIO_TEMPORARIO"
+ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
 
 st.markdown(f"""
 <div class="kpi-row">
