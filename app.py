@@ -1324,7 +1324,7 @@ def _html_tabela_resumo_funil(rows: list) -> str:
 
 def _html_tabela_financeira(fin: dict) -> str:
     campos = [
-        ("ValorContratacao", "Valor Contratado",  lambda x: f"R$ {x:,.2f}"),
+        ("ValorContratacao", "Valor Total Empréstimo",  lambda x: f"R$ {x:,.2f}"),
         ("RendaLiquida",     "Renda Líquida",      lambda x: f"R$ {x:,.2f}"),
         ("Prazo",            "Prazo (meses)",       lambda x: f"{x:.0f}"),
         ("Taxa",             "Taxa Mensal (%)",     lambda x: f"{x:.2f}"),
@@ -1420,11 +1420,10 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     ag_valor = agg.get("aguardando_valor", 0.0)
     ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
     _prazo_d  = fin.get("Prazo", {})
-    _ticket_d = fin.get("ValorParcela", {})
     _taxa_d   = fin.get("Taxa", {})
     prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-    ticket_s = f"R$ {_ticket_d['media']:,.0f}".replace(",", ".") if _ticket_d.get("media") else "—"
-    taxa_s   = f"{_taxa_d['media']:.2f}% a.m.".replace(".", ",") if _taxa_d.get("media") else "—"
+    ticket_s = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
+    taxa_s   = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1440,8 +1439,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Ticket médio</div>
-        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor da parcela</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
+        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor total do empréstimo</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
@@ -2053,10 +2052,9 @@ ag_valor = agg.get("aguardando_valor", 0.0)
 ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
 
 _prazo_d  = fin.get("Prazo", {})
-_ticket_d = fin.get("ValorParcela", {})
 _taxa_d   = fin.get("Taxa", {})
 prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-ticket_s = f"R$ {_ticket_d['media']:,.0f}".replace(",", ".") if _ticket_d.get("media") else "—"
+ticket_s = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
 taxa_s   = f"{_taxa_d['media']:.2f}% a.m.".replace(".", ",") if _taxa_d.get("media") else "—"
 
 st.markdown(f"""
@@ -2092,9 +2090,9 @@ st.markdown(f"""
     <div class="kpi-sub">contratos aprovados</div>
   </div>
   <div class="kpi-card">
-    <div class="kpi-label">Ticket médio</div>
+    <div class="kpi-label">Ticket médio do empréstimo</div>
     <div class="kpi-value">{ticket_s}</div>
-    <div class="kpi-sub">valor da parcela</div>
+    <div class="kpi-sub">valor total do empréstimo</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Taxa média</div>
