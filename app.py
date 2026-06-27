@@ -1794,6 +1794,8 @@ if _tv_url_token and _tv_secret and _tv_url_token == _tv_secret:
 _cookies = CookieController()
 
 if not st.session_state.get("logged_in"):
+    # Logout explícito: ignora o cookie nesta renderização (JS de remoção ainda não executou)
+    _just_logged_out = st.session_state.pop("_force_logout", False)
     token = _cookies.get(_COOKIE_NAME)
     if token is None and not st.session_state.get("_cookie_checked"):
         # Primeira renderização: cookie controller ainda não leu o cookie — aguarda
@@ -1803,7 +1805,7 @@ if not st.session_state.get("logged_in"):
         [data-testid="stHeader"],footer,#MainMenu{display:none!important}
         </style>""", unsafe_allow_html=True)
         st.stop()
-    if token:
+    if token and not _just_logged_out:
         email_from_cookie = _verify_token(token)
         if email_from_cookie:
             user_from_cookie = _find_user(email_from_cookie)
@@ -2020,6 +2022,7 @@ with col_title:
             for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
                 st.session_state.pop(_k, None)
             st.session_state["_cookie_checked"] = True  # evita tela preta pós-logout
+            st.session_state["_force_logout"] = True    # impede restore do cookie no mesmo rerun
             st.rerun()
 
 with col_picker:
