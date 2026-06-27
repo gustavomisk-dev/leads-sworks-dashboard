@@ -330,8 +330,10 @@ def agregar(dias_raw: list) -> dict:
     etapa_motivos = defaultdict(lambda: defaultdict(int))
     emp_motivos   = defaultdict(lambda: defaultdict(int))
     valores_cont     = []
-    aguardando       = 0
-    aguardando_valor = 0.0
+    aguardando          = 0
+    aguardando_valor    = 0.0
+    aguardando_liberado = 0.0
+    aguardando_iof      = 0.0
 
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
@@ -396,8 +398,10 @@ def agregar(dias_raw: list) -> dict:
                 emp_motivos[emp][label] += cnt
 
         valores_cont.extend(d.get("valores_contratacao", []))
-        aguardando       += d.get("aguardando", 0)
-        aguardando_valor += d.get("aguardando_valor", 0.0)
+        aguardando          += d.get("aguardando", 0)
+        aguardando_valor    += d.get("aguardando_valor", 0.0)
+        aguardando_liberado += d.get("aguardando_liberado", 0.0)
+        aguardando_iof      += d.get("aguardando_iof", 0.0)
 
     aprovados  = d_status.get(3, 0)
     reprovados = d_status.get(4, 0)
@@ -455,8 +459,10 @@ def agregar(dias_raw: list) -> dict:
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
         "valores_contratacao": valores_cont,
-        "aguardando":        aguardando,
-        "aguardando_valor":  round(aguardando_valor, 2),
+        "aguardando":           aguardando,
+        "aguardando_valor":     round(aguardando_valor, 2),
+        "aguardando_liberado":  round(aguardando_liberado, 2),
+        "aguardando_iof":       round(aguardando_iof, 2),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -1416,14 +1422,25 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol      = fin.get("ValorContratacao", {})
     vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
-    ag       = agg.get("aguardando", 0)
-    ag_valor = agg.get("aguardando_valor", 0.0)
-    ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
-    _prazo_d  = fin.get("Prazo", {})
-    _taxa_d   = fin.get("Taxa", {})
-    prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-    ticket_s = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
-    taxa_s   = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
+    ag            = agg.get("aguardando", 0)
+    ag_valor      = agg.get("aguardando_valor", 0.0)
+    ag_liberado   = agg.get("aguardando_liberado", 0.0)
+    ag_iof        = agg.get("aguardando_iof", 0.0)
+    if ag_valor:
+        ag_val_s = (
+            f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".")
+            + f"<br><span style='font-size:0.78em;color:#64748b'>"
+            f"Liberado R$ {ag_liberado:,.0f} · IOF R$ {ag_iof:,.0f}</span>".replace(",", ".")
+        )
+    else:
+        ag_val_s = "BLOQUEIO_TEMPORARIO"
+    _prazo_d   = fin.get("Prazo", {})
+    _taxa_d    = fin.get("Taxa", {})
+    _parcela_d = fin.get("ValorParcela", {})
+    prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+    ticket_s  = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
+    parcela_s = f"R$ {_parcela_d['media']:,.0f}".replace(",", ".") if _parcela_d.get("media") else "—"
+    taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1441,6 +1458,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
         <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor a pagar pelo cliente</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div>
+        <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
@@ -2048,14 +2067,25 @@ taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
 vol      = fin.get("ValorContratacao", {})
 vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
 ag       = agg.get("aguardando", 0)
-ag_valor = agg.get("aguardando_valor", 0.0)
-ag_val_s = f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".") if ag_valor else "BLOQUEIO_TEMPORARIO"
+ag_valor    = agg.get("aguardando_valor", 0.0)
+ag_liberado = agg.get("aguardando_liberado", 0.0)
+ag_iof      = agg.get("aguardando_iof", 0.0)
+if ag_valor:
+    ag_val_s = (
+        f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".")
+        + f"<br><span style='font-size:0.78em;color:#64748b'>"
+        f"Liberado R$ {ag_liberado:,.0f} · IOF R$ {ag_iof:,.0f}</span>".replace(",", ".")
+    )
+else:
+    ag_val_s = "BLOQUEIO_TEMPORARIO"
 
-_prazo_d  = fin.get("Prazo", {})
-_taxa_d   = fin.get("Taxa", {})
-prazo_s  = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-ticket_s = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
-taxa_s   = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
+_prazo_d   = fin.get("Prazo", {})
+_taxa_d    = fin.get("Taxa", {})
+_parcela_d = fin.get("ValorParcela", {})
+prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+ticket_s  = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
+parcela_s = f"R$ {_parcela_d['media']:,.0f}".replace(",", ".") if _parcela_d.get("media") else "—"
+taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
 
 st.markdown(f"""
 <div class="kpi-row">
@@ -2093,6 +2123,11 @@ st.markdown(f"""
     <div class="kpi-label">Ticket médio do empréstimo</div>
     <div class="kpi-value">{ticket_s}</div>
     <div class="kpi-sub">valor a pagar pelo cliente</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Ticket médio da parcela</div>
+    <div class="kpi-value">{parcela_s}</div>
+    <div class="kpi-sub">média pond. pelo prazo</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Taxa média</div>
