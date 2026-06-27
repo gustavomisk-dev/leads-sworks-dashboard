@@ -32,15 +32,14 @@ st.markdown("""
 <style>
 [data-testid="collapsedControl"] { display: none; }
 
-.kpi-row { display: flex; gap: 12px; margin: 16px 0 24px; flex-wrap: wrap; }
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0 16px; }
 .kpi-card {
-    flex: 1; min-width: 130px;
     background: #131210; border-radius: 10px;
-    padding: 16px 18px; border: 1px solid #272420; text-align: center;
+    padding: 11px 14px; border: 1px solid #272420; text-align: center;
 }
-.kpi-label { color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
-.kpi-value { color: #FEC52E; font-size: 24px; font-weight: 700; line-height: 1.1; }
-.kpi-sub   { color: #64748b; font-size: 11px; margin-top: 5px; }
+.kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
+.kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
 
 .sec { color: #FEC52E; font-size: 15px; font-weight: 600; margin: 28px 0 8px;
        border-bottom: 1px solid #272420; padding-bottom: 6px; }
