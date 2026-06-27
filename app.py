@@ -1069,7 +1069,7 @@ function resize(){{window.parent.postMessage({{type:'streamlit:setFrameHeight',h
 function tgl(id){{
   var r=document.getElementById(id);
   var b=document.getElementById('b'+id).querySelector('span');
-  if(r.style.display===''){r.style.display='none';b.textContent='▶';b.style.color='#64748b';}
+  if(r.style.display===''){{r.style.display='none';b.textContent='▶';b.style.color='#64748b';}}
   else{{r.style.display='';b.textContent='▼';b.style.color='#ef4444';}}
   resize();
 }}
