@@ -1047,7 +1047,7 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
                 f'</td></tr>'
             )
     return f"""<style>
-body{{margin:0;padding:0;background:#0d0c0a;font-family:sans-serif;overflow:hidden}}
+body{{margin:0;padding:0;background:#0d0c0a;font-family:sans-serif}}
 .main{{width:100%;border-collapse:collapse;background:#0d0c0a}}
 .main thead tr{{border-bottom:1px solid #1e293b}}
 .main th{{font-size:9px;color:#475569;font-weight:normal;padding:5px 6px}}
@@ -1065,15 +1065,12 @@ body{{margin:0;padding:0;background:#0d0c0a;font-family:sans-serif;overflow:hidd
 .mn{{font-size:10px;color:#64748b;text-align:right;padding:2px 0 2px 10px}}
 </style>
 <script>
-function resize(){{window.parent.postMessage({{type:'streamlit:setFrameHeight',height:document.body.scrollHeight+4}},'*');}}
 function tgl(id){{
   var r=document.getElementById(id);
   var b=document.getElementById('b'+id).querySelector('span');
   if(r.style.display===''){{r.style.display='none';b.textContent='▶';b.style.color='#64748b';}}
   else{{r.style.display='';b.textContent='▼';b.style.color='#ef4444';}}
-  resize();
 }}
-window.addEventListener('load',resize);
 </script>
 <table class="main">
 <thead><tr><th></th><th>#</th><th style="text-align:left">Razão Social</th><th>Leads</th><th>%</th></tr></thead>
@@ -2283,10 +2280,8 @@ with col_s1:
         _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
         if _tbl_html:
             n_emp = min(len(emp_rep), 15)
-            _height = 40 + n_emp * 34 + sum(
-                len(emp_mot.get(e, {})) * 22 for e in list(emp_rep)[:n_emp]
-            )
-            components.html(_tbl_html, height=max(200, _height), scrolling=False)
+            _height = 44 + n_emp * 34
+            components.html(_tbl_html, height=_height, scrolling=True)
     else:
         st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
 
