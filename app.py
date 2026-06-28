@@ -1578,6 +1578,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
       <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
+    </div>
+    <div class="kpi-row" style="grid-template-columns: repeat(6, 1fr);">
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
@@ -2207,6 +2209,18 @@ if ag_valor:
     )
 else:
     ag_val_s = "BLOQUEIO_TEMPORARIO"
+ass       = agg.get("assinado", 0)
+ass_valor    = agg.get("assinado_valor", 0.0)
+ass_liberado = agg.get("assinado_liberado", 0.0)
+ass_iof      = agg.get("assinado_iof", 0.0)
+if ass_valor:
+    ass_val_s = (
+        f"Projeção de Desembolso: R$ {ass_valor:,.0f}".replace(",", ".")
+        + f"<br><span style='font-size:0.78em;color:#64748b'>"
+        f"Liberado R$ {ass_liberado:,.0f} · IOF R$ {ass_iof:,.0f}</span>".replace(",", ".")
+    )
+else:
+    ass_val_s = "ASSINADO"
 
 _prazo_d   = fin.get("Prazo", {})
 _taxa_d    = fin.get("Taxa", {})
@@ -2243,6 +2257,8 @@ st.markdown(f"""
     <div class="kpi-value">{vol_s}</div>
     <div class="kpi-sub">valor contratado total</div>
   </div>
+</div>
+<div class="kpi-row" style="grid-template-columns: repeat(6, 1fr);">
   <div class="kpi-card">
     <div class="kpi-label">Prazo médio</div>
     <div class="kpi-value">{prazo_s}</div>
@@ -2267,6 +2283,11 @@ st.markdown(f"""
     <div class="kpi-label">Aguardando 24h</div>
     <div class="kpi-value">{ag:,}</div>
     <div class="kpi-sub">{ag_val_s}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Aguardando Averbação</div>
+    <div class="kpi-value">{ass:,}</div>
+    <div class="kpi-sub">{ass_val_s}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
