@@ -92,8 +92,9 @@ _HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}", "Cache-Control": "no-cache
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
-_COOKIE_NAME    = "zileads_session"
-_COOKIE_MAX_AGE = 86400 * 7   # 7 dias
+_COOKIE_NAME          = "zileads_session"
+_COOKIE_MAX_AGE       = 7_200   # 2h — expiração por inatividade
+_COOKIE_REFRESH_AFTER = 900     # re-emite cookie a cada 15min de atividade
 _login_attempts: dict = {}    # {email: {"count": int, "blocked_until": float|None}}
 
 _SVG_Z = (
@@ -1914,6 +1915,7 @@ if _tv_url_token and _tv_secret and _tv_url_token == _tv_secret:
             "display_name":    "TV",
             "_cookie_set":     True,
             "_cookie_checked": True,
+            "_is_tv":          True,   # sessão TV: sem cookie, sem expiração por inatividade
         })
     if "tv_slide" not in st.session_state:
         st.session_state["tv_slide"] = 0
@@ -1951,14 +1953,19 @@ if not st.session_state.get("logged_in"):
     st.session_state["_cookie_checked"] = True
     _login_page(_cookies)
 
-if not st.session_state.get("_cookie_set"):
-    try:
-        _cookies.set(_COOKIE_NAME, _make_token(st.session_state["user_email"]),
-                     max_age=_COOKIE_MAX_AGE)
-    except RuntimeError as e:
-        st.error(str(e))
-        st.stop()
-    st.session_state["_cookie_set"] = True
+if not st.session_state.get("_is_tv"):
+    _now = time.time()
+    _last_ref = st.session_state.get("_last_cookie_refresh", 0)
+    if _now - _last_ref > _COOKIE_REFRESH_AFTER:
+        try:
+            _cookies.set(_COOKIE_NAME, _make_token(st.session_state["user_email"]),
+                         max_age=_COOKIE_MAX_AGE)
+            st.session_state["_last_cookie_refresh"] = _now
+        except RuntimeError as e:
+            st.error(str(e))
+            st.stop()
+    if not st.session_state.get("_cookie_set"):
+        st.session_state["_cookie_set"] = True
 
 # ── Carrega datas disponiveis ─────────────────────────────────────────────────
 
