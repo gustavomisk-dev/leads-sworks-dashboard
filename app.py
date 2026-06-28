@@ -2165,12 +2165,20 @@ with col_title:
             st.rerun()
 
 with col_picker:
-    intervalo = st.date_input(
-        "Período de análise",
-        value=(d_ini_default, data_max),
-        min_value=data_min, max_value=data_max,
-        format="DD/MM/YYYY",
-    )
+    _cp_dat, _cp_ref = st.columns([4, 1])
+    with _cp_dat:
+        intervalo = st.date_input(
+            "Período de análise",
+            value=(d_ini_default, data_max),
+            min_value=data_min, max_value=data_max,
+            format="DD/MM/YYYY",
+        )
+    with _cp_ref:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
+            carregar_dia.clear()
+            listar_datas.clear()
+            st.rerun()
 
 if isinstance(intervalo, (list, tuple)):
     d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
