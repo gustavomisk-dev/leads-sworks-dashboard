@@ -2300,15 +2300,16 @@ st.markdown(f"""
 st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
 _TIPO_LABEL_MAP = {
-    "PAGAMENTO":                 "Aguardando Pagamento",
-    "AVERBACAO_PENDENTE_MANUAL": "Pend. Averbação Manual",
-    "ASSINADO":                  "Aguardando Averbação",
-    "ASSINATURA":                "Aguardando Assinatura",
-    "ENTREVISTA":                "Em Entrevista",
-    "FORMALIZACAO":              "Em Formalização",
+    "PAGAMENTO":                 "Pix Aguardando Execução",
+    "ASSINATURA":                "CCB Aguardando Assinatura",
     "BLOQUEIO_TEMPORARIO":       "Aguardando 24h",
-    "SIMULACAO":                 "Em Simulação",
-    "PRE_APROVADO":              "Pré-aprovado",
+    "FORMALIZACAO":              "Aguardando Aceite Formalização",
+    "PRE_APROVADO":              "Proposta Enviada — Aguard. Aceite",
+    "AVERBACAO_PENDENTE_MANUAL": "Averbação Pend. Manual",
+    "ENTREVISTA":                "Antifraude Nuvidio",
+    "ASSINADO":                  "Falha Pós-Assinatura",
+    "SIMULACAO":                 "Recalculando Proposta",
+    "PENDENTE_DADOS_PAGAMENTO":  "Dados de Pagamento Pendentes",
 }
 
 _pt_sec = agg.get("projecao_tipos", {})
