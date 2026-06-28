@@ -1552,12 +1552,15 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
     _pt_tv        = agg.get("projecao_tipos", {})
     _proj_count   = sum(d["count"]    for d in _pt_tv.values())
+    _proj_count_s = f"{_proj_count_s}".replace(",", ".")
     _proj_valor   = sum(d["valor"]    for d in _pt_tv.values())
     _proj_lib     = sum(d["liberado"] for d in _pt_tv.values())
     _proj_iof_tv  = sum(d["iof"]      for d in _pt_tv.values())
     if _proj_valor:
         _proj_sub = (
-            f"R$ {_proj_valor:,.0f}".replace(",", ".")
+            "<span style='color:#FEC52E'>"
+            + f"R$ {_proj_valor:,.0f}".replace(",", ".")
+            + "</span>"
             + f"<br><span style='font-size:0.78em;color:#64748b'>"
             + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof_tv:,.0f}".replace(",", ".")
             + "</span>"
@@ -2217,12 +2220,15 @@ vol      = fin.get("ValorContratacao", {})
 vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
 _pt_nm      = agg.get("projecao_tipos", {})
 _proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
+_proj_cnt_s = f"{_proj_cnt_s}".replace(",", ".")
 _proj_val   = sum(d["valor"]    for d in _pt_nm.values())
 _proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
 _proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
 if _proj_val:
     _proj_kpi_sub = (
-        f"R$ {_proj_val:,.0f}".replace(",", ".")
+        "<span style='color:#FEC52E'>"
+        + f"R$ {_proj_val:,.0f}".replace(",", ".")
+        + "</span>"
         + f"<br><span style='font-size:0.78em;color:#64748b'>"
         + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof:,.0f}".replace(",", ".")
         + "</span>"
@@ -2314,7 +2320,8 @@ _TIPO_LABEL_MAP = {
 
 _pt_sec = agg.get("projecao_tipos", {})
 if _pt_sec:
-    def _r(v): return f"R$ {v:,.0f}".replace(",", ".") if v else "—"
+    def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+    def _n(v): return f"{v:,}".replace(",", ".")
 
     _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
     _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
@@ -2325,7 +2332,7 @@ if _pt_sec:
     _rows = "".join(
         f"<tr>"
         f"<td class='pj-lbl'>{_TIPO_LABEL_MAP.get(ts, ts)}</td>"
-        f"<td class='pj-n'>{d['count']:,}</td>"
+        f"<td class='pj-n'>{_n(d['count'])}</td>"
         f"<td class='pj-n'>{_r(d['valor'])}</td>"
         f"<td class='pj-n'>{_r(d['liberado'])}</td>"
         f"<td class='pj-n'>{_r(d['iof'])}</td>"
@@ -2361,7 +2368,7 @@ if _pt_sec:
     {_rows}
     <tr class="pj-tot">
       <td class="pj-lbl">Total</td>
-      <td class="pj-n">{_t_cnt:,}</td>
+      <td class="pj-n">{_n(_t_cnt)}</td>
       <td class="pj-n">{_r(_t_val)}</td>
       <td class="pj-n">{_r(_t_lib)}</td>
       <td class="pj-n">{_r(_t_iof)}</td>
