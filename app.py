@@ -342,6 +342,7 @@ def agregar(dias_raw: list) -> dict:
     assinado_valor      = 0.0
     assinado_liberado   = 0.0
     assinado_iof        = 0.0
+    projecao_tipos_agg  = defaultdict(lambda: {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
 
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
@@ -414,6 +415,11 @@ def agregar(dias_raw: list) -> dict:
         assinado_valor      += d.get("assinado_valor", 0.0)
         assinado_liberado   += d.get("assinado_liberado", 0.0)
         assinado_iof        += d.get("assinado_iof", 0.0)
+        for _ts, _v in d.get("projecao_tipos", {}).items():
+            projecao_tipos_agg[_ts]["count"]    += _v.get("count", 0)
+            projecao_tipos_agg[_ts]["valor"]    += _v.get("valor", 0.0)
+            projecao_tipos_agg[_ts]["liberado"] += _v.get("liberado", 0.0)
+            projecao_tipos_agg[_ts]["iof"]      += _v.get("iof", 0.0)
 
     aprovados  = d_status.get(3, 0)
     reprovados = d_status.get(4, 0)
@@ -471,6 +477,15 @@ def agregar(dias_raw: list) -> dict:
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
         "valores_contratacao": valores_cont,
+        "projecao_tipos": {
+            ts: {
+                "count":    d["count"],
+                "valor":    round(d["valor"], 2),
+                "liberado": round(d["liberado"], 2),
+                "iof":      round(d["iof"], 2),
+            }
+            for ts, d in sorted(projecao_tipos_agg.items(), key=lambda x: -x[1]["valor"])
+        },
         "aguardando":           aguardando,
         "aguardando_valor":     round(aguardando_valor, 2),
         "aguardando_liberado":  round(aguardando_liberado, 2),
@@ -1535,30 +1550,20 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol      = fin.get("ValorContratacao", {})
     vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
-    ag            = agg.get("aguardando", 0)
-    ag_valor      = agg.get("aguardando_valor", 0.0)
-    ag_liberado   = agg.get("aguardando_liberado", 0.0)
-    ag_iof        = agg.get("aguardando_iof", 0.0)
-    if ag_valor:
-        ag_val_s = (
-            f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".")
+    _pt_tv        = agg.get("projecao_tipos", {})
+    _proj_count   = sum(d["count"]    for d in _pt_tv.values())
+    _proj_valor   = sum(d["valor"]    for d in _pt_tv.values())
+    _proj_lib     = sum(d["liberado"] for d in _pt_tv.values())
+    _proj_iof_tv  = sum(d["iof"]      for d in _pt_tv.values())
+    if _proj_valor:
+        _proj_sub = (
+            f"R$ {_proj_valor:,.0f}".replace(",", ".")
             + f"<br><span style='font-size:0.78em;color:#64748b'>"
-            f"Liberado R$ {ag_liberado:,.0f} · IOF R$ {ag_iof:,.0f}</span>".replace(",", ".")
+            + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof_tv:,.0f}".replace(",", ".")
+            + "</span>"
         )
     else:
-        ag_val_s = "BLOQUEIO_TEMPORARIO"
-    ass           = agg.get("assinado", 0)
-    ass_valor     = agg.get("assinado_valor", 0.0)
-    ass_liberado  = agg.get("assinado_liberado", 0.0)
-    ass_iof       = agg.get("assinado_iof", 0.0)
-    if ass_valor:
-        ass_val_s = (
-            f"Projeção de Desembolso: R$ {ass_valor:,.0f}".replace(",", ".")
-            + f"<br><span style='font-size:0.78em;color:#64748b'>"
-            f"Liberado R$ {ass_liberado:,.0f} · IOF R$ {ass_iof:,.0f}</span>".replace(",", ".")
-        )
-    else:
-        ass_val_s = "ASSINADO"
+        _proj_sub = "—"
     _prazo_d   = fin.get("Prazo", {})
     _taxa_d    = fin.get("Taxa", {})
     _parcela_d = fin.get("ValorParcela", {})
@@ -1580,7 +1585,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
     </div>
-    <div class="kpi-row" style="grid-template-columns: repeat(6, 1fr);">
+    <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
@@ -1589,10 +1594,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
-        <div class="kpi-value">{ag:,}</div><div class="kpi-sub">{ag_val_s}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Aguardando Averbação</div>
-        <div class="kpi-value">{ass:,}</div><div class="kpi-sub">{ass_val_s}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
+        <div class="kpi-value">{_proj_count:,}</div><div class="kpi-sub">{_proj_sub}</div></div>
     </div>
     """
 
@@ -2204,30 +2207,20 @@ periodo_label = (
 taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
 vol      = fin.get("ValorContratacao", {})
 vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
-ag       = agg.get("aguardando", 0)
-ag_valor    = agg.get("aguardando_valor", 0.0)
-ag_liberado = agg.get("aguardando_liberado", 0.0)
-ag_iof      = agg.get("aguardando_iof", 0.0)
-if ag_valor:
-    ag_val_s = (
-        f"Projeção de Desembolso: R$ {ag_valor:,.0f}".replace(",", ".")
+_pt_nm      = agg.get("projecao_tipos", {})
+_proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
+_proj_val   = sum(d["valor"]    for d in _pt_nm.values())
+_proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
+_proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
+if _proj_val:
+    _proj_kpi_sub = (
+        f"R$ {_proj_val:,.0f}".replace(",", ".")
         + f"<br><span style='font-size:0.78em;color:#64748b'>"
-        f"Liberado R$ {ag_liberado:,.0f} · IOF R$ {ag_iof:,.0f}</span>".replace(",", ".")
+        + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof:,.0f}".replace(",", ".")
+        + "</span>"
     )
 else:
-    ag_val_s = "BLOQUEIO_TEMPORARIO"
-ass       = agg.get("assinado", 0)
-ass_valor    = agg.get("assinado_valor", 0.0)
-ass_liberado = agg.get("assinado_liberado", 0.0)
-ass_iof      = agg.get("assinado_iof", 0.0)
-if ass_valor:
-    ass_val_s = (
-        f"Projeção de Desembolso: R$ {ass_valor:,.0f}".replace(",", ".")
-        + f"<br><span style='font-size:0.78em;color:#64748b'>"
-        f"Liberado R$ {ass_liberado:,.0f} · IOF R$ {ass_iof:,.0f}</span>".replace(",", ".")
-    )
-else:
-    ass_val_s = "ASSINADO"
+    _proj_kpi_sub = "—"
 
 _prazo_d   = fin.get("Prazo", {})
 _taxa_d    = fin.get("Taxa", {})
@@ -2265,7 +2258,7 @@ st.markdown(f"""
     <div class="kpi-sub">valor contratado total</div>
   </div>
 </div>
-<div class="kpi-row" style="grid-template-columns: repeat(6, 1fr);">
+<div class="kpi-row">
   <div class="kpi-card">
     <div class="kpi-label">Prazo médio</div>
     <div class="kpi-value">{prazo_s}</div>
@@ -2287,21 +2280,96 @@ st.markdown(f"""
     <div class="kpi-sub">contratos aprovados</div>
   </div>
   <div class="kpi-card">
-    <div class="kpi-label">Aguardando 24h</div>
-    <div class="kpi-value">{ag:,}</div>
-    <div class="kpi-sub">{ag_val_s}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">Aguardando Averbação</div>
-    <div class="kpi-value">{ass:,}</div>
-    <div class="kpi-sub">{ass_val_s}</div>
+    <div class="kpi-label">Projeção de Desembolso</div>
+    <div class="kpi-value">{_proj_cnt:,}</div>
+    <div class="kpi-sub">{_proj_kpi_sub}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── 1. Distribuição por Status ────────────────────────────────────────────────
+# ── 1. Projeção de Desembolso ────────────────────────────────────────────────
 
-st.markdown('<div class="sec">1. Distribuição por Status</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
+
+_TIPO_LABEL_MAP = {
+    "PAGAMENTO":                 "Aguardando Pagamento",
+    "AVERBACAO_PENDENTE_MANUAL": "Pend. Averbação Manual",
+    "ASSINADO":                  "Aguardando Averbação",
+    "ASSINATURA":                "Aguardando Assinatura",
+    "ENTREVISTA":                "Em Entrevista",
+    "FORMALIZACAO":              "Em Formalização",
+    "BLOQUEIO_TEMPORARIO":       "Aguardando 24h",
+    "SIMULACAO":                 "Em Simulação",
+    "PRE_APROVADO":              "Pré-aprovado",
+}
+
+_pt_sec = agg.get("projecao_tipos", {})
+if _pt_sec:
+    def _r(v): return f"R$ {v:,.0f}".replace(",", ".") if v else "—"
+
+    _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
+    _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
+    _t_val  = sum(d["valor"]    for d in _pt_sec.values())
+    _t_lib  = sum(d["liberado"] for d in _pt_sec.values())
+    _t_iof  = sum(d["iof"]      for d in _pt_sec.values())
+
+    _rows = "".join(
+        f"<tr>"
+        f"<td class='pj-lbl'>{_TIPO_LABEL_MAP.get(ts, ts)}</td>"
+        f"<td class='pj-n'>{d['count']:,}</td>"
+        f"<td class='pj-n'>{_r(d['valor'])}</td>"
+        f"<td class='pj-n'>{_r(d['liberado'])}</td>"
+        f"<td class='pj-n'>{_r(d['iof'])}</td>"
+        f"</tr>"
+        for ts, d in _sorted
+    )
+
+    st.markdown(f"""
+<style>
+.pj-wrap{{overflow-x:auto;margin:6px 0 18px}}
+.pj-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
+.pj-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
+            text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
+.pj-tbl th.pj-n{{text-align:right}}
+.pj-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
+.pj-lbl{{color:#cbd5e1;white-space:nowrap}}
+.pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+.pj-tbl tr:hover td{{background:#1a1815}}
+.pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
+            font-weight:700;border-top:2px solid #272420}}
+.pj-tot .pj-lbl{{color:#FEC52E}}
+</style>
+<div class="pj-wrap">
+<table class="pj-tbl">
+  <thead><tr>
+    <th>Etapa</th>
+    <th class="pj-n">Leads</th>
+    <th class="pj-n">Valor Total</th>
+    <th class="pj-n">Liberado</th>
+    <th class="pj-n">IOF</th>
+  </tr></thead>
+  <tbody>
+    {_rows}
+    <tr class="pj-tot">
+      <td class="pj-lbl">Total</td>
+      <td class="pj-n">{_t_cnt:,}</td>
+      <td class="pj-n">{_r(_t_val)}</td>
+      <td class="pj-n">{_r(_t_lib)}</td>
+      <td class="pj-n">{_r(_t_iof)}</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+""", unsafe_allow_html=True)
+else:
+    st.markdown(
+        "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
+        unsafe_allow_html=True,
+    )
+
+# ── 2. Distribuição por Status ────────────────────────────────────────────────
+
+st.markdown('<div class="sec">2. Distribuição por Status</div>', unsafe_allow_html=True)
 
 col_d, col_f = st.columns(2)
 with col_d:
@@ -2315,7 +2383,7 @@ with col_f:
 
 # ── 2. Evolução Temporal ──────────────────────────────────────────────────────
 
-st.markdown('<div class="sec">2. Evolução Temporal</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">3. Evolução Temporal</div>', unsafe_allow_html=True)
 
 fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
 if fig:
@@ -2323,7 +2391,7 @@ if fig:
 
 # ── 3. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-st.markdown('<div class="sec">3. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">4. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
 
 html_fin = _html_tabela_financeira(fin)
 if html_fin:
@@ -2337,7 +2405,7 @@ if fig:
 
 # ── 4. Etapa de Reprovação ────────────────────────────────────────────────────
 
-st.markdown('<div class="sec">4. Etapa de Reprovação</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">5. Etapa de Reprovação</div>', unsafe_allow_html=True)
 
 n_rep    = f.get("reprovados", 0)
 etapas_d = agg.get("etapas", {})
@@ -2410,7 +2478,7 @@ else:
 
 # ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
 
-st.markdown('<div class="sec">5. Motivos de Reprovação</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">6. Motivos de Reprovação</div>', unsafe_allow_html=True)
 
 col_m1, col_m2 = st.columns(2)
 
@@ -2435,7 +2503,7 @@ with col_m2:
 
 # ── 6. Bloqueios ──────────────────────────────────────────────────────────────
 
-st.markdown('<div class="sec">6. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">7. Bloqueios por Tipo</div>', unsafe_allow_html=True)
 
 fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
 if fig:
@@ -2447,7 +2515,7 @@ else:
 
 # ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
 
-st.markdown('<div class="sec">7. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">8. Segmentação — Reprovados</div>', unsafe_allow_html=True)
 
 col_s1, col_s2 = st.columns(2)
 
@@ -2509,7 +2577,7 @@ with col_s4:
 
 # ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
 
-st.markdown('<div class="sec">8. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+st.markdown('<div class="sec">9. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
 
 n_ap = f.get("aprovados", 0)
 
