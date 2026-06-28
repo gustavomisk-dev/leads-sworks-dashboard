@@ -1259,66 +1259,96 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         + '</div></div></div>'
     )
 
-    # Conectores via bordas CSS em tabela com border-collapse:separate
-    # Linha 1 direita: └ → continua no gap → ┐ linha 2
-    # Linha 2 esquerda: ┘ → continua no gap → ┌ linha 3
-    td_r1_right = (f'style="padding:0;width:28px;'
-                   f'border-right:2px solid {_C};border-bottom:2px solid {_C};'
-                   f'border-radius:0 0 12px 0;"')
-    td_gap1_right = (f'style="padding:0;border-right:2px solid {_C};"')
-    td_r2_right   = (f'style="padding:0;width:28px;'
-                     f'border-right:2px solid {_C};border-top:2px solid {_C};'
-                     f'border-radius:0 12px 0 0;"')
-    td_r2_left    = (f'style="padding:0;width:28px;'
-                     f'border-left:2px solid {_C};border-bottom:2px solid {_C};'
-                     f'border-radius:0 0 0 12px;"')
-    td_gap2_left  = (f'style="padding:0;border-left:2px solid {_C};"')
-    td_r3_left    = (f'style="padding:0;width:28px;'
-                     f'border-left:2px solid {_C};border-top:2px solid {_C};'
-                     f'border-radius:12px 0 0 0;"')
+    # Snake layout — flexbox puro com espaçadores conectores.
+    # Cada linha tem a forma: [conteúdo][espaçador com borda][canto].
+    # O espaçador (flex:1) faz a linha horizontal que liga o último item ao canto.
+    # Com min-width:max-content no container externo, o espaçador pode ficar zero
+    # quando o conteúdo toma todo o espaço — a borda do canto encosta no último item.
 
-    snake_table = (
-        f'<table style="border-collapse:separate;border-spacing:0;width:100%;">'
-        f'<tbody>'
-        # Linha 1
-        f'<tr>'
-        f'<td style="padding:0;width:28px;"></td>'
-        f'<td style="padding:6px 0;">'
-        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;">{r1}</div>'
-        f'</td>'
-        f'<td {td_r1_right}></td>'
-        f'</tr>'
-        # Gap 1
-        f'<tr style="height:14px;">'
-        f'<td style="padding:0;"></td>'
-        f'<td style="padding:0;"></td>'
-        f'<td {td_gap1_right}></td>'
-        f'</tr>'
-        # Linha 2 (row-reverse = RTL visual)
-        f'<tr>'
-        f'<td {td_r2_left}></td>'
-        f'<td style="padding:6px 0;">'
-        f'<div style="display:flex;align-items:flex-start;flex-direction:row-reverse;flex-wrap:nowrap;">{r2}</div>'
-        f'</td>'
-        f'<td {td_r2_right}></td>'
-        f'</tr>'
-        # Gap 2
-        f'<tr style="height:14px;">'
-        f'<td {td_gap2_left}></td>'
-        f'<td style="padding:0;"></td>'
-        f'<td style="padding:0;"></td>'
-        f'</tr>'
-        # Linha 3
-        f'<tr>'
-        f'<td {td_r3_left}></td>'
-        f'<td style="padding:6px 0;">'
-        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;">{r3}</div>'
-        f'</td>'
-        f'<td style="padding:0;width:28px;"></td>'
-        f'</tr>'
-        f'</tbody>'
-        f'</table>'
+    _R = 10   # raio dos cantos em px
+    _BW = 2   # espessura das bordas em px
+    _GAP_H = 12  # altura da faixa de descida entre linhas
+    # Offset vertical para alinhar a linha do conector com o centro das caixas
+    _MT = 20  # margin-top para alinhar espaçador/canto com o meio dos boxes (~20px)
+
+    def _corner(borders, radius, *, mt=_MT, w=20):
+        """Célula de canto com bordas e border-radius."""
+        b = ";".join(f"border-{side}:{_BW}px solid {_C}" for side in borders)
+        r_val = ";".join(
+            f"border-{p}-radius:{_R}px" if v else f"border-{p}-radius:0"
+            for p, v in zip(
+                ["top-left","top-right","bottom-right","bottom-left"], radius
+            )
+        )
+        return (
+            f'<div style="width:{w}px;flex-shrink:0;align-self:stretch;'
+            f'{b};{r_val};margin-top:{mt}px;"></div>'
+        )
+
+    def _spacer(border_side, *, mt=_MT):
+        """Espaçador horizontal flexível com uma borda de conexão."""
+        return (
+            f'<div style="flex:1;min-width:8px;align-self:flex-start;'
+            f'border-{border_side}:{_BW}px solid {_C};'
+            f'margin-top:{mt}px;"></div>'
+        )
+
+    def _vline(side, h=_GAP_H):
+        """Segmento vertical de descida entre linhas."""
+        return (
+            f'<div style="border-{side}:{_BW}px solid {_C};'
+            f'height:{h}px;"></div>'
+        )
+
+    # ── Linha 1 (L→R): conteúdo + espaçador + canto direito (vira para baixo)
+    row1 = (
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
+        f'padding:6px 0;">'
+        + r1
+        + _spacer("bottom")
+        + _corner(["right","bottom"], [0,0,1,0])
+        + '</div>'
     )
+
+    # Descida direita entre linha 1 e 2
+    vgap1 = (
+        f'<div style="display:flex;justify-content:flex-end;">'
+        + _vline("right")
+        + '</div>'
+    )
+
+    # ── Linha 2 (R→L, row-reverse): canto direito (sobe) + espaçador + conteúdo + espaçador + canto esquerdo (vira para baixo)
+    row2 = (
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
+        f'padding:6px 0;">'
+        + _corner(["right","top"], [0,1,0,0])
+        + _spacer("top")
+        + f'<div style="display:flex;align-items:flex-start;flex-direction:row-reverse;flex-wrap:nowrap;">'
+        + r2
+        + '</div>'
+        + _spacer("bottom")
+        + _corner(["left","bottom"], [0,0,0,1])
+        + '</div>'
+    )
+
+    # Descida esquerda entre linha 2 e 3
+    vgap2 = (
+        f'<div style="display:flex;justify-content:flex-start;">'
+        + _vline("left")
+        + '</div>'
+    )
+
+    # ── Linha 3 (L→R): canto esquerdo (sobe) + espaçador + conteúdo
+    row3 = (
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
+        f'padding:6px 0;">'
+        + _corner(["left","top"], [1,0,0,0])
+        + _spacer("top")
+        + r3
+        + '</div>'
+    )
+
+    snake_html = row1 + vgap1 + row2 + vgap2 + row3
 
     title_html = (
         '<div style="font-size:10px;color:#475569;text-transform:uppercase;'
@@ -1343,9 +1373,9 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     )
 
     wrapper = (
-        '<div style="overflow-x:auto;">'
-        '<div style="min-width:max-content;padding:4px 0 4px;">'
-        + snake_table + mc_section
+        '<div style="overflow-x:auto;padding:4px 0;">'
+        '<div style="display:inline-block;min-width:max-content;">'
+        + snake_html + mc_section
         + '</div></div>'
     )
 
