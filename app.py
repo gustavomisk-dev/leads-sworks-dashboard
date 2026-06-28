@@ -526,7 +526,7 @@ def _fig_donut(d_status: dict):
         ),
         margin=dict(t=50, b=10, l=10, r=200), height=360,
         annotations=[dict(
-            text=f"<b>{total:,}</b><br>leads",
+            text=f"<b>{_nbr(total)}</b><br>leads",
             x=0.275,                 # center of pie domain [0, 0.55]
             y=0.5,
             font=dict(size=14, color="#e2e8f0"),
@@ -698,7 +698,7 @@ def _fig_mapa_ufs(ufs: dict):
         values = [v  for _, v  in pairs]
 
     total = sum(values) or 1
-    customdata = [f"<b>{lbl}</b>: {val:,} leads ({100*val/total:.1f}%)"
+    customdata = [f"<b>{lbl}</b>: {_nbr(val)} leads ({100*val/total:.1f}%)"
                   for lbl, val in zip(labels, values)]
 
     # Arco-íris: vermelho (hue=0) → violeta (hue=270); "Outros" fica cinza
@@ -778,15 +778,15 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
     if pct_base > 0:
         shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in values]
         if not show_pct:
-            texts = [f"{v:,}" for v in values]
+            texts = [f"{_nbr(v)}" for v in values]
         elif show_abs:
-            texts = [f"{v:,}  |  {100*v/pct_base:.1f}%" for v in values]
+            texts = [f"{_nbr(v)}  |  {100*v/pct_base:.1f}%" for v in values]
         else:
             texts  = [f"{100*v/pct_base:.1f}%" for v in values]
         tpos   = "inside"
     else:
         shades = color
-        texts  = [f"{v:,}" for v in values]
+        texts  = [f"{_nbr(v)}" for v in values]
         tpos   = "outside"
     fig = go.Figure(go.Bar(
         x=values, y=labels, orientation="h",
@@ -820,12 +820,12 @@ def _fig_histograma(valores: list):
     fig.add_vline(x=mediana, line=dict(color="#f87171", dash="dash", width=2.5))
     fig.add_vline(x=media,   line=dict(color="#fb923c", dash="dot",  width=2))
     fig.add_annotation(x=0.98, y=0.97, xref="paper", yref="paper",
-        text=f"Mediana: R$ {mediana:,.0f}", font=dict(color="#f87171", size=12),
+        text=("Mediana: R$ " + f"{mediana:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")), font=dict(color="#f87171", size=12),
         showarrow=False, xanchor="right", yanchor="top",
         bgcolor="rgba(13,12,10,0.88)", borderpad=6,
         bordercolor="rgba(248,113,113,0.35)", borderwidth=1)
     fig.add_annotation(x=0.98, y=0.84, xref="paper", yref="paper",
-        text=f"Média: R$ {media:,.0f}", font=dict(color="#fb923c", size=12),
+        text=("Média: R$ " + f"{media:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")), font=dict(color="#fb923c", size=12),
         showarrow=False, xanchor="right", yanchor="top",
         bgcolor="rgba(13,12,10,0.88)", borderpad=6,
         bordercolor="rgba(251,146,60,0.35)", borderwidth=1)
@@ -861,11 +861,11 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
         denom = n_antes if is_antes else n_corte
         pct   = 100 * v / denom if denom else 0
         gc    = "rgba(251,146,60," if is_antes else "rgba(96,165,250,"
-        gl    = (f"dos {n_antes:,} reprov. antes do clique"
-                 if is_antes else f"dos {n_corte:,} reprov. após clique")
+        gl    = (f"dos {_nbr(n_antes)} reprov. antes do clique"
+                 if is_antes else f"dos {_nbr(n_corte)} reprov. após clique")
         colors.append(f"{gc}{shade:.2f})")
-        texts.append(f"{v:,} ({pct:.1f}%)")
-        hovers.append(f"<b>{name}</b><br>{v:,} leads · {pct:.2f}% {gl}")
+        texts.append(f"{_nbr(v)} ({pct:.1f}%)")
+        hovers.append(f"<b>{name}</b><br>{_nbr(v)} leads · {pct:.2f}% {gl}")
     n_dep = len(depois_sorted)
     shapes = [
         dict(type="line", x0=0, x1=1, xref="paper", y0=n_dep-0.5, y1=n_dep-0.5, yref="y",
@@ -885,12 +885,12 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
     fig.add_trace(go.Scatter(
         x=[None], y=[None], mode="markers",
         marker=dict(color="rgba(251,146,60,0.85)", symbol="square", size=14),
-        name=f"Antes do clique ({n_antes:,})",
+        name=f"Antes do clique ({_nbr(n_antes)})",
     ))
     fig.add_trace(go.Scatter(
         x=[None], y=[None], mode="markers",
         marker=dict(color="rgba(96,165,250,0.85)", symbol="square", size=14),
-        name=f"Depois do clique ({n_corte:,})",
+        name=f"Depois do clique ({_nbr(n_corte)})",
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
@@ -937,9 +937,9 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         else:
             rej_colors.append(f"rgba(96,165,250,{shade:.2f})")
     rej_hover = [
-        f"<b>{r['etapa']}</b><br>Chegaram: {r['chegaram']:,}<br>"
-        f"Reprovados aqui: {r['rejeitados']:,} ({r['pct']:.1f}%)<br>"
-        f"Avançaram: {r['restante_apos']:,}"
+        f"<b>{r['etapa']}</b><br>Chegaram: {_nbr(r['chegaram'])}<br>"
+        f"Reprovados aqui: {_nbr(r['rejeitados'])} ({r['pct']:.1f}%)<br>"
+        f"Avançaram: {_nbr(r['restante_apos'])}"
         for r in rows_r
     ]
     bar_h = max(360, len(rows) * 52 + 90)
@@ -948,7 +948,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         x=[r["rejeitados"] for r in rows_r], y=y_labels, orientation="h",
         name="Reprovados",
         marker=dict(color=rej_colors, line=dict(color="#0d0c0a", width=0.5)),
-        text=[f"{r['rejeitados']:,} ({r['pct']:.1f}%)" for r in rows_r],
+        text=[f"{_nbr(r['rejeitados'])} ({r['pct']:.1f}%)" for r in rows_r],
         textposition="inside", insidetextanchor="middle",
         textfont=dict(size=13, color="rgba(255,255,255,0.90)"),
         hovertemplate="%{customdata}<extra></extra>", customdata=rej_hover,
@@ -957,7 +957,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
         x=[r["restante_apos"] for r in rows_r], y=y_labels, orientation="h",
         name="Avançaram",
         marker=dict(color="rgba(255,255,255,0.07)", line=dict(color="#0d0c0a", width=0.5)),
-        text=[f"{r['restante_apos']:,}" if r["restante_apos"] > 0 else "" for r in rows_r],
+        text=[f"{_nbr(r['restante_apos'])}" if r["restante_apos"] > 0 else "" for r in rows_r],
         textposition="inside", insidetextanchor="middle",
         textfont=dict(size=12, color="rgba(255,255,255,0.35)"),
         hovertemplate="%{y}: %{x:,} avançaram<extra></extra>",
@@ -989,7 +989,7 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
     fig = go.Figure(go.Bar(
         x=labels, y=values,
         marker=dict(color=colors, line=dict(color="#0d0c0a", width=1), opacity=0.88),
-        text=[f"{v:,}<br>{p:.1f}%" for v, p in zip(values, pcts)],
+        text=[f"{_nbr(v)}<br>{p:.1f}%" for v, p in zip(values, pcts)],
         textposition="outside",
         textfont=dict(size=12, color="#e2e8f0"),
         hovertemplate="%{x}: <b>%{y:,}</b><extra></extra>",
@@ -1028,7 +1028,7 @@ def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
                 f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
                 f'<td style="color:#94a3b8;white-space:nowrap">{code}</td>'
                 f'<td class="wrap">{desc}</td>'
-                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r">{_nbr(cnt)}</td>'
                 f'<td class="r" style="color:#94a3b8">{pct}</td>'
                 f'</tr>'
             )
@@ -1037,7 +1037,7 @@ def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
                 f'<tr class="{rc}">'
                 f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
                 f'<td class="wrap">{label}</td>'
-                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r">{_nbr(cnt)}</td>'
                 f'<td class="r" style="color:#94a3b8">{pct}</td>'
                 f'</tr>'
             )
@@ -1105,7 +1105,7 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
             f'<tr class="{rc}">'
             f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
             f'<td class="wrap">{name_cell}</td>'
-            f'<td class="r">{cnt:,}</td>'
+            f'<td class="r">{_nbr(cnt)}</td>'
             f'<td class="r" style="color:#94a3b8">{pct}</td>'
             f'</tr>'
         )
@@ -1151,13 +1151,13 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         sub = "".join(
             f'<div style="font-size:8px;color:#94a3b8;overflow:hidden;'
             f'text-overflow:ellipsis;white-space:nowrap;max-width:68px;">'
-            f'&#8226; {e}: {etapas[e]:,}</div>'
+            f'&#8226; {e}: {_nbr(etapas[e])}</div>'
             for e in keys if etapas.get(e, 0)
         )
         below = (
             f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
             f'font-weight:700;white-space:nowrap;text-align:center;">'
-            f'&#11015; {count:,}&nbsp;({pct:.1f}%)</div>{sub}'
+            f'&#11015; {_nbr(count)}&nbsp;({pct:.1f}%)</div>{sub}'
         ) if count else ""
         return (
             f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">'
@@ -1197,7 +1197,7 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     mc_below  = (
         f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
         f'font-weight:700;white-space:nowrap;text-align:center;">'
-        f'&#11015; {mc_total:,}&nbsp;({mc_pct:.1f}%)</div>'
+        f'&#11015; {_nbr(mc_total)}&nbsp;({mc_pct:.1f}%)</div>'
     ) if mc_total else ""
     mc_compact = (
         f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">'
@@ -1409,7 +1409,7 @@ def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> 
                 f'<tr class="{rc}">'
                 f"<td>{etapa if i == 0 else ''}</td>"
                 f'<td class="wrap">{motivo}</td>'
-                f'<td class="r">{cnt:,}</td>'
+                f'<td class="r">{_nbr(cnt)}</td>'
                 f'<td class="r">{pct}</td>'
                 f"</tr>"
             )
@@ -1438,10 +1438,10 @@ def _html_tabela_resumo_funil(rows: list) -> str:
         trs.append(
             f'<tr>'
             f'<td style="color:{cor};font-weight:600">{r["etapa"]}</td>'
-            f'<td style="text-align:right">{r["chegaram"]:,}</td>'
-            f'<td style="text-align:right">{r["rejeitados"]:,}</td>'
+            f'<td style="text-align:right">{_nbr(r["chegaram"])}</td>'
+            f'<td style="text-align:right">{_nbr(r["rejeitados"])}</td>'
             f'<td style="text-align:right;color:{cor}">{pct_str}</td>'
-            f'<td style="text-align:right;color:#64748b">{r["restante_apos"]:,}</td>'
+            f'<td style="text-align:right;color:#64748b">{_nbr(r["restante_apos"])}</td>'
             f'</tr>'
         )
     return (
@@ -1458,8 +1458,8 @@ def _html_tabela_resumo_funil(rows: list) -> str:
 
 def _html_tabela_financeira(fin: dict) -> str:
     campos = [
-        ("ValorContratacao", "Valor Total Empréstimo",  lambda x: f"R$ {x:,.2f}"),
-        ("RendaLiquida",     "Renda Líquida",      lambda x: f"R$ {x:,.2f}"),
+        ("ValorContratacao", "Valor Total Empréstimo",  lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))),
+        ("RendaLiquida",     "Renda Líquida",      lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))),
         ("Prazo",            "Prazo (meses)",       lambda x: f"{x:.0f}"),
         ("Taxa",             "Taxa Mensal (%)",     lambda x: f"{x:.2f}"),
     ]
@@ -1473,7 +1473,7 @@ def _html_tabela_financeira(fin: dict) -> str:
         rows_html.append(
             f'<tr class="{rc}">'
             f'<td>{label}</td>'
-            f'<td class="r">{v["n"]:,}</td>'
+            f'<td class="r">{_nbr(v["n"])}</td>'
             f'<td class="r">{fmt(v["media"])}</td>'
             f'<td class="r">{fmt(v["mediana"])}</td>'
             f'<td class="r">{fmt(v["min"])}</td>'
@@ -1549,41 +1549,46 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol      = fin.get("ValorContratacao", {})
-    vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
+    vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
     _pt_tv        = agg.get("projecao_tipos", {})
     _proj_count   = sum(d["count"]    for d in _pt_tv.values())
-    _proj_count_s = f"{_proj_count_s}".replace(",", ".")
+    _proj_count_s = f"{_proj_count:,}".replace(",", ".")
     _proj_valor   = sum(d["valor"]    for d in _pt_tv.values())
     _proj_lib     = sum(d["liberado"] for d in _pt_tv.values())
     _proj_iof_tv  = sum(d["iof"]      for d in _pt_tv.values())
     if _proj_valor:
+        _proj_val_fmt_tv = ("R$ " + f"{_proj_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        _proj_lib_fmt_tv = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        _proj_iof_fmt_tv = ("R$ " + f"{_proj_iof_tv:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         _proj_sub = (
-            "<span style='color:#FEC52E'>"
-            + f"R$ {_proj_valor:,.0f}".replace(",", ".")
-            + "</span>"
-            + f"<br><span style='font-size:0.78em;color:#64748b'>"
-            + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof_tv:,.0f}".replace(",", ".")
-            + "</span>"
+            f"<span style='color:#64748b;font-size:0.82em'>"
+            f"{_proj_count_s} leads·Lib.{_proj_lib_fmt_tv}·IOF {_proj_iof_fmt_tv}"
+            "</span>"
         )
     else:
-        _proj_sub = "—"
+        _proj_val_fmt_tv = "—"
+        _proj_sub = ""
     _prazo_d   = fin.get("Prazo", {})
     _taxa_d    = fin.get("Taxa", {})
     _parcela_d = fin.get("ValorParcela", {})
     prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-    ticket_s  = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
-    parcela_s = f"R$ {_parcela_d['media']:,.0f}".replace(",", ".") if _parcela_d.get("media") else "—"
+    ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
+    parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
     taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
+    _total_fmt = _nbr(funil["total"])
+    _aprov_fmt = _nbr(funil["aprovados"])
+    _term_fmt  = _nbr(funil["terminais"])
+    _repro_fmt = _nbr(funil["reprovados"])
     _kpi_html = f"""
     <div class="kpi-row">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
-        <div class="kpi-value">{funil['total']:,}</div><div class="kpi-sub">{periodo}</div></div>
+        <div class="kpi-value">{_total_fmt}</div><div class="kpi-sub">{periodo}</div></div>
       <div class="kpi-card"><div class="kpi-label">Aprovados</div>
-        <div class="kpi-value">{funil['aprovados']:,}</div><div class="kpi-sub">taxa: {taxa}</div></div>
+        <div class="kpi-value">{_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
-        <div class="kpi-value">{taxa}</div><div class="kpi-sub">{funil['terminais']:,} finalizados</div></div>
+        <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_term_fmt} finalizados</div></div>
       <div class="kpi-card"><div class="kpi-label">Reprovados</div>
-        <div class="kpi-value">{funil['reprovados']:,}</div>
+        <div class="kpi-value">{_repro_fmt}</div>
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
       <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
@@ -1598,7 +1603,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
-        <div class="kpi-value">{_proj_count:,}</div><div class="kpi-sub">{_proj_sub}</div></div>
+        <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">{_proj_sub}</div></div>
     </div>
     """
 
@@ -2217,7 +2222,7 @@ periodo_label = (
 
 taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
 vol      = fin.get("ValorContratacao", {})
-vol_s    = f"R$ {vol['total']:,.0f}".replace(",", ".") if vol.get("total") else "—"
+vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
 _pt_nm      = agg.get("projecao_tipos", {})
 _proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
 _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
@@ -2225,45 +2230,50 @@ _proj_val   = sum(d["valor"]    for d in _pt_nm.values())
 _proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
 _proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
 if _proj_val:
+    _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    _proj_iof_fmt = ("R$ " + f"{_proj_iof:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     _proj_kpi_sub = (
-        "<span style='color:#FEC52E'>"
-        + f"R$ {_proj_val:,.0f}".replace(",", ".")
-        + "</span>"
-        + f"<br><span style='font-size:0.78em;color:#64748b'>"
-        + f"Lib. R$ {_proj_lib:,.0f} · IOF R$ {_proj_iof:,.0f}".replace(",", ".")
-        + "</span>"
+        f"<span style='color:#64748b;font-size:0.82em'>"
+        f"{_proj_cnt_s} leads · Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
+        "</span>"
     )
 else:
-    _proj_kpi_sub = "—"
+    _proj_val_fmt = "—"
+    _proj_kpi_sub = ""
 
 _prazo_d   = fin.get("Prazo", {})
 _taxa_d    = fin.get("Taxa", {})
 _parcela_d = fin.get("ValorParcela", {})
 prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-ticket_s  = f"R$ {vol['media']:,.0f}".replace(",", ".") if vol.get("media") else "—"
-parcela_s = f"R$ {_parcela_d['media']:,.0f}".replace(",", ".") if _parcela_d.get("media") else "—"
+ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
+parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
 taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
 
+_f_total_fmt = _nbr(f["total"])
+_f_aprov_fmt = _nbr(f["aprovados"])
+_f_term_fmt  = _nbr(f["terminais"])
+_f_repro_fmt = _nbr(f["reprovados"])
 st.markdown(f"""
 <div class="kpi-row">
   <div class="kpi-card">
     <div class="kpi-label">Total de leads</div>
-    <div class="kpi-value">{f['total']:,}</div>
+    <div class="kpi-value">{_f_total_fmt}</div>
     <div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Aprovados</div>
-    <div class="kpi-value">{f['aprovados']:,}</div>
+    <div class="kpi-value">{_f_aprov_fmt}</div>
     <div class="kpi-sub">taxa: {taxa}</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Taxa de aprovação</div>
     <div class="kpi-value">{taxa}</div>
-    <div class="kpi-sub">{f['terminais']:,} finalizados</div>
+    <div class="kpi-sub">{_f_term_fmt} finalizados</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Reprovados</div>
-    <div class="kpi-value">{f['reprovados']:,}</div>
+    <div class="kpi-value">{_f_repro_fmt}</div>
     <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
   </div>
   <div class="kpi-card">
@@ -2295,7 +2305,7 @@ st.markdown(f"""
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Projeção de Desembolso</div>
-    <div class="kpi-value">{_proj_cnt:,}</div>
+    <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
     <div class="kpi-sub">{_proj_kpi_sub}</div>
   </div>
 </div>
@@ -2452,7 +2462,7 @@ if etapas_d and n_rep > 0:
         fig_g = go.Figure(go.Bar(
             x=x, y=y, orientation="h",
             marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
-            text=[f"{v:,} ({p})" for v, p in zip(x, ps)],
+            text=[f"{_nbr(v)} ({p})" for v, p in zip(x, ps)],
             textposition="inside", insidetextanchor="end",
             textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
             hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
