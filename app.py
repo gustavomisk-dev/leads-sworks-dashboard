@@ -1123,7 +1123,7 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
 
 
 def _html_diagrama(etapas: dict, n_rep: int) -> str:
-    """HTML do Workflow 37 — snake de 3 linhas (CSS-only, sem JS)."""
+    """HTML do Workflow 37 — linha única horizontal + detalhamento Motor de Crédito."""
     if not etapas or not n_rep:
         return ""
 
@@ -1208,39 +1208,37 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         f'<div style="{mc_s}">Motor de<br>Cr&#233;dito</div>{mc_below}</div>'
     )
 
-    # Linha 1 (L→R): Início → Inicializa Dados → MC → Cálculo → Proposta Leilão → Cadastro → Formalização
-    r1 = (
+    # Linha única (L→R): todos os steps em sequência de fluxo
+    flow_content = (
         _circle("In&#237;cio", "#22c55e", "#16a34a") + _ARR_R
-        + _unit("Inicializa Dados",         ["Já Reprovado (reentrada)"]) + _ARR_R
+        + _unit("Inicializa Dados",             ["Já Reprovado (reentrada)"]) + _ARR_R
         + mc_compact + _ARR_R
-        + _unit("C&#225;lculo Proposta",    ["Cálculo de Proposta"]) + _ARR_R
-        + _unit("Proposta Leil&#227;o",     []) + _ARR_R
-        + _unit("Cadastro Proposta",        ["Cadastro Proposta"]) + _ARR_R
-        + _unit("Formaliza&#231;&#227;o",   [])
-    )
-
-    # Linha 2 (R→L): listada na ORDEM DO FLUXO (primeiro = mais à direita com row-reverse)
-    r2 = (
-        _unit("Atualiz. Dados",             []) + _ARR_L
-        + _unit("Obter CCB",                []) + _ARR_L
-        + _unit("Envia CCB &#218;nico",     ["Envia CCB Único"]) + _ARR_L
-        + _unit("Averba&#231;&#227;o Dtprev", ["Averbação"]) + _ARR_L
-        + _unit("Antifraude",               []) + _ARR_L
-        + _unit("Envio Inf. Dtprev",        []) + _ARR_L
-        + _unit("Obter Endosso",            [])
-    )
-
-    # Linha 3 (L→R): Pagamento Pix → ... → Aprovado
-    r3 = (
-        _unit("Pagamento Pix",              []) + _ARR_R
-        + _unit("Tesouraria",               []) + _ARR_R
-        + _unit("Portal Cr&#233;dito",      []) + _ARR_R
-        + _unit("Contratar Seguro",         []) + _ARR_R
-        + _unit("Envia Comunica&#231;&#227;o", []) + _ARR_R
+        + _unit("C&#225;lculo Proposta",        ["Cálculo de Proposta"]) + _ARR_R
+        + _unit("Proposta Leil&#227;o",         []) + _ARR_R
+        + _unit("Cadastro Proposta",            ["Cadastro Proposta"]) + _ARR_R
+        + _unit("Formaliza&#231;&#227;o",       []) + _ARR_R
+        + _unit("Obter Endosso",                []) + _ARR_R
+        + _unit("Envio Inf. Dtprev",            []) + _ARR_R
+        + _unit("Antifraude",                   []) + _ARR_R
+        + _unit("Averba&#231;&#227;o Dtprev",   ["Averbação"]) + _ARR_R
+        + _unit("Envia CCB &#218;nico",         ["Envia CCB Único"]) + _ARR_R
+        + _unit("Obter CCB",                    []) + _ARR_R
+        + _unit("Atualiz. Dados",               []) + _ARR_R
+        + _unit("Pagamento Pix",                []) + _ARR_R
+        + _unit("Tesouraria",                   []) + _ARR_R
+        + _unit("Portal Cr&#233;dito",          []) + _ARR_R
+        + _unit("Contratar Seguro",             []) + _ARR_R
+        + _unit("Envia Comunica&#231;&#227;o",  []) + _ARR_R
         + _circle("Aprovado", "#22c55e", "#16a34a")
     )
 
-    # Detalhamento do Motor de Crédito (abaixo do snake)
+    snake_html = (
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;padding:6px 0;">'
+        + flow_content
+        + '</div>'
+    )
+
+    # Detalhamento do Motor de Crédito (2ª linha abaixo do fluxo)
     mc_detail = ""
     for i, (name, keys) in enumerate(_MC_ITEMS):
         if i > 0:
@@ -1253,102 +1251,10 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         f'<div style="font-size:9px;color:#a5b4fc;font-weight:700;'
         f'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">'
         f'Motor de Cr&#233;dito &#8212; Detalhamento</div>'
-        f'<div style="overflow-x:auto;">'
-        f'<div style="display:flex;align-items:flex-start;min-width:max-content;">'
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;">'
         + mc_detail
-        + '</div></div></div>'
+        + '</div></div>'
     )
-
-    # Snake layout — flexbox puro com espaçadores conectores.
-    # Cada linha tem a forma: [conteúdo][espaçador com borda][canto].
-    # O espaçador (flex:1) faz a linha horizontal que liga o último item ao canto.
-    # Com min-width:max-content no container externo, o espaçador pode ficar zero
-    # quando o conteúdo toma todo o espaço — a borda do canto encosta no último item.
-
-    _R = 10   # raio dos cantos em px
-    _BW = 2   # espessura das bordas em px
-    _GAP_H = 12  # altura da faixa de descida entre linhas
-    # Offset vertical para alinhar a linha do conector com o centro das caixas
-    _MT = 20  # margin-top para alinhar espaçador/canto com o meio dos boxes (~20px)
-
-    def _corner(borders, radius, *, mt=_MT, w=20):
-        """Célula de canto com bordas e border-radius."""
-        b = ";".join(f"border-{side}:{_BW}px solid {_C}" for side in borders)
-        r_val = ";".join(
-            f"border-{p}-radius:{_R}px" if v else f"border-{p}-radius:0"
-            for p, v in zip(
-                ["top-left","top-right","bottom-right","bottom-left"], radius
-            )
-        )
-        return (
-            f'<div style="width:{w}px;flex-shrink:0;align-self:stretch;'
-            f'{b};{r_val};margin-top:{mt}px;"></div>'
-        )
-
-    def _spacer(border_side, *, mt=_MT):
-        """Espaçador horizontal flexível com uma borda de conexão."""
-        return (
-            f'<div style="flex:1;min-width:8px;align-self:flex-start;'
-            f'border-{border_side}:{_BW}px solid {_C};'
-            f'margin-top:{mt}px;"></div>'
-        )
-
-    def _vline(side, h=_GAP_H):
-        """Segmento vertical de descida entre linhas."""
-        return (
-            f'<div style="border-{side}:{_BW}px solid {_C};'
-            f'height:{h}px;"></div>'
-        )
-
-    # ── Linha 1 (L→R): conteúdo + espaçador + canto direito (vira para baixo)
-    row1 = (
-        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
-        f'padding:6px 0;">'
-        + r1
-        + _spacer("bottom")
-        + _corner(["right","bottom"], [0,0,1,0])
-        + '</div>'
-    )
-
-    # Descida direita entre linha 1 e 2
-    vgap1 = (
-        f'<div style="display:flex;justify-content:flex-end;">'
-        + _vline("right")
-        + '</div>'
-    )
-
-    # ── Linha 2 (R→L, row-reverse): canto direito (sobe) + espaçador + conteúdo + espaçador + canto esquerdo (vira para baixo)
-    row2 = (
-        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
-        f'padding:6px 0;">'
-        + _corner(["right","top"], [0,1,0,0])
-        + _spacer("top")
-        + f'<div style="display:flex;align-items:flex-start;flex-direction:row-reverse;flex-wrap:nowrap;">'
-        + r2
-        + '</div>'
-        + _spacer("bottom")
-        + _corner(["left","bottom"], [0,0,0,1])
-        + '</div>'
-    )
-
-    # Descida esquerda entre linha 2 e 3
-    vgap2 = (
-        f'<div style="display:flex;justify-content:flex-start;">'
-        + _vline("left")
-        + '</div>'
-    )
-
-    # ── Linha 3 (L→R): canto esquerdo (sobe) + espaçador + conteúdo
-    row3 = (
-        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;'
-        f'padding:6px 0;">'
-        + _corner(["left","top"], [1,0,0,0])
-        + _spacer("top")
-        + r3
-        + '</div>'
-    )
-
-    snake_html = row1 + vgap1 + row2 + vgap2 + row3
 
     title_html = (
         '<div style="font-size:10px;color:#475569;text-transform:uppercase;'
