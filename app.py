@@ -661,6 +661,10 @@ _RE_BLOQUEADO_DASH = re.compile(r'^Bloqueado pelo Segurado\b')
 _RE_CNPJ_NF_DASH   = re.compile(r'^CNPJ\s+[\d.\/\-]+\s+não encontrado', re.IGNORECASE)
 
 
+def _nbr(v) -> str:
+    return f"{v:,}".replace(",", ".")
+
+
 def _norm_label(s: str) -> str:
     if _RE_BLOQUEADO_DASH.match(s):
         return "Bloqueado pelo Segurado"
