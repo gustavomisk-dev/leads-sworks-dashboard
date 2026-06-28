@@ -6,6 +6,7 @@ Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 import hashlib
 import hmac
 import json
+import re
 import statistics
 import time
 import bcrypt
@@ -242,6 +243,9 @@ _ETAPA_WORKFLOW_ORDER = [
     "SCR",
     "Análise PH3A (PF)",
     "Cálculo de Proposta",
+    "Cadastro Proposta",
+    "Envia CCB Único",
+    "Averbação",
 ]
 
 _TEMPLATE = "plotly_dark"
@@ -333,6 +337,10 @@ def agregar(dias_raw: list) -> dict:
     aguardando_valor    = 0.0
     aguardando_liberado = 0.0
     aguardando_iof      = 0.0
+    assinado            = 0
+    assinado_valor      = 0.0
+    assinado_liberado   = 0.0
+    assinado_iof        = 0.0
 
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
@@ -363,7 +371,7 @@ def agregar(dias_raw: list) -> dict:
                 motivos[k] += v
         for k, v in d.get("top_motivos_det", {}).items():
             if k:
-                motivos_det[k] += v
+                motivos_det[_norm_label(k)] += v
         for k, v in d.get("top_empregadores", {}).items():
             if k:
                 empregadores[k] += v
@@ -390,7 +398,7 @@ def agregar(dias_raw: list) -> dict:
 
         for etapa, mots in d.get("etapa_motivos", {}).items():
             for label, cnt in mots.items():
-                etapa_motivos[etapa][label] += cnt
+                etapa_motivos[etapa][_norm_label(label)] += cnt
 
         for emp, mots in d.get("emp_motivos", {}).items():
             for label, cnt in mots.items():
@@ -401,6 +409,10 @@ def agregar(dias_raw: list) -> dict:
         aguardando_valor    += d.get("aguardando_valor", 0.0)
         aguardando_liberado += d.get("aguardando_liberado", 0.0)
         aguardando_iof      += d.get("aguardando_iof", 0.0)
+        assinado            += d.get("assinado", 0)
+        assinado_valor      += d.get("assinado_valor", 0.0)
+        assinado_liberado   += d.get("assinado_liberado", 0.0)
+        assinado_iof        += d.get("assinado_iof", 0.0)
 
     aprovados  = d_status.get(3, 0)
     reprovados = d_status.get(4, 0)
@@ -462,6 +474,10 @@ def agregar(dias_raw: list) -> dict:
         "aguardando_valor":     round(aguardando_valor, 2),
         "aguardando_liberado":  round(aguardando_liberado, 2),
         "aguardando_iof":       round(aguardando_iof, 2),
+        "assinado":             assinado,
+        "assinado_valor":       round(assinado_valor, 2),
+        "assinado_liberado":    round(assinado_liberado, 2),
+        "assinado_iof":         round(assinado_iof, 2),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -618,17 +634,29 @@ def _sem_codigo(d: dict, max_chars: int = 50) -> dict:
 
 # CNAE_BLOCKLIST e CNAE_RED sempre disparam juntos; idem CBO — junta em um só rótulo.
 _MOTIVOS_DET_MERGE = {
-    "COMPANY_CNAE_BLOCKLIST": "CNAE Bloqueado",
-    "CNAE_RED":               "CNAE Bloqueado",
-    "CBO_BLOCKLIST":          "CBO Bloqueado",
-    "CBO_RED":                "CBO Bloqueado",
+    "COMPANY_CNAE_BLOCKLIST":   "CNAE Bloqueado",
+    "CNAE_RED":                 "CNAE Bloqueado",
+    "CBO_BLOCKLIST":            "CBO Bloqueado",
+    "CBO_RED":                  "CBO Bloqueado",
+    "Reprovação Perfil Margem": "Cadastro Proposta Reprovada",
 }
+
+_RE_BLOQUEADO_DASH = re.compile(r'^Bloqueado pelo Segurado\b')
+_RE_CNPJ_NF_DASH   = re.compile(r'^CNPJ\s+[\d.\/\-]+\s+não encontrado', re.IGNORECASE)
+
+
+def _norm_label(s: str) -> str:
+    if _RE_BLOQUEADO_DASH.match(s):
+        return "Bloqueado pelo Segurado"
+    if _RE_CNPJ_NF_DASH.match(s):
+        return "CNPJ não encontrado"
+    return _MOTIVOS_DET_MERGE.get(s, s)
 
 
 def _merge_motivos_det(d: dict) -> dict:
     out: dict = {}
     for k, v in d.items():
-        label = _MOTIVOS_DET_MERGE.get(k, k)
+        label = _norm_label(k)
         out[label] = out.get(label, 0) + v
     return out
 
@@ -1075,115 +1103,207 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
 
 
 def _html_diagrama(etapas: dict, n_rep: int) -> str:
-    """HTML do Workflow 37 portado de gerar_relatorio_html.py."""
+    """HTML do Workflow 37 — snake de 3 linhas (CSS-only, sem JS)."""
     if not etapas or not n_rep:
         return ""
 
-    _PRE  = [("Inicializa Dados", ["Já Reprovado (reentrada)"])]
-    _MC   = [
-        ("Validações Internas", ["Validações Internas"]),
-        ("Receita Federal PF",  ["Receita Federal PF"]),
-        ("Consulta Dataprev",   ["Consulta Dataprev"]),
-        ("Receita Federal PJ",  ["Receita Federal PJ"]),
-        ("PH3A PJ",             ["Análise PH3A (PJ)"]),
-        ("SCR",                 ["SCR"]),
-        ("PH3A PF",             ["Análise PH3A (PF)"]),
-    ]
-    _POST = [
-        ("Cálculo Proposta",    ["Cálculo de Proposta"]),
-        ("Proposta Leilão",     []),
-        ("Cadastro Proposta",   []),
-        ("Formalização",        [], True),
-        ("Obter CCB",           []),
-        ("Averbação Dataprev",  []),
-        ("Antifraude",          []),
-        ("Pagamento Pix",       []),
-        ("Aprovação",           []),
-    ]
+    _C = "#374151"  # cor dos conectores e setas
 
-    _BOX_W = "min-width:58px;max-width:78px;line-height:1.35;white-space:normal;"
+    _BOX_W = "min-width:52px;max-width:72px;line-height:1.35;white-space:normal;"
     _S_OK  = ("background:#1a3560;border:1px solid rgba(96,165,250,0.25);"
-               f"color:#93c5fd;border-radius:8px;padding:6px 10px;"
-               f"font-size:11px;font-weight:500;text-align:center;{_BOX_W}")
+               f"color:#93c5fd;border-radius:8px;padding:6px 9px;"
+               f"font-size:10.5px;font-weight:500;text-align:center;{_BOX_W}")
     _S_REJ = ("background:#431407;border:1.5px solid #f97316;"
-               f"color:#fed7aa;border-radius:8px;padding:6px 10px;"
-               f"font-size:11px;font-weight:500;text-align:center;{_BOX_W}")
-    _ARR   = '<div style="padding:9px 4px 0;color:#374151;font-size:12px;flex-shrink:0;">&#9654;</div>'
+               f"color:#fed7aa;border-radius:8px;padding:6px 9px;"
+               f"font-size:10.5px;font-weight:500;text-align:center;{_BOX_W}")
+    _ARR_R = f'<div style="padding:9px 3px 0;color:{_C};font-size:12px;flex-shrink:0;">&#9654;</div>'
+    _ARR_L = f'<div style="padding:9px 3px 0;color:{_C};font-size:12px;flex-shrink:0;">&#9664;</div>'
 
-    def _unit(name, etapa_keys, nowrap=False):
-        count = sum(etapas.get(e, 0) for e in etapa_keys)
+    def _unit(name, keys, small=False):
+        count = sum(etapas.get(e, 0) for e in keys)
         pct   = 100 * count / n_rep if n_rep and count else 0
-        _s = _S_REJ if count else _S_OK
-        if nowrap:
-            _s = _s.replace("max-width:78px;", "").replace("white-space:normal;", "white-space:nowrap;")
-        box   = f'<div style="{_s}">{name}</div>'
-        below = ""
-        if count:
-            sub = "".join(
-                f'<div style="font-size:8px;color:#94a3b8;overflow:hidden;'
-                f'text-overflow:ellipsis;white-space:nowrap;max-width:70px;">'
-                f'&#8226; {e}: {etapas[e]:,}</div>'
-                for e in etapa_keys if etapas.get(e, 0)
-            )
-            below = (
-                f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
-                f'font-weight:700;white-space:nowrap;text-align:center;">'
-                f'&#11015; {count:,}&nbsp;({pct:.1f}%)</div>{sub}'
-            )
+        sw    = ("min-width:44px;max-width:62px;line-height:1.3;white-space:normal;"
+                 if small else _BOX_W)
+        fsz   = "9.5px" if small else "10.5px"
+        ok_s  = (f"background:#1a3560;border:1px solid rgba(96,165,250,0.25);"
+                  f"color:#93c5fd;border-radius:8px;padding:5px 8px;"
+                  f"font-size:{fsz};font-weight:500;text-align:center;{sw}")
+        rej_s = (f"background:#431407;border:1.5px solid #f97316;"
+                  f"color:#fed7aa;border-radius:8px;padding:5px 8px;"
+                  f"font-size:{fsz};font-weight:500;text-align:center;{sw}")
+        s   = rej_s if count else ok_s
+        sub = "".join(
+            f'<div style="font-size:8px;color:#94a3b8;overflow:hidden;'
+            f'text-overflow:ellipsis;white-space:nowrap;max-width:68px;">'
+            f'&#8226; {e}: {etapas[e]:,}</div>'
+            for e in keys if etapas.get(e, 0)
+        )
+        below = (
+            f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
+            f'font-weight:700;white-space:nowrap;text-align:center;">'
+            f'&#11015; {count:,}&nbsp;({pct:.1f}%)</div>{sub}'
+        ) if count else ""
         return (
-            f'<div style="display:flex;flex-direction:column;'
-            f'align-items:center;flex-shrink:0;">{box}{below}</div>'
+            f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">'
+            f'<div style="{s}">{name}</div>{below}</div>'
         )
 
-    inicio = (
-        '<div style="display:flex;flex-direction:column;align-items:center;'
-        'flex-shrink:0;padding-top:7px;">'
-        '<div style="width:22px;height:22px;border-radius:50%;background:#22c55e;'
-        'border:2px solid #16a34a;"></div>'
-        '<div style="font-size:9px;color:#64748b;margin-top:4px;">Início</div>'
-        '</div>'
+    def _circle(label, color, border):
+        return (
+            f'<div style="display:flex;flex-direction:column;align-items:center;'
+            f'flex-shrink:0;padding-top:7px;">'
+            f'<div style="width:22px;height:22px;border-radius:50%;'
+            f'background:{color};border:2px solid {border};"></div>'
+            f'<div style="font-size:9px;color:#64748b;margin-top:4px;">{label}</div>'
+            f'</div>'
+        )
+
+    # Motor de Crédito: caixa compacta no snake + detalhamento abaixo
+    _MC_ITEMS = [
+        ("Valid. Internas",  ["Validações Internas"]),
+        ("RF PF",            ["Receita Federal PF"]),
+        ("Dataprev",         ["Consulta Dataprev"]),
+        ("RF PJ",            ["Receita Federal PJ"]),
+        ("PH3A PJ",          ["Análise PH3A (PJ)"]),
+        ("SCR",              ["SCR"]),
+        ("PH3A PF",          ["Análise PH3A (PF)"]),
+    ]
+    mc_total = sum(sum(etapas.get(e, 0) for e in keys) for _, keys in _MC_ITEMS)
+    mc_pct   = 100 * mc_total / n_rep if n_rep and mc_total else 0
+    mc_sw    = "min-width:60px;max-width:90px;line-height:1.35;white-space:normal;"
+    mc_ok_s  = (f"background:#1a3560;border:1px solid rgba(99,102,241,0.40);"
+                 f"color:#a5b4fc;border-radius:8px;padding:6px 10px;"
+                 f"font-size:10.5px;font-weight:700;text-align:center;{mc_sw}")
+    mc_rej_s = (f"background:#431407;border:1.5px solid rgba(99,102,241,0.60);"
+                 f"color:#c4b5fd;border-radius:8px;padding:6px 10px;"
+                 f"font-size:10.5px;font-weight:700;text-align:center;{mc_sw}")
+    mc_s      = mc_rej_s if mc_total else mc_ok_s
+    mc_below  = (
+        f'<div style="font-size:9px;color:#f97316;margin-top:4px;'
+        f'font-weight:700;white-space:nowrap;text-align:center;">'
+        f'&#11015; {mc_total:,}&nbsp;({mc_pct:.1f}%)</div>'
+    ) if mc_total else ""
+    mc_compact = (
+        f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">'
+        f'<div style="{mc_s}">Motor de<br>Cr&#233;dito</div>{mc_below}</div>'
     )
 
-    pre_html = inicio
-    for name, etapa_keys in _PRE:
-        pre_html += _ARR + _unit(name, etapa_keys)
+    # Linha 1 (L→R): Início → Inicializa Dados → MC → Cálculo → Proposta Leilão → Cadastro → Formalização
+    r1 = (
+        _circle("In&#237;cio", "#22c55e", "#16a34a") + _ARR_R
+        + _unit("Inicializa Dados",         ["Já Reprovado (reentrada)"]) + _ARR_R
+        + mc_compact + _ARR_R
+        + _unit("C&#225;lculo Proposta",    ["Cálculo de Proposta"]) + _ARR_R
+        + _unit("Proposta Leil&#227;o",     []) + _ARR_R
+        + _unit("Cadastro Proposta",        ["Cadastro Proposta"]) + _ARR_R
+        + _unit("Formaliza&#231;&#227;o",   [])
+    )
 
-    mc_inner = ""
-    for i, (name, etapa_keys) in enumerate(_MC):
+    # Linha 2 (R→L): listada na ORDEM DO FLUXO (primeiro = mais à direita com row-reverse)
+    r2 = (
+        _unit("Atualiz. Dados",             []) + _ARR_L
+        + _unit("Obter CCB",                []) + _ARR_L
+        + _unit("Envia CCB &#218;nico",     ["Envia CCB Único"]) + _ARR_L
+        + _unit("Averba&#231;&#227;o Dtprev", ["Averbação"]) + _ARR_L
+        + _unit("Antifraude",               []) + _ARR_L
+        + _unit("Envio Inf. Dtprev",        []) + _ARR_L
+        + _unit("Obter Endosso",            [])
+    )
+
+    # Linha 3 (L→R): Pagamento Pix → ... → Aprovado
+    r3 = (
+        _unit("Pagamento Pix",              []) + _ARR_R
+        + _unit("Tesouraria",               []) + _ARR_R
+        + _unit("Portal Cr&#233;dito",      []) + _ARR_R
+        + _unit("Contratar Seguro",         []) + _ARR_R
+        + _unit("Envia Comunica&#231;&#227;o", []) + _ARR_R
+        + _circle("Aprovado", "#22c55e", "#16a34a")
+    )
+
+    # Detalhamento do Motor de Crédito (abaixo do snake)
+    mc_detail = ""
+    for i, (name, keys) in enumerate(_MC_ITEMS):
         if i > 0:
-            mc_inner += _ARR
-        mc_inner += _unit(name, etapa_keys)
+            mc_detail += _ARR_R
+        mc_detail += _unit(name, keys, small=True)
 
-    mc_label = (
-        '<div style="font-size:9px;color:#a5b4fc;font-weight:700;'
-        'text-align:center;padding-bottom:6px;white-space:nowrap;'
-        'text-transform:uppercase;letter-spacing:0.5px;">Motor de Cr&#233;dito</div>'
-    )
-    mc_flow = (
-        '<div style="display:flex;align-items:flex-start;'
-        'border:1px solid rgba(99,102,241,0.40);border-radius:10px;'
-        'padding:6px;background:rgba(99,102,241,0.06);">'
-        + mc_inner + '</div>'
-    )
-    mc_html = (
-        _ARR
-        + '<div style="display:flex;flex-direction:column;flex-shrink:0;">'
-        + mc_label + mc_flow + '</div>'
+    mc_section = (
+        f'<div style="margin-top:14px;border:1px solid rgba(99,102,241,0.35);'
+        f'border-radius:8px;padding:8px 12px;background:rgba(99,102,241,0.06);">'
+        f'<div style="font-size:9px;color:#a5b4fc;font-weight:700;'
+        f'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">'
+        f'Motor de Cr&#233;dito &#8212; Detalhamento</div>'
+        f'<div style="overflow-x:auto;">'
+        f'<div style="display:flex;align-items:flex-start;min-width:max-content;">'
+        + mc_detail
+        + '</div></div></div>'
     )
 
-    post_html = ""
-    for _entry in _POST:
-        _nm, _ek = _entry[0], _entry[1]
-        post_html += _ARR + _unit(_nm, _ek, _entry[2] if len(_entry) > 2 else False)
+    # Conectores via bordas CSS em tabela com border-collapse:separate
+    # Linha 1 direita: └ → continua no gap → ┐ linha 2
+    # Linha 2 esquerda: ┘ → continua no gap → ┌ linha 3
+    td_r1_right = (f'style="padding:0;width:28px;'
+                   f'border-right:2px solid {_C};border-bottom:2px solid {_C};'
+                   f'border-radius:0 0 12px 0;"')
+    td_gap1_right = (f'style="padding:0;border-right:2px solid {_C};"')
+    td_r2_right   = (f'style="padding:0;width:28px;'
+                     f'border-right:2px solid {_C};border-top:2px solid {_C};'
+                     f'border-radius:0 12px 0 0;"')
+    td_r2_left    = (f'style="padding:0;width:28px;'
+                     f'border-left:2px solid {_C};border-bottom:2px solid {_C};'
+                     f'border-radius:0 0 0 12px;"')
+    td_gap2_left  = (f'style="padding:0;border-left:2px solid {_C};"')
+    td_r3_left    = (f'style="padding:0;width:28px;'
+                     f'border-left:2px solid {_C};border-top:2px solid {_C};'
+                     f'border-radius:12px 0 0 0;"')
 
-    fim_html = (
-        _ARR
-        + '<div style="display:flex;flex-direction:column;align-items:center;'
-          'flex-shrink:0;padding-top:7px;">'
-          '<div style="width:22px;height:22px;border-radius:50%;background:#dc2626;'
-          'border:2px solid #b91c1c;"></div>'
-          '<div style="font-size:9px;color:#64748b;margin-top:4px;">Aprovado</div>'
-          '</div>'
+    snake_table = (
+        f'<table style="border-collapse:separate;border-spacing:0;width:100%;">'
+        f'<tbody>'
+        # Linha 1
+        f'<tr>'
+        f'<td style="padding:0;width:28px;"></td>'
+        f'<td style="padding:6px 0;">'
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;">{r1}</div>'
+        f'</td>'
+        f'<td {td_r1_right}></td>'
+        f'</tr>'
+        # Gap 1
+        f'<tr style="height:14px;">'
+        f'<td style="padding:0;"></td>'
+        f'<td style="padding:0;"></td>'
+        f'<td {td_gap1_right}></td>'
+        f'</tr>'
+        # Linha 2 (row-reverse = RTL visual)
+        f'<tr>'
+        f'<td {td_r2_left}></td>'
+        f'<td style="padding:6px 0;">'
+        f'<div style="display:flex;align-items:flex-start;flex-direction:row-reverse;flex-wrap:nowrap;">{r2}</div>'
+        f'</td>'
+        f'<td {td_r2_right}></td>'
+        f'</tr>'
+        # Gap 2
+        f'<tr style="height:14px;">'
+        f'<td {td_gap2_left}></td>'
+        f'<td style="padding:0;"></td>'
+        f'<td style="padding:0;"></td>'
+        f'</tr>'
+        # Linha 3
+        f'<tr>'
+        f'<td {td_r3_left}></td>'
+        f'<td style="padding:6px 0;">'
+        f'<div style="display:flex;align-items:flex-start;flex-wrap:nowrap;">{r3}</div>'
+        f'</td>'
+        f'<td style="padding:0;width:28px;"></td>'
+        f'</tr>'
+        f'</tbody>'
+        f'</table>'
+    )
+
+    title_html = (
+        '<div style="font-size:10px;color:#475569;text-transform:uppercase;'
+        'letter-spacing:0.6px;margin-bottom:12px;font-weight:600;">'
+        'Fluxo do Workflow 37 &#8212; Consignado Privado</div>'
     )
 
     legend = (
@@ -1195,28 +1315,21 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
         '<div style="width:12px;height:12px;border-radius:3px;background:#1a3560;'
         'border:1px solid rgba(96,165,250,0.25);flex-shrink:0;"></div>Sem reprovações</div>'
         '<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#94a3b8;">'
-        '<div style="width:30px;height:12px;border-radius:3px;'
+        '<div style="width:24px;height:12px;border-radius:3px;'
         'border:1px solid rgba(99,102,241,0.40);'
         'background:rgba(99,102,241,0.06);flex-shrink:0;"></div>'
         'Motor de Cr&#233;dito</div>'
         '</div>'
     )
 
-    title_html = (
-        '<div style="font-size:10px;color:#475569;text-transform:uppercase;'
-        'letter-spacing:0.6px;margin-bottom:12px;font-weight:600;">'
-        'Fluxo do Workflow 37 &#8212; Motor de Cr&#233;dito expandido</div>'
-    )
-
-    flow = (
+    wrapper = (
         '<div style="overflow-x:auto;">'
-        '<div style="display:flex;align-items:flex-start;gap:0;'
-        'min-width:max-content;padding:4px 0 10px;">'
-        + pre_html + mc_html + post_html + fim_html
+        '<div style="min-width:max-content;padding:4px 0 4px;">'
+        + snake_table + mc_section
         + '</div></div>'
     )
 
-    return title_html + flow + legend
+    return title_html + wrapper + legend
 
 
 def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> str:
@@ -1433,6 +1546,18 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         )
     else:
         ag_val_s = "BLOQUEIO_TEMPORARIO"
+    ass           = agg.get("assinado", 0)
+    ass_valor     = agg.get("assinado_valor", 0.0)
+    ass_liberado  = agg.get("assinado_liberado", 0.0)
+    ass_iof       = agg.get("assinado_iof", 0.0)
+    if ass_valor:
+        ass_val_s = (
+            f"Projeção de Desembolso: R$ {ass_valor:,.0f}".replace(",", ".")
+            + f"<br><span style='font-size:0.78em;color:#64748b'>"
+            f"Liberado R$ {ass_liberado:,.0f} · IOF R$ {ass_iof:,.0f}</span>".replace(",", ".")
+        )
+    else:
+        ass_val_s = "ASSINADO"
     _prazo_d   = fin.get("Prazo", {})
     _taxa_d    = fin.get("Taxa", {})
     _parcela_d = fin.get("ValorParcela", {})
@@ -1463,6 +1588,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Aguardando 24h</div>
         <div class="kpi-value">{ag:,}</div><div class="kpi-sub">{ag_val_s}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Aguardando Averbação</div>
+        <div class="kpi-value">{ass:,}</div><div class="kpi-sub">{ass_val_s}</div></div>
     </div>
     """
 
