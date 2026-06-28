@@ -2300,16 +2300,16 @@ st.markdown(f"""
 st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
 _TIPO_LABEL_MAP = {
-    "PAGAMENTO":                 "Pix Aguardando Execução",
-    "ASSINATURA":                "CCB Aguardando Assinatura",
-    "BLOQUEIO_TEMPORARIO":       "Aguardando 24h",
-    "FORMALIZACAO":              "Aguardando Aceite Formalização",
-    "PRE_APROVADO":              "Proposta Enviada — Aguard. Aceite",
-    "AVERBACAO_PENDENTE_MANUAL": "Averbação Pend. Manual",
-    "ENTREVISTA":                "Antifraude Nuvidio",
-    "ASSINADO":                  "Falha Pós-Assinatura",
-    "SIMULACAO":                 "Recalculando Proposta",
-    "PENDENTE_DADOS_PAGAMENTO":  "Dados de Pagamento Pendentes",
+    "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
+    "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
+    "ASSINATURA":                "Aguardando CCB Único (Suspenso)",
+    "ENTREVISTA":                "Aguardando Entrevista Antifraude da Nuvidio (Suspenso)",
+    "FORMALIZACAO":              "Aguardando Aceite para Formalização (Suspenso)",
+    "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
+    "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
+    "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
+    "BLOQUEIO_TEMPORARIO":       "Aguardando 24h (Em Andamento)",
+    "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
 }
 
 _pt_sec = agg.get("projecao_tipos", {})
