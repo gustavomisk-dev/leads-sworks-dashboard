@@ -1491,11 +1491,13 @@ def _html_tabela_resumo_funil(rows: list) -> str:
 
 
 def _html_tabela_financeira(fin: dict) -> str:
+    _brl = lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     campos = [
-        ("ValorContratacao", "Valor Total Empréstimo",  lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))),
-        ("RendaLiquida",     "Renda Líquida",      lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))),
-        ("Prazo",            "Prazo (meses)",       lambda x: f"{x:.0f}"),
-        ("Taxa",             "Taxa Mensal (%)",     lambda x: f"{x:.2f}"),
+        ("ValorContratacao",  "Valor Contratado",    _brl),
+        ("RendaLiquida",      "Renda Líquida",       _brl),
+        ("Prazo",             "Prazo (meses)",        lambda x: f"{x:.0f}"),
+        ("Taxa",              "Taxa Mensal (%)",      lambda x: f"{x:.2f}"),
+        ("TempoEmpregoMeses", "Tempo de Emprego (meses)", lambda x: f"{x:.2f}"),
     ]
     rows_html = []
     for campo, label, fmt in campos:
@@ -1631,7 +1633,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
-        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor a pagar pelo cliente</div></div>
+        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor contratado</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div>
         <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
@@ -2326,7 +2328,7 @@ try:
       <div class="kpi-card">
         <div class="kpi-label">Ticket médio do empréstimo</div>
         <div class="kpi-value">{ticket_s}</div>
-        <div class="kpi-sub">valor a pagar pelo cliente</div>
+        <div class="kpi-sub">valor contratado</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Ticket médio da parcela</div>
