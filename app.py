@@ -1638,7 +1638,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _proj_iof_fmt_tv = ("R$ " + f"{_proj_iof_tv:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         _proj_sub = (
             f"<span style='color:#64748b;font-size:0.82em'>"
-            f"{_proj_count_s} leads·Lib.{_proj_lib_fmt_tv}·IOF {_proj_iof_fmt_tv}"
+            f"Lib. {_proj_lib_fmt_tv} · IOF {_proj_iof_fmt_tv}"
             "</span>"
         )
     else:
@@ -1655,6 +1655,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _aprov_fmt = _nbr(funil["aprovados"])
     _term_fmt  = _nbr(funil["terminais"])
     _repro_fmt = _nbr(funil["reprovados"])
+    _ag_fmt    = _nbr(agg.get("aguardando", 0))
     _kpi_html = f"""
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1664,8 +1665,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Reprovados</div>
         <div class="kpi-value">{_repro_fmt}</div>
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
-        <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_term_fmt} finalizados</div></div>
+      <div class="kpi-card"><div class="kpi-label">Aguardando desembolso</div>
+        <div class="kpi-value">{_ag_fmt}</div><div class="kpi-sub">aprovados pendentes</div></div>
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
@@ -2316,7 +2317,7 @@ try:
         _proj_iof_fmt = ("R$ " + f"{_proj_iof:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         _proj_kpi_sub = (
             f"<span style='color:#64748b;font-size:0.82em'>"
-            f"{_proj_cnt_s} leads · Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
+            f"Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
             "</span>"
         )
     else:
@@ -2335,6 +2336,7 @@ try:
     _f_aprov_fmt = _nbr(f["aprovados"])
     _f_term_fmt  = _nbr(f["terminais"])
     _f_repro_fmt = _nbr(f["reprovados"])
+    _f_ag_fmt    = _nbr(agg.get("aguardando", 0))
     st.markdown(f"""
     <div class="kpi-row">
       <div class="kpi-card">
@@ -2353,9 +2355,9 @@ try:
         <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Taxa de aprovação</div>
-        <div class="kpi-value">{taxa}</div>
-        <div class="kpi-sub">{_f_term_fmt} finalizados</div>
+        <div class="kpi-label">Aguardando desembolso</div>
+        <div class="kpi-value">{_f_ag_fmt}</div>
+        <div class="kpi-sub">aprovados pendentes</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Volume aprovado</div>
