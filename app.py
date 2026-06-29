@@ -1655,7 +1655,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _aprov_fmt = _nbr(funil["aprovados"])
     _term_fmt  = _nbr(funil["terminais"])
     _repro_fmt = _nbr(funil["reprovados"])
-    _ag_fmt    = _nbr(agg.get("aguardando", 0))
+    _ag_fmt    = _nbr(_proj_count)
     _kpi_html = f"""
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -2336,7 +2336,7 @@ try:
     _f_aprov_fmt = _nbr(f["aprovados"])
     _f_term_fmt  = _nbr(f["terminais"])
     _f_repro_fmt = _nbr(f["reprovados"])
-    _f_ag_fmt    = _nbr(agg.get("aguardando", 0))
+    _f_ag_fmt    = _nbr(_proj_cnt)
     st.markdown(f"""
     <div class="kpi-row">
       <div class="kpi-card">
