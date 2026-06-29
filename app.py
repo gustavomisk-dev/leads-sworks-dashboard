@@ -650,11 +650,17 @@ def _sem_codigo(d: dict, max_chars: int = 50) -> dict:
 
 # CNAE_BLOCKLIST e CNAE_RED sempre disparam juntos; idem CBO — junta em um só rótulo.
 _MOTIVOS_DET_MERGE = {
-    "COMPANY_CNAE_BLOCKLIST":   "CNAE Bloqueado",
-    "CNAE_RED":                 "CNAE Bloqueado",
-    "CBO_BLOCKLIST":            "CBO Bloqueado",
-    "CBO_RED":                  "CBO Bloqueado",
-    "Reprovação Perfil Margem": "Cadastro Proposta Reprovada",
+    # códigos normalizados (fallback)
+    "COMPANY_CNAE_BLOCKLIST":                            "CNAE da empresa está na lista de CNAEs bloqueados | O semáforo do CNAE é vermelho",
+    "CNAE_RED":                                          "CNAE da empresa está na lista de CNAEs bloqueados | O semáforo do CNAE é vermelho",
+    "CBO_BLOCKLIST":                                     "CBO do cliente está na lista de CBOs bloqueados | O semáforo do CBO é vermelho",
+    "CBO_RED":                                           "CBO do cliente está na lista de CBOs bloqueados | O semáforo do CBO é vermelho",
+    # textos detalhados vindos do campo MotivoReprovacaoDetalhado
+    "CNAE da empresa está na lista de CNAEs bloqueados": "CNAE da empresa está na lista de CNAEs bloqueados | O semáforo do CNAE é vermelho",
+    "O semáforo do CNAE é vermelho":                    "CNAE da empresa está na lista de CNAEs bloqueados | O semáforo do CNAE é vermelho",
+    "CBO do cliente está na lista de CBOs bloqueados":  "CBO do cliente está na lista de CBOs bloqueados | O semáforo do CBO é vermelho",
+    "O semaforo do CBO é vermelho":                     "CBO do cliente está na lista de CBOs bloqueados | O semáforo do CBO é vermelho",
+    "Reprovação Perfil Margem":                          "Cadastro Proposta Reprovada",
 }
 
 _RE_BLOQUEADO_DASH = re.compile(r'^Bloqueado pelo Segurado\b')
