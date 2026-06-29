@@ -1661,15 +1661,15 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{_total_fmt}</div><div class="kpi-sub">{periodo}</div></div>
       <div class="kpi-card"><div class="kpi-label">Aprovados</div>
         <div class="kpi-value">{_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
-        <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_term_fmt} finalizados</div></div>
       <div class="kpi-card"><div class="kpi-label">Reprovados</div>
         <div class="kpi-value">{_repro_fmt}</div>
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
+      <div class="kpi-card"><div class="kpi-label">Taxa aprovação</div>
+        <div class="kpi-value">{taxa}</div><div class="kpi-sub">{_term_fmt} finalizados</div></div>
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
-        <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
+      <div class="kpi-card"><div class="kpi-label">Taxa média</div>
+        <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
       <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
@@ -1678,8 +1678,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
     </div>
     <div class="kpi-row" style="display:flex;justify-content:center;gap:8px">
-      <div class="kpi-card" style="width:calc(25% - 6px)"><div class="kpi-label">Taxa média</div>
-        <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+      <div class="kpi-card" style="width:calc(25% - 6px)"><div class="kpi-label">Volume aprovado</div>
+        <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
       <div class="kpi-card" style="width:calc(25% - 6px)"><div class="kpi-label">Projeção de Desembolso</div>
         <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">{_proj_sub}</div></div>
     </div>
@@ -2348,14 +2348,14 @@ try:
         <div class="kpi-sub">taxa: {taxa}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Taxa de aprovação</div>
-        <div class="kpi-value">{taxa}</div>
-        <div class="kpi-sub">{_f_term_fmt} finalizados</div>
-      </div>
-      <div class="kpi-card">
         <div class="kpi-label">Reprovados</div>
         <div class="kpi-value">{_f_repro_fmt}</div>
         <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Taxa de aprovação</div>
+        <div class="kpi-value">{taxa}</div>
+        <div class="kpi-sub">{_f_term_fmt} finalizados</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Volume aprovado</div>
