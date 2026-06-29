@@ -256,7 +256,7 @@ _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=13, color="#94a3b8")
 
-_TV_N_SLIDES   = 16
+_TV_N_SLIDES   = 17
 _TV_INTERVAL_S = 20  # seconds per slide
 
 _TV_CSS = """<style>
@@ -1684,21 +1684,23 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     """
 
     if slide == 0:
-        _tv_h("KPIs · Distribuição por Status", periodo)
+        _tv_h("KPIs", periodo)
         st.markdown(_kpi_html, unsafe_allow_html=True)
+
+    elif slide == 1:
+        _tv_h("Distribuição por Status", periodo)
         fig = _fig_donut(funil.get("_d_status", {}))
         if fig:
             fig.update_traces(textfont=dict(size=27))
             fig.update_annotations(font_size=30)
             fig.update_layout(
-                height=440,
+                height=560,
                 legend=dict(font=dict(size=30, color="#94a3b8")),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-    elif slide == 1:
-        _tv_h("KPIs · Funil de Conversão", periodo)
-        st.markdown(_kpi_html, unsafe_allow_html=True)
+    elif slide == 2:
+        _tv_h("Funil de Conversão", periodo)
         fig = _fig_funil_rico(funil)
         if fig:
             fig.update_traces(
@@ -1706,33 +1708,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 texttemplate="%{value:,}  %{percentInitial:.1%}",
             )
             fig.update_layout(
-                height=460,
+                height=560,
                 title=dict(text=""),
                 xaxis=dict(tickfont=_TV_AF),
                 yaxis=dict(tickfont=_TV_YTXT, automargin=True),
                 margin=dict(t=10, b=20, l=250, r=40),
-            )
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
-    elif slide == 2:
-        _tv_h("Evolução Temporal", periodo)
-        fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
-        if fig:
-            fig.update_layout(
-                height=620,
-                title=dict(text=""),
-                margin=dict(t=120, b=20, l=10, r=20),
-                xaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
-                yaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
-                legend=dict(
-                    orientation="h",
-                    x=0.5, y=1.07,
-                    xanchor="center", yanchor="bottom",
-                    bgcolor="rgba(15,14,11,0.88)",
-                    bordercolor="rgba(255,255,255,0.10)",
-                    borderwidth=1,
-                    font=dict(size=34, color="#94a3b8"),
-                ),
             )
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
@@ -1969,6 +1949,28 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             st.info("Sem dados de empregadores dos aprovados.")
 
     elif slide == 15:
+        _tv_h("Evolução Temporal", periodo)
+        fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
+        if fig:
+            fig.update_layout(
+                height=620,
+                title=dict(text=""),
+                margin=dict(t=120, b=20, l=10, r=20),
+                xaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
+                yaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
+                legend=dict(
+                    orientation="h",
+                    x=0.5, y=1.07,
+                    xanchor="center", yanchor="bottom",
+                    bgcolor="rgba(15,14,11,0.88)",
+                    bordercolor="rgba(255,255,255,0.10)",
+                    borderwidth=1,
+                    font=dict(size=34, color="#94a3b8"),
+                ),
+            )
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    elif slide == 16:
         _tv_h("Top CBOs dos Aprovados", periodo)
         cbos_ap = agg.get("top_cbos", {})
         if cbos_ap:
