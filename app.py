@@ -333,6 +333,7 @@ def agregar(dias_raw: list) -> dict:
     etapas       = defaultdict(int)
     etapa_motivos = defaultdict(lambda: defaultdict(int))
     emp_motivos   = defaultdict(lambda: defaultdict(int))
+    emp_ap_stats_raw: dict = {}
     valores_cont     = []
     aguardando          = 0
     aguardando_valor    = 0.0
@@ -406,6 +407,25 @@ def agregar(dias_raw: list) -> dict:
             for label, cnt in mots.items():
                 emp_motivos[emp][label] += cnt
 
+        for emp, s in d.get("emp_ap_stats", {}).items():
+            if emp not in emp_ap_stats_raw:
+                emp_ap_stats_raw[emp] = {
+                    "n_tempo": 0, "sum_tempo": 0.0,
+                    "n_renda": 0, "sum_renda": 0.0,
+                    "n_valor": 0, "sum_valor": 0.0,
+                    "n_prazo": 0, "sum_prazo": 0.0,
+                    "n_taxa":  0, "sum_taxa":  0.0,
+                    "num_funcionarios": None, "faturamento": None,
+                    "dividas_ativas":   None, "capital_social": None,
+                }
+            a = emp_ap_stats_raw[emp]
+            for _c in ("tempo", "renda", "valor", "prazo", "taxa"):
+                a[f"n_{_c}"]   += s.get(f"n_{_c}", 0)
+                a[f"sum_{_c}"] += s.get(f"sum_{_c}", 0.0)
+            for _pj in ("num_funcionarios", "faturamento", "dividas_ativas", "capital_social"):
+                if a[_pj] is None and s.get(_pj) is not None:
+                    a[_pj] = s[_pj]
+
         valores_cont.extend(d.get("valores_contratacao", []))
         aguardando          += d.get("aguardando", 0)
         aguardando_valor    += d.get("aguardando_valor", 0.0)
@@ -459,6 +479,20 @@ def agregar(dias_raw: list) -> dict:
     def _top(dd, n):
         return dict(sorted(dd.items(), key=lambda x: -x[1])[:n])
 
+    emp_ap_stats_final: dict = {}
+    for _emp, _a in emp_ap_stats_raw.items():
+        emp_ap_stats_final[_emp] = {
+            "media_tempo": _a["sum_tempo"] / _a["n_tempo"] if _a["n_tempo"] else None,
+            "media_renda": _a["sum_renda"] / _a["n_renda"] if _a["n_renda"] else None,
+            "media_valor": _a["sum_valor"] / _a["n_valor"] if _a["n_valor"] else None,
+            "media_prazo": _a["sum_prazo"] / _a["n_prazo"] if _a["n_prazo"] else None,
+            "media_taxa":  _a["sum_taxa"]  / _a["n_taxa"]  if _a["n_taxa"]  else None,
+            "num_funcionarios": _a["num_funcionarios"],
+            "faturamento":      _a["faturamento"],
+            "dividas_ativas":   _a["dividas_ativas"],
+            "capital_social":   _a["capital_social"],
+        }
+
     return {
         "funil":             funil,
         "financeiro":        financeiro,
@@ -476,6 +510,7 @@ def agregar(dias_raw: list) -> dict:
         "etapas":            dict(etapas),
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
+        "emp_ap_stats":      emp_ap_stats_final,
         "valores_contratacao": valores_cont,
         "projecao_tipos": {
             ts: {
@@ -1119,6 +1154,99 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
             f'<td class="r" style="color:#94a3b8">{pct}</td>'
             f'</tr>'
         )
+    thead = '<thead><tr><th class="c">#</th><th>Razão Social</th><th class="r">Leads</th><th class="r">%</th></tr></thead>'
+    return (
+        '<div class="dtbl-wrap"><table class="dtbl">'
+        + thead
+        + '<tbody>' + "".join(rows) + '</tbody>'
+        + '</table></div>'
+    )
+
+
+def _html_emp_ap_expandable(emp_ap: dict, emp_stats: dict, n_ap: int, n: int = 15) -> str:
+    """Tabela de empregadores aprovados com <details>/<summary> para stats financeiras e PJ."""
+    if not emp_ap:
+        return ""
+
+    def _brl(x):
+        if x is None:
+            return "—"
+        s = f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"R$ {s}"
+
+    def _num(x):
+        return f"{x:,.0f}".replace(",", ".") if x is not None else "—"
+
+    _items = list(emp_ap.items())[:n]
+    rows = []
+    for i, (emp, cnt) in enumerate(_items):
+        pct  = f"{100*cnt/n_ap:.1f}%" if n_ap else "—"
+        rc   = "g0" if i % 2 == 0 else "g1"
+        st   = emp_stats.get(emp, {})
+
+        _CELL_L = "font-size:0.78em;color:#94a3b8;padding:2px 8px 2px 0;white-space:nowrap"
+        _CELL_R = "font-size:0.78em;color:#e2e8f0;font-weight:600;text-align:right;white-space:nowrap;padding:2px 0"
+        _HDR    = "font-size:0.72em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 0 2px"
+
+        def _row(label, val):
+            if val == "—":
+                return ""
+            return (
+                f'<tr>'
+                f'<td style="{_CELL_L}">{label}</td>'
+                f'<td style="{_CELL_R}">{val}</td>'
+                f'</tr>'
+            )
+
+        def _hdr_row(title):
+            return f'<tr><td colspan="2" style="{_HDR}">{title}</td></tr>'
+
+        fin_rows = (
+            _hdr_row("Médias dos aprovados")
+            + _row("Tempo de Emprego", f"{st['media_tempo']:.1f} meses" if st.get("media_tempo") else "—")
+            + _row("Renda Líquida",    _brl(st.get("media_renda")))
+            + _row("Valor Contratado", _brl(st.get("media_valor")))
+            + _row("Prazo",            f"{st['media_prazo']:.0f} meses" if st.get("media_prazo") else "—")
+            + _row("Taxa Mensal",      f"{st['media_taxa']:.2f}%" if st.get("media_taxa") else "—")
+        )
+        pj_rows = (
+            _hdr_row("Dados da empresa")
+            + _row("Nº Funcionários", _num(st.get("num_funcionarios")))
+            + _row("Faturamento",     _brl(st.get("faturamento")))
+            + _row("Dívidas Ativas",  _brl(st.get("dividas_ativas")))
+            + _row("Capital Social",  _brl(st.get("capital_social")))
+        )
+
+        has_detail = st and any(
+            st.get(k) is not None
+            for k in ("media_tempo","media_renda","media_valor","media_prazo","media_taxa",
+                       "num_funcionarios","faturamento","dividas_ativas","capital_social")
+        )
+
+        if has_detail:
+            name_cell = (
+                f'<details style="cursor:pointer">'
+                f'<summary style="list-style:none;display:flex;align-items:center;gap:6px">'
+                f'<span style="font-size:9px;color:#64748b">&#9654;</span>{emp}'
+                f'</summary>'
+                f'<div style="margin:6px 0 4px 14px">'
+                f'<table style="width:100%;border-collapse:collapse">'
+                f'<tbody>{fin_rows}{pj_rows}</tbody>'
+                f'</table></div>'
+                f'</details>'
+            )
+        else:
+            name_cell = emp
+
+        rows.append(
+            f'<tr class="{rc}">'
+            f'<td class="c" style="color:#64748b;width:28px">{i+1}</td>'
+            f'<td class="wrap">{name_cell}</td>'
+            f'<td class="r">{_nbr(cnt)}</td>'
+            f'<td class="r" style="color:#94a3b8">{pct}</td>'
+            f'</tr>'
+        )
+
     thead = '<thead><tr><th class="c">#</th><th>Razão Social</th><th class="r">Leads</th><th class="r">%</th></tr></thead>'
     return (
         '<div class="dtbl-wrap"><table class="dtbl">'
@@ -2560,10 +2688,11 @@ try:
     
     with col_e:
         emp_ap = agg.get("top_empregadores", {})
+        emp_ap_stats = agg.get("emp_ap_stats", {})
         fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
         if fig:
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        tbl = _html_tabela_ranking(emp_ap, "Razão Social", n_ap)
+        tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
         if tbl:
             st.markdown(tbl, unsafe_allow_html=True)
     
