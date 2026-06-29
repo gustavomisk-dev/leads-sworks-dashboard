@@ -1677,10 +1677,10 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div>
         <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
     </div>
-    <div class="kpi-row">
-      <div class="kpi-card" style="flex:1"><div class="kpi-label">Taxa média</div>
+    <div class="kpi-row" style="justify-content:center">
+      <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-      <div class="kpi-card" style="flex:1"><div class="kpi-label">Projeção de Desembolso</div>
+      <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
         <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">{_proj_sub}</div></div>
     </div>
     """
