@@ -2184,9 +2184,21 @@ try:
             _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
             len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
         )
-        time.sleep(_TV_INTERVAL_S)
-        st.session_state["tv_slide"] = (_tv_slide + 1) % _TV_N_SLIDES
-        st.rerun()
+        _tv_now = time.time()
+        if st.session_state.get("tv_slide_at_start") != _tv_slide:
+            # Primeira renderização deste slide: rerun imediato para enviar frame
+            # completo ao browser e remover elementos antigos do DOM.
+            st.session_state["tv_slide_start"] = _tv_now
+            st.session_state["tv_slide_at_start"] = _tv_slide
+            st.rerun()
+        else:
+            # Segunda renderização: DOM já está limpo. Aguarda o tempo restante.
+            _tv_remaining = max(0.0, _TV_INTERVAL_S - (_tv_now - st.session_state["tv_slide_start"]))
+            time.sleep(_tv_remaining)
+            st.session_state["tv_slide"] = (_tv_slide + 1) % _TV_N_SLIDES
+            st.session_state.pop("tv_slide_start", None)
+            st.session_state.pop("tv_slide_at_start", None)
+            st.rerun()
     
     # ── Saída de modo TV: sai do fullscreen via JS ────────────────────────────────
     else:
