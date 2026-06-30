@@ -289,7 +289,7 @@ def listar_datas() -> list:
     url = f"https://api.github.com/repos/{_REPO}/contents/dados"
     r = requests.get(url, headers=_HEADERS_JSON, timeout=15)
     if r.status_code != 200:
-        return []
+        raise RuntimeError(f"GitHub API retornou {r.status_code}")
     datas = []
     for arq in r.json():
         nome = arq.get("name", "")
@@ -302,12 +302,9 @@ def listar_datas() -> list:
 def carregar_dia(dia_str: str) -> dict:
     url = f"https://api.github.com/repos/{_REPO}/contents/dados/{dia_str}.json"
     r = requests.get(url, headers=_HEADERS_RAW, timeout=15)
-    if r.status_code == 200:
-        try:
-            return json.loads(r.text)
-        except Exception:
-            pass
-    return {}
+    if r.status_code != 200:
+        raise RuntimeError(f"GitHub API retornou {r.status_code}")
+    return json.loads(r.text)
 
 # ── Agregacao ─────────────────────────────────────────────────────────────────
 
