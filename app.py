@@ -2070,7 +2070,12 @@ try:
     data_min = datetime.strptime(datas[0],  "%Y%m%d").date()
     data_max = datetime.strptime(datas[-1], "%Y%m%d").date()
     d_ini_default = data_max
-    
+
+    # _slot: container exclusivo do dashboard normal.
+    # Em modo TV, _slot.empty() remove todo conteúdo anterior deste container
+    # antes de renderizar os slides — elimina o ghosting do dashboard normal.
+    _slot = st.empty()
+
     # ── Modo TV: atalho completo ──────────────────────────────────────────────────
     if st.query_params.get("tv", "0") == "1":
         # Slide via session_state (não URL) → rerun via WebSocket, sem page reload, sem perder fullscreen
@@ -2081,6 +2086,7 @@ try:
         _tv_next   = (_tv_slide + 1) % _TV_N_SLIDES
     
         # CSS TV antecipado (evita flash antes de _render_tv_slide)
+        _slot.empty()  # remove dashboard normal do DOM antes de renderizar o slide
         st.markdown(_TV_CSS, unsafe_allow_html=True)
     
         # Tela cheia automática (melhor esforço — pode ser bloqueado sem gesto do usuário)
@@ -2211,517 +2217,518 @@ try:
         } catch(e) {}
         </script>
         """, height=0)
-    
-    # ── Header + seletor ──────────────────────────────────────────────────────────
-    
-    col_title, col_picker = st.columns([1, 1])
-    
-    with col_title:
-        _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
-        with _c_tit:
-            st.markdown(
-                '<div style="display:flex;align-items:flex-end;gap:4px;margin:4px 0 6px">'
-                '<svg viewBox="0 0 483 462" xmlns="http://www.w3.org/2000/svg" '
-                'style="height:44px;width:auto;flex-shrink:0;display:block;'
-                'margin-bottom:5px">'
-                '<path d="M400.738 373.763C392.772 365.797 377.074 359.276 365.814 '
-                '359.276H214.153C202.893 359.276 198.725 351.579 204.876 342.134L'
-                '224.641 311.882C230.792 302.471 229.313 288.252 221.38 280.286L'
-                '178.053 236.959C170.087 228.993 158.524 230.17 152.306 239.581L'
-                '18.191 443.14C12.0063 452.551 16.1406 460.215 27.4009 460.215H'
-                '466.753C478.014 460.215 480.703 453.694 472.736 445.728L400.738 '
-                '373.729V373.763Z" fill="#FEC52E"/>'
-                '<path d="M219.065 100.939C230.325 100.939 234.46 108.636 228.275 '
-                '118.014L197.889 164.131C191.704 173.543 193.15 187.727 201.116 '
-                '195.693L244.174 238.751C252.14 246.717 263.669 245.508 269.854 '
-                '236.096L412.944 17.1424C419.095 7.73085 414.927 0 403.667 0H'
-                '10.5652C-0.695032 0 -3.38405 6.52066 4.58217 14.4869L76.5807 '
-                '86.4856C84.547 94.4518 100.244 100.972 111.504 100.972H219.065V'
-                '100.939Z" fill="#FEC52E"/>'
-                '</svg>'
-                '<span style="font-size:28px;font-weight:700;line-height:1;'
-                'color:#e2e8f0;letter-spacing:-0.5px">ileads</span>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
-                f'até {data_max.strftime("%d/%m/%Y")}</div>',
-                unsafe_allow_html=True,
-            )
-        with _c_tv:
-            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-            if st.button("📺 Modo TV", use_container_width=True):
-                st.session_state["tv_slide"] = 0
-                st.query_params["tv"] = "1"
-                st.rerun()
-        with _c_out:
-            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-            if st.button("Sair", use_container_width=True):
-                _cookies.remove(_COOKIE_NAME)
-                for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
-                    st.session_state.pop(_k, None)
-                st.session_state["_cookie_checked"] = True  # evita tela preta pós-logout
-                st.session_state["_force_logout"] = True    # impede restore do cookie no mesmo rerun
-                st.rerun()
-    
-    with col_picker:
-        _cp_dat, _cp_ref = st.columns([4, 1])
-        with _cp_dat:
-            intervalo = st.date_input(
-                "Período de análise",
-                value=(d_ini_default, data_max),
-                min_value=data_min, max_value=data_max,
-                format="DD/MM/YYYY",
-            )
-        with _cp_ref:
-            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-            if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
-                carregar_dia.clear()
-                listar_datas.clear()
-                st.rerun()
-    
-    if isinstance(intervalo, (list, tuple)):
-        d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
-    else:
-        d_ini = d_fim = data_max
-    
-    datas_sel = [d for d in datas if d_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim]
-    n_dias    = len(datas_sel)
-    
-    if not datas_sel:
-        st.warning("Nenhum dado no período selecionado.")
-        st.stop()
-    
-    # ── Carrega e agrega ──────────────────────────────────────────────────────────
-    
-    with st.spinner(f"Carregando {n_dias} dia(s)..."):
-        dias_raw = [d for d in [carregar_dia(d) for d in datas_sel] if d]
-    
-    if not dias_raw:
-        st.warning("Sem dados para o período selecionado.")
-        st.stop()
-    
-    agg = agregar(dias_raw)
-    f   = agg["funil"]
-    fin = agg["financeiro"]
-    
-    periodo_label = (
-        d_ini.strftime("%d/%m/%Y") if d_ini == d_fim
-        else f"{d_ini.strftime('%d/%m/%Y')} — {d_fim.strftime('%d/%m/%Y')}"
-    )
-    
-    # ── KPIs ──────────────────────────────────────────────────────────────────────
-    
-    taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
-    vol      = fin.get("ValorContratacao", {})
-    vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
-    _pt_nm      = agg.get("projecao_tipos", {})
-    _proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
-    _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-    _proj_val   = sum(d["valor"]    for d in _pt_nm.values())
-    _proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
-    _proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
-    if _proj_val:
-        _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_iof_fmt = ("R$ " + f"{_proj_iof:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_kpi_sub = (
-            f"<span style='color:#64748b;font-size:0.82em'>"
-            f"Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
-            "</span>"
-        )
-    else:
-        _proj_val_fmt = "—"
-        _proj_kpi_sub = ""
-    
-    _prazo_d   = fin.get("Prazo", {})
-    _taxa_d    = fin.get("Taxa", {})
-    _parcela_d = fin.get("ValorParcela", {})
-    prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
-    ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
-    parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
-    taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
-    
-    _f_total_fmt = _nbr(f["total"])
-    _f_aprov_fmt = _nbr(f["aprovados"])
-    _f_term_fmt  = _nbr(f["terminais"])
-    _f_repro_fmt = _nbr(f["reprovados"])
-    _f_ag_fmt    = _nbr(_proj_cnt)
-    st.markdown(f"""
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Total de leads</div>
-        <div class="kpi-value">{_f_total_fmt}</div>
-        <div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Aprovados</div>
-        <div class="kpi-value">{_f_aprov_fmt}</div>
-        <div class="kpi-sub">taxa: {taxa}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Reprovados</div>
-        <div class="kpi-value">{_f_repro_fmt}</div>
-        <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Aguardando desembolso</div>
-        <div class="kpi-value">{_f_ag_fmt}</div>
-        <div class="kpi-sub">aprovados pendentes</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Volume aprovado</div>
-        <div class="kpi-value">{vol_s}</div>
-        <div class="kpi-sub">valor contratado total</div>
-      </div>
-    </div>
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Ticket médio do empréstimo</div>
-        <div class="kpi-value">{ticket_s}</div>
-        <div class="kpi-sub">valor contratado</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Ticket médio da parcela</div>
-        <div class="kpi-value">{parcela_s}</div>
-        <div class="kpi-sub">média pond. pelo prazo</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Taxa média</div>
-        <div class="kpi-value">{taxa_s}</div>
-        <div class="kpi-sub">contratos aprovados</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Prazo médio</div>
-        <div class="kpi-value">{prazo_s}</div>
-        <div class="kpi-sub">contratos aprovados</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Projeção de Desembolso</div>
-        <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
-        <div class="kpi-sub">{_proj_kpi_sub}</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # ── 1. Projeção de Desembolso ────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
-    
-    _TIPO_LABEL_MAP = {
-        "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
-        "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
-        "ASSINATURA":                "Aguardando CCB Único (Suspenso)",
-        "ENTREVISTA":                "Aguardando Entrevista Antifraude da Nuvidio (Suspenso)",
-        "FORMALIZACAO":              "Aguardando Aceite para Formalização (Suspenso)",
-        "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
-        "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
-        "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
-        "BLOQUEIO_TEMPORARIO":       "Aguardando 24h (Em Andamento)",
-        "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
-    }
-    
-    _pt_sec = agg.get("projecao_tipos", {})
-    if _pt_sec:
-        def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
-        def _n(v): return f"{v:,}".replace(",", ".")
-    
-        _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
-        _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
-        _t_val  = sum(d["valor"]    for d in _pt_sec.values())
-        _t_lib  = sum(d["liberado"] for d in _pt_sec.values())
-        _t_iof  = sum(d["iof"]      for d in _pt_sec.values())
-    
-        _rows = "".join(
-            f"<tr>"
-            f"<td class='pj-lbl'>{_TIPO_LABEL_MAP.get(ts, ts)}</td>"
-            f"<td class='pj-n'>{_n(d['count'])}</td>"
-            f"<td class='pj-n'>{_r(d['valor'])}</td>"
-            f"<td class='pj-n'>{_r(d['liberado'])}</td>"
-            f"<td class='pj-n'>{_r(d['iof'])}</td>"
-            f"</tr>"
-            for ts, d in _sorted
-        )
-    
-        st.markdown(f"""
-    <style>
-    .pj-wrap{{overflow-x:auto;margin:6px 0 18px}}
-    .pj-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
-    .pj-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
-                text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
-    .pj-tbl th.pj-n{{text-align:right}}
-    .pj-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
-    .pj-lbl{{color:#cbd5e1;white-space:nowrap}}
-    .pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
-    .pj-tbl tr:hover td{{background:#1a1815}}
-    .pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
-                font-weight:700;border-top:2px solid #272420}}
-    .pj-tot .pj-lbl{{color:#FEC52E}}
-    </style>
-    <div class="pj-wrap">
-    <table class="pj-tbl">
-      <thead><tr>
-        <th>Etapa</th>
-        <th class="pj-n">Leads</th>
-        <th class="pj-n">Valor Total</th>
-        <th class="pj-n">Liberado</th>
-        <th class="pj-n">IOF</th>
-      </tr></thead>
-      <tbody>
-        {_rows}
-        <tr class="pj-tot">
-          <td class="pj-lbl">Total</td>
-          <td class="pj-n">{_n(_t_cnt)}</td>
-          <td class="pj-n">{_r(_t_val)}</td>
-          <td class="pj-n">{_r(_t_lib)}</td>
-          <td class="pj-n">{_r(_t_iof)}</td>
-        </tr>
-      </tbody>
-    </table>
-    </div>
-    """, unsafe_allow_html=True)
-    else:
-        st.markdown(
-            "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
-            unsafe_allow_html=True,
-        )
-    
-    # ── 2. Distribuição por Status ────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">2. Distribuição por Status</div>', unsafe_allow_html=True)
-    
-    col_d, col_f = st.columns(2)
-    with col_d:
-        fig = _fig_donut(f.get("_d_status", {}))
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    with col_f:
-        fig = _fig_funil_rico(f)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    
-    # ── 2. Evolução Temporal ──────────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">3. Evolução Temporal</div>', unsafe_allow_html=True)
-    
-    fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    
-    # ── 3. Perfil Financeiro — Aprovados ─────────────────────────────────────────
-    
-    st.markdown('<div class="sec">4. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
-    
-    html_fin = _html_tabela_financeira(fin)
-    if html_fin:
-        st.markdown(html_fin, unsafe_allow_html=True)
-        if n_dias > 1:
-            st.caption("*Mediana = média ponderada das medianas diárias")
-    
-    fig = _fig_histograma(agg.get("valores_contratacao", []))
-    if fig:
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    
-    # ── 4. Etapa de Reprovação ────────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">5. Etapa de Reprovação</div>', unsafe_allow_html=True)
-    
-    n_rep    = f.get("reprovados", 0)
-    etapas_d = agg.get("etapas", {})
-    etapa_motivos_d = agg.get("etapa_motivos", {})
-    
-    # Diagrama do Workflow
-    diagrama_html = _html_diagrama(etapas_d, n_rep)
-    if diagrama_html:
-        st.markdown(diagrama_html, unsafe_allow_html=True)
-        st.markdown("")
-    
-    # 3 abas: Visão Geral | Visão Detalhada | Visão de Funil
-    if etapas_d and n_rep > 0:
-        tab_g, tab_d, tab_f = st.tabs(["Visão Geral", "Visão Detalhada", "Visão de Funil"])
-    
-        with tab_g:
-            _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
-            ordered = sorted(
-                [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
-                key=lambda x: _order_idx.get(x[0], 999)
-            )
-            max_v = max(v for _, v in ordered) if ordered else 1
-            y  = [e for e, _ in reversed(ordered)]
-            x  = [v for _, v in reversed(ordered)]
-            ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
-            shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
-    
-            fig_g = go.Figure(go.Bar(
-                x=x, y=y, orientation="h",
-                marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
-                text=[f"{_nbr(v)} ({p})" for v, p in zip(x, ps)],
-                textposition="inside", insidetextanchor="end",
-                textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
-                hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
-            ))
-            h = max(300, len(ordered) * 40 + 80)
-            fig_g.update_layout(
-                template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                title=dict(text="Reprovados por Etapa de Workflow", font=_TF),
-                xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-                yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
-                uniformtext_minsize=9, uniformtext_mode="hide",
-                margin=dict(t=50, b=30, l=20, r=40), height=h,
-            )
-            st.plotly_chart(fig_g, use_container_width=True, config=_CONF)
-    
-            tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
-            if tbl_g:
-                st.markdown(tbl_g, unsafe_allow_html=True)
-    
-        with tab_d:
-            fig_d = _fig_etapas_split(etapas_d, n_rep)
-            if fig_d:
-                st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
-    
-            tbl_d = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
-            if tbl_d:
-                st.markdown(tbl_d, unsafe_allow_html=True)
-    
-        with tab_f:
-            result_f = _fig_funil_etapa(etapas_d, n_rep)
-            if result_f:
-                fig_f, rows_f = result_f
-                st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
-                tbl_resumo = _html_tabela_resumo_funil(rows_f)
-                if tbl_resumo:
-                    st.markdown(tbl_resumo, unsafe_allow_html=True)
-    else:
-        st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
-    
-    # ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">6. Motivos de Reprovação</div>', unsafe_allow_html=True)
-    
-    col_m1, col_m2 = st.columns(2)
-    
-    with col_m1:
-        fig = _fig_barras_h(agg.get("top_motivos", {}),
-                            "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de motivos.")
-    
-    with col_m2:
-        mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
-        if mot_det:
-            n_det = sum(mot_det.values())
-            fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
-                                pct_base=n_det)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
-    
-    # ── 6. Bloqueios ──────────────────────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">7. Bloqueios por Tipo</div>', unsafe_allow_html=True)
-    
-    fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
-    if fig:
-        col_bl, _ = st.columns([1, 1])
-        with col_bl:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-    else:
-        st.info("Sem dados de bloqueios.")
-    
-    # ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
-    
-    st.markdown('<div class="sec">8. Segmentação — Reprovados</div>', unsafe_allow_html=True)
-    
-    col_s1, col_s2 = st.columns(2)
-    
-    with col_s1:
-        emp_rep = agg.get("top_emp_rep", {})
-        emp_mot = agg.get("emp_motivos", {})
-        if emp_rep:
-            fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
-            if _tbl_html:
-                st.markdown(_tbl_html, unsafe_allow_html=True)
-        else:
-            st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
-    
-    with col_s2:
-        ufs = agg.get("top_ufs", {})
-        if ufs:
-            n_ufs = sum(ufs.values())
-            fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
-        else:
-            st.info("Sem dados de UF dos reprovados.")
-    
-    col_s3, col_s4 = st.columns(2)
-    
-    with col_s3:
-        cnaes = agg.get("top_cnaes", {})
-        if cnaes:
-            n_cnae = sum(cnaes.values())
-            fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
-                                pct_base=n_cnae)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
-        else:
-            st.info("Sem dados de CNAE bloqueado.")
-    
-    with col_s4:
-        cbos_rep = agg.get("top_cbos_rep", {})
-        if cbos_rep:
-            n_cbo_r = sum(cbos_rep.values())
-            fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
-                                pct_base=n_cbo_r)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-            tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
-        else:
-            st.info("Sem dados de CBO dos reprovados.")
-    
-    # ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
-    
-    st.markdown('<div class="sec">9. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
-    
-    n_ap = f.get("aprovados", 0)
-    
-    col_e, col_c = st.columns(2)
-    
-    with col_e:
-        emp_ap = agg.get("top_empregadores", {})
-        emp_ap_stats = agg.get("emp_ap_stats", {})
-        fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
-        if tbl:
-            st.markdown(tbl, unsafe_allow_html=True)
-    
-    with col_c:
-        cbos_ap = agg.get("top_cbos", {})
-        fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
-        if tbl:
-            st.markdown(tbl, unsafe_allow_html=True)
+        with _slot.container():
 
+            # ── Header + seletor ──────────────────────────────────────────────────────────
+            
+            col_title, col_picker = st.columns([1, 1])
+            
+            with col_title:
+                _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
+                with _c_tit:
+                    st.markdown(
+                        '<div style="display:flex;align-items:flex-end;gap:4px;margin:4px 0 6px">'
+                        '<svg viewBox="0 0 483 462" xmlns="http://www.w3.org/2000/svg" '
+                        'style="height:44px;width:auto;flex-shrink:0;display:block;'
+                        'margin-bottom:5px">'
+                        '<path d="M400.738 373.763C392.772 365.797 377.074 359.276 365.814 '
+                        '359.276H214.153C202.893 359.276 198.725 351.579 204.876 342.134L'
+                        '224.641 311.882C230.792 302.471 229.313 288.252 221.38 280.286L'
+                        '178.053 236.959C170.087 228.993 158.524 230.17 152.306 239.581L'
+                        '18.191 443.14C12.0063 452.551 16.1406 460.215 27.4009 460.215H'
+                        '466.753C478.014 460.215 480.703 453.694 472.736 445.728L400.738 '
+                        '373.729V373.763Z" fill="#FEC52E"/>'
+                        '<path d="M219.065 100.939C230.325 100.939 234.46 108.636 228.275 '
+                        '118.014L197.889 164.131C191.704 173.543 193.15 187.727 201.116 '
+                        '195.693L244.174 238.751C252.14 246.717 263.669 245.508 269.854 '
+                        '236.096L412.944 17.1424C419.095 7.73085 414.927 0 403.667 0H'
+                        '10.5652C-0.695032 0 -3.38405 6.52066 4.58217 14.4869L76.5807 '
+                        '86.4856C84.547 94.4518 100.244 100.972 111.504 100.972H219.065V'
+                        '100.939Z" fill="#FEC52E"/>'
+                        '</svg>'
+                        '<span style="font-size:28px;font-weight:700;line-height:1;'
+                        'color:#e2e8f0;letter-spacing:-0.5px">ileads</span>'
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="periodo">Dados de {data_min.strftime("%d/%m/%Y")} '
+                        f'até {data_max.strftime("%d/%m/%Y")}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with _c_tv:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("📺 Modo TV", use_container_width=True):
+                        st.session_state["tv_slide"] = 0
+                        st.query_params["tv"] = "1"
+                        st.rerun()
+                with _c_out:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("Sair", use_container_width=True):
+                        _cookies.remove(_COOKIE_NAME)
+                        for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
+                            st.session_state.pop(_k, None)
+                        st.session_state["_cookie_checked"] = True  # evita tela preta pós-logout
+                        st.session_state["_force_logout"] = True    # impede restore do cookie no mesmo rerun
+                        st.rerun()
+            
+            with col_picker:
+                _cp_dat, _cp_ref = st.columns([4, 1])
+                with _cp_dat:
+                    intervalo = st.date_input(
+                        "Período de análise",
+                        value=(d_ini_default, data_max),
+                        min_value=data_min, max_value=data_max,
+                        format="DD/MM/YYYY",
+                    )
+                with _cp_ref:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
+                        carregar_dia.clear()
+                        listar_datas.clear()
+                        st.rerun()
+            
+            if isinstance(intervalo, (list, tuple)):
+                d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
+            else:
+                d_ini = d_fim = data_max
+            
+            datas_sel = [d for d in datas if d_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim]
+            n_dias    = len(datas_sel)
+            
+            if not datas_sel:
+                st.warning("Nenhum dado no período selecionado.")
+                st.stop()
+            
+            # ── Carrega e agrega ──────────────────────────────────────────────────────────
+            
+            with st.spinner(f"Carregando {n_dias} dia(s)..."):
+                dias_raw = [d for d in [carregar_dia(d) for d in datas_sel] if d]
+            
+            if not dias_raw:
+                st.warning("Sem dados para o período selecionado.")
+                st.stop()
+            
+            agg = agregar(dias_raw)
+            f   = agg["funil"]
+            fin = agg["financeiro"]
+            
+            periodo_label = (
+                d_ini.strftime("%d/%m/%Y") if d_ini == d_fim
+                else f"{d_ini.strftime('%d/%m/%Y')} — {d_fim.strftime('%d/%m/%Y')}"
+            )
+            
+            # ── KPIs ──────────────────────────────────────────────────────────────────────
+            
+            taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
+            vol      = fin.get("ValorContratacao", {})
+            vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
+            _pt_nm      = agg.get("projecao_tipos", {})
+            _proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
+            _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
+            _proj_val   = sum(d["valor"]    for d in _pt_nm.values())
+            _proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
+            _proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
+            if _proj_val:
+                _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                _proj_iof_fmt = ("R$ " + f"{_proj_iof:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                _proj_kpi_sub = (
+                    f"<span style='color:#64748b;font-size:0.82em'>"
+                    f"Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
+                    "</span>"
+                )
+            else:
+                _proj_val_fmt = "—"
+                _proj_kpi_sub = ""
+            
+            _prazo_d   = fin.get("Prazo", {})
+            _taxa_d    = fin.get("Taxa", {})
+            _parcela_d = fin.get("ValorParcela", {})
+            prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+            ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
+            parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
+            taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
+            
+            _f_total_fmt = _nbr(f["total"])
+            _f_aprov_fmt = _nbr(f["aprovados"])
+            _f_term_fmt  = _nbr(f["terminais"])
+            _f_repro_fmt = _nbr(f["reprovados"])
+            _f_ag_fmt    = _nbr(_proj_cnt)
+            st.markdown(f"""
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Total de leads</div>
+                <div class="kpi-value">{_f_total_fmt}</div>
+                <div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Aprovados</div>
+                <div class="kpi-value">{_f_aprov_fmt}</div>
+                <div class="kpi-sub">taxa: {taxa}</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Reprovados</div>
+                <div class="kpi-value">{_f_repro_fmt}</div>
+                <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Aguardando desembolso</div>
+                <div class="kpi-value">{_f_ag_fmt}</div>
+                <div class="kpi-sub">aprovados pendentes</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Volume aprovado</div>
+                <div class="kpi-value">{vol_s}</div>
+                <div class="kpi-sub">valor contratado total</div>
+              </div>
+            </div>
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Ticket médio do empréstimo</div>
+                <div class="kpi-value">{ticket_s}</div>
+                <div class="kpi-sub">valor contratado</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Ticket médio da parcela</div>
+                <div class="kpi-value">{parcela_s}</div>
+                <div class="kpi-sub">média pond. pelo prazo</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Taxa média</div>
+                <div class="kpi-value">{taxa_s}</div>
+                <div class="kpi-sub">contratos aprovados</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Prazo médio</div>
+                <div class="kpi-value">{prazo_s}</div>
+                <div class="kpi-sub">contratos aprovados</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Projeção de Desembolso</div>
+                <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
+                <div class="kpi-sub">{_proj_kpi_sub}</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # ── 1. Projeção de Desembolso ────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
+            
+            _TIPO_LABEL_MAP = {
+                "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
+                "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
+                "ASSINATURA":                "Aguardando CCB Único (Suspenso)",
+                "ENTREVISTA":                "Aguardando Entrevista Antifraude da Nuvidio (Suspenso)",
+                "FORMALIZACAO":              "Aguardando Aceite para Formalização (Suspenso)",
+                "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
+                "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
+                "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
+                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h (Em Andamento)",
+                "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
+            }
+            
+            _pt_sec = agg.get("projecao_tipos", {})
+            if _pt_sec:
+                def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+                def _n(v): return f"{v:,}".replace(",", ".")
+            
+                _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
+                _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
+                _t_val  = sum(d["valor"]    for d in _pt_sec.values())
+                _t_lib  = sum(d["liberado"] for d in _pt_sec.values())
+                _t_iof  = sum(d["iof"]      for d in _pt_sec.values())
+            
+                _rows = "".join(
+                    f"<tr>"
+                    f"<td class='pj-lbl'>{_TIPO_LABEL_MAP.get(ts, ts)}</td>"
+                    f"<td class='pj-n'>{_n(d['count'])}</td>"
+                    f"<td class='pj-n'>{_r(d['valor'])}</td>"
+                    f"<td class='pj-n'>{_r(d['liberado'])}</td>"
+                    f"<td class='pj-n'>{_r(d['iof'])}</td>"
+                    f"</tr>"
+                    for ts, d in _sorted
+                )
+            
+                st.markdown(f"""
+            <style>
+            .pj-wrap{{overflow-x:auto;margin:6px 0 18px}}
+            .pj-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
+            .pj-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
+                        text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
+            .pj-tbl th.pj-n{{text-align:right}}
+            .pj-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
+            .pj-lbl{{color:#cbd5e1;white-space:nowrap}}
+            .pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+            .pj-tbl tr:hover td{{background:#1a1815}}
+            .pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
+                        font-weight:700;border-top:2px solid #272420}}
+            .pj-tot .pj-lbl{{color:#FEC52E}}
+            </style>
+            <div class="pj-wrap">
+            <table class="pj-tbl">
+              <thead><tr>
+                <th>Etapa</th>
+                <th class="pj-n">Leads</th>
+                <th class="pj-n">Valor Total</th>
+                <th class="pj-n">Liberado</th>
+                <th class="pj-n">IOF</th>
+              </tr></thead>
+              <tbody>
+                {_rows}
+                <tr class="pj-tot">
+                  <td class="pj-lbl">Total</td>
+                  <td class="pj-n">{_n(_t_cnt)}</td>
+                  <td class="pj-n">{_r(_t_val)}</td>
+                  <td class="pj-n">{_r(_t_lib)}</td>
+                  <td class="pj-n">{_r(_t_iof)}</td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+            """, unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
+                    unsafe_allow_html=True,
+                )
+            
+            # ── 2. Distribuição por Status ────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">2. Distribuição por Status</div>', unsafe_allow_html=True)
+            
+            col_d, col_f = st.columns(2)
+            with col_d:
+                fig = _fig_donut(f.get("_d_status", {}))
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            with col_f:
+                fig = _fig_funil_rico(f)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            
+            # ── 2. Evolução Temporal ──────────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">3. Evolução Temporal</div>', unsafe_allow_html=True)
+            
+            fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            
+            # ── 3. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            
+            st.markdown('<div class="sec">4. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            
+            html_fin = _html_tabela_financeira(fin)
+            if html_fin:
+                st.markdown(html_fin, unsafe_allow_html=True)
+                if n_dias > 1:
+                    st.caption("*Mediana = média ponderada das medianas diárias")
+            
+            fig = _fig_histograma(agg.get("valores_contratacao", []))
+            if fig:
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            
+            # ── 4. Etapa de Reprovação ────────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">5. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            
+            n_rep    = f.get("reprovados", 0)
+            etapas_d = agg.get("etapas", {})
+            etapa_motivos_d = agg.get("etapa_motivos", {})
+            
+            # Diagrama do Workflow
+            diagrama_html = _html_diagrama(etapas_d, n_rep)
+            if diagrama_html:
+                st.markdown(diagrama_html, unsafe_allow_html=True)
+                st.markdown("")
+            
+            # 3 abas: Visão Geral | Visão Detalhada | Visão de Funil
+            if etapas_d and n_rep > 0:
+                tab_g, tab_d, tab_f = st.tabs(["Visão Geral", "Visão Detalhada", "Visão de Funil"])
+            
+                with tab_g:
+                    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+                    ordered = sorted(
+                        [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
+                        key=lambda x: _order_idx.get(x[0], 999)
+                    )
+                    max_v = max(v for _, v in ordered) if ordered else 1
+                    y  = [e for e, _ in reversed(ordered)]
+                    x  = [v for _, v in reversed(ordered)]
+                    ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
+                    shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
+            
+                    fig_g = go.Figure(go.Bar(
+                        x=x, y=y, orientation="h",
+                        marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
+                        text=[f"{_nbr(v)} ({p})" for v, p in zip(x, ps)],
+                        textposition="inside", insidetextanchor="end",
+                        textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+                        hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
+                    ))
+                    h = max(300, len(ordered) * 40 + 80)
+                    fig_g.update_layout(
+                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                        title=dict(text="Reprovados por Etapa de Workflow", font=_TF),
+                        xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+                        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
+                        uniformtext_minsize=9, uniformtext_mode="hide",
+                        margin=dict(t=50, b=30, l=20, r=40), height=h,
+                    )
+                    st.plotly_chart(fig_g, use_container_width=True, config=_CONF)
+            
+                    tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
+                    if tbl_g:
+                        st.markdown(tbl_g, unsafe_allow_html=True)
+            
+                with tab_d:
+                    fig_d = _fig_etapas_split(etapas_d, n_rep)
+                    if fig_d:
+                        st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
+            
+                    tbl_d = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
+                    if tbl_d:
+                        st.markdown(tbl_d, unsafe_allow_html=True)
+            
+                with tab_f:
+                    result_f = _fig_funil_etapa(etapas_d, n_rep)
+                    if result_f:
+                        fig_f, rows_f = result_f
+                        st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
+                        tbl_resumo = _html_tabela_resumo_funil(rows_f)
+                        if tbl_resumo:
+                            st.markdown(tbl_resumo, unsafe_allow_html=True)
+            else:
+                st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
+            
+            # ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">6. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            
+            col_m1, col_m2 = st.columns(2)
+            
+            with col_m1:
+                fig = _fig_barras_h(agg.get("top_motivos", {}),
+                                    "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                else:
+                    st.info("Sem dados de motivos.")
+            
+            with col_m2:
+                mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
+                if mot_det:
+                    n_det = sum(mot_det.values())
+                    fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
+                                        pct_base=n_det)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                else:
+                    st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
+            
+            # ── 6. Bloqueios ──────────────────────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">7. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            
+            fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
+            if fig:
+                col_bl, _ = st.columns([1, 1])
+                with col_bl:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            else:
+                st.info("Sem dados de bloqueios.")
+            
+            # ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
+            
+            st.markdown('<div class="sec">8. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            
+            col_s1, col_s2 = st.columns(2)
+            
+            with col_s1:
+                emp_rep = agg.get("top_emp_rep", {})
+                emp_mot = agg.get("emp_motivos", {})
+                if emp_rep:
+                    fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
+                    if _tbl_html:
+                        st.markdown(_tbl_html, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
+            
+            with col_s2:
+                ufs = agg.get("top_ufs", {})
+                if ufs:
+                    n_ufs = sum(ufs.values())
+                    fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de UF dos reprovados.")
+            
+            col_s3, col_s4 = st.columns(2)
+            
+            with col_s3:
+                cnaes = agg.get("top_cnaes", {})
+                if cnaes:
+                    n_cnae = sum(cnaes.values())
+                    fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
+                                        pct_base=n_cnae)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de CNAE bloqueado.")
+            
+            with col_s4:
+                cbos_rep = agg.get("top_cbos_rep", {})
+                if cbos_rep:
+                    n_cbo_r = sum(cbos_rep.values())
+                    fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
+                                        pct_base=n_cbo_r)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de CBO dos reprovados.")
+            
+            # ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
+            
+            st.markdown('<div class="sec">9. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            
+            n_ap = f.get("aprovados", 0)
+            
+            col_e, col_c = st.columns(2)
+            
+            with col_e:
+                emp_ap = agg.get("top_empregadores", {})
+                emp_ap_stats = agg.get("emp_ap_stats", {})
+                fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+            
+            with col_c:
+                cbos_ap = agg.get("top_cbos", {})
+                fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+        
 except Exception:
     st.warning(
         "⚠️ **Plataforma em manutenção** — houve um erro inesperado. "
