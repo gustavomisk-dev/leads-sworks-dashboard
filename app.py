@@ -269,7 +269,8 @@ footer{display:none!important}
 [data-testid="stDeployButton"],[data-testid="stStatusWidget"]{display:none!important}
 section.main>.block-container{
     padding:0 1.5rem 2rem!important;max-width:100%!important;
-    max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important}
+    max-height:100vh!important;overflow:hidden!important;background:#0f0e0b!important;
+    opacity:1!important}
 [data-testid="column"],[data-testid="stVerticalBlock"]{background:#0f0e0b!important}
 iframe{height:0!important;min-height:0!important;overflow:hidden!important}
 section.main>.block-container>[data-testid="stVerticalBlock"]{margin-top:-2rem!important}
@@ -1584,13 +1585,10 @@ def _tv_nav(slide: int) -> None:
         for i in range(_TV_N_SLIDES)
     )
     _ap = f"tvp{slide}"
-    _af = f"tvf{slide}"
     st.markdown(f"""
     <style>
       @keyframes {_ap}{{from{{width:0%}}to{{width:100%}}}}
-      @keyframes {_af}{{from{{opacity:0}}to{{opacity:1}}}}
       body,html{{background:#0f0e0b!important}}
-      section.main>.block-container{{animation:{_af} .4s ease}}
     </style>
     <div style="position:fixed;bottom:0;left:0;right:0;height:3px;background:#1a1814;z-index:9999">
       <div style="height:100%;background:#FEC52E;
@@ -2173,8 +2171,7 @@ try:
     
         _datas_sel_tv = [d for d in datas
                          if _d_ini_tv <= datetime.strptime(d, "%Y%m%d").date() <= data_max]
-        with st.spinner("Carregando..."):
-            _dias_raw_tv = [d for d in [carregar_dia(d) for d in _datas_sel_tv] if d]
+        _dias_raw_tv = [d for d in [carregar_dia(d) for d in _datas_sel_tv] if d]
         if not _dias_raw_tv:
             st.warning("Sem dados para o período selecionado.")
             st.stop()
