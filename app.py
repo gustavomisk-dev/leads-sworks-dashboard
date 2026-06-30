@@ -527,6 +527,8 @@ def agregar(dias_raw: list) -> dict:
         "assinado_valor":       round(assinado_valor, 2),
         "assinado_liberado":    round(assinado_liberado, 2),
         "assinado_iof":         round(assinado_iof, 2),
+        "pipeline_financeiro":  dias_raw[-1].get("pipeline_financeiro", {}) if dias_raw else {},
+        "duplicatas_cpf":       dias_raw[-1].get("duplicatas_cpf", []) if dias_raw else [],
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -1572,6 +1574,48 @@ def _html_tabela_financeira(fin: dict) -> str:
     )
 
 
+def _html_tabela_pipeline(fin: dict) -> str:
+    _brl = lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    campos = [
+        ("ValorContratacao",  "Valor Contratado",         _brl),
+        ("RendaLiquida",      "Renda Líquida",            _brl),
+        ("Prazo",             "Prazo (meses)",             lambda x: f"{x:.0f}"),
+        ("Taxa",              "Taxa Mensal (%)",           lambda x: f"{x:.2f}"),
+        ("TempoEmpregoMeses", "Tempo de Emprego (meses)", lambda x: f"{x:.2f}"),
+    ]
+    rows_html = []
+    for campo, label, fmt in campos:
+        v = fin.get(campo, {})
+        if v.get("n", 0) < 1:
+            continue
+        total_s = fmt(v["total"]) if campo == "ValorContratacao" else "—"
+        rc = "g0" if len(rows_html) % 2 == 0 else "g1"
+        rows_html.append(
+            f'<tr class="{rc}">'
+            f'<td>{label}</td>'
+            f'<td class="r">{_nbr(v["n"])}</td>'
+            f'<td class="r">{fmt(v["media"])}</td>'
+            f'<td class="r">{fmt(v["mediana"])}</td>'
+            f'<td class="r">{fmt(v["min"])}</td>'
+            f'<td class="r">{fmt(v["max"])}</td>'
+            f'<td class="r">{total_s}</td>'
+            f'</tr>'
+        )
+    if not rows_html:
+        return ""
+    return (
+        '<div class="dtbl-title">Estatísticas Financeiras — Aguardando Desembolso</div>'
+        '<div class="dtbl-wrap"><table class="dtbl">'
+        '<thead><tr>'
+        '<th>Campo</th><th class="r">N</th><th class="r">Média</th>'
+        '<th class="r">Mediana*</th><th class="r">Mínimo</th><th class="r">Máximo</th>'
+        '<th class="r">Total</th>'
+        '</tr></thead>'
+        '<tbody>' + "".join(rows_html) + '</tbody>'
+        '</table></div>'
+    )
+
+
 # ── Modo TV ───────────────────────────────────────────────────────────────────
 
 def _tv_nav(slide: int) -> None:
@@ -2491,9 +2535,57 @@ try:
                     unsafe_allow_html=True,
                 )
             
-            # ── 2. Distribuição por Status ────────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">2. Distribuição por Status</div>', unsafe_allow_html=True)
+            # ── 2. Leads Aguardando Desembolso ───────────────────────────────────────────
+
+            st.markdown('<div class="sec">2. Leads Aguardando Desembolso</div>', unsafe_allow_html=True)
+
+            _pf = agg.get("pipeline_financeiro", {})
+            _dup = agg.get("duplicatas_cpf", [])
+
+            html_pf = _html_tabela_pipeline(_pf)
+            if html_pf:
+                st.markdown(html_pf, unsafe_allow_html=True)
+                if n_dias > 1:
+                    st.caption("*Dados do dia mais recente selecionado")
+
+            if _dup:
+                _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                _dup_rows = []
+                for _i, _item in enumerate(_dup):
+                    _rc = "g0" if _i % 2 == 0 else "g1"
+                    _conts = "<br>".join(
+                        f'{c["codigo"] or c["identificador"][:8]} — {c["etapa"]} — {_brl2(c["valor"])}'
+                        for c in _item["contratos"]
+                    )
+                    _dup_rows.append(
+                        f'<tr class="{_rc}">'
+                        f'<td>{_item["cpf"]}</td>'
+                        f'<td>{_item["nome"]}</td>'
+                        f'<td class="r">{len(_item["contratos"])}</td>'
+                        f'<td class="r">{_brl2(_item["total"])}</td>'
+                        f'<td style="font-size:.82em;line-height:1.5">{_conts}</td>'
+                        f'</tr>'
+                    )
+                _dup_html = (
+                    '<div class="dtbl-title" style="color:#f59e0b">&#9888; CPFs com múltiplos contratos &mdash; total &gt; R$&nbsp;15k</div>'
+                    '<div class="dtbl-wrap"><table class="dtbl">'
+                    '<thead><tr>'
+                    '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
+                    '<th class="r">Total</th><th>Detalhes</th>'
+                    '</tr></thead>'
+                    '<tbody>' + "".join(_dup_rows) + '</tbody>'
+                    '</table></div>'
+                )
+                st.markdown(_dup_html, unsafe_allow_html=True)
+            elif _pf:
+                st.markdown(
+                    "<p style='color:#475569;font-size:.88em'>Nenhum CPF com múltiplos contratos acima de R$&nbsp;15k.</p>",
+                    unsafe_allow_html=True,
+                )
+
+            # ── 3. Distribuição por Status ────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">3. Distribuição por Status</div>', unsafe_allow_html=True)
             
             col_d, col_f = st.columns(2)
             with col_d:
@@ -2505,17 +2597,17 @@ try:
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 2. Evolução Temporal ──────────────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">3. Evolução Temporal</div>', unsafe_allow_html=True)
+            # ── 4. Evolução Temporal ──────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">4. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 3. Perfil Financeiro — Aprovados ─────────────────────────────────────────
-            
-            st.markdown('<div class="sec">4. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            # ── 5. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+
+            st.markdown('<div class="sec">5. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -2527,9 +2619,9 @@ try:
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 4. Etapa de Reprovação ────────────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">5. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            # ── 6. Etapa de Reprovação ────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">6. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -2602,7 +2694,7 @@ try:
             
             # ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
             
-            st.markdown('<div class="sec">6. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -2627,7 +2719,7 @@ try:
             
             # ── 6. Bloqueios ──────────────────────────────────────────────────────────────
             
-            st.markdown('<div class="sec">7. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">8. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
             if fig:
@@ -2639,7 +2731,7 @@ try:
             
             # ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
             
-            st.markdown('<div class="sec">8. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">9. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -2701,7 +2793,7 @@ try:
             
             # ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
             
-            st.markdown('<div class="sec">9. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">10. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
