@@ -1683,7 +1683,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Reprovados</div>
         <div class="kpi-value">{_repro_fmt}</div>
         <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Aguardando desembolso</div>
+      <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div>
         <div class="kpi-value">{_ag_fmt}</div><div class="kpi-sub">aprovados pendentes</div></div>
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -2406,7 +2406,7 @@ try:
                 <div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div>
               </div>
               <div class="kpi-card">
-                <div class="kpi-label">Aguardando desembolso</div>
+                <div class="kpi-label">Projeção de Leads a Desembolsar</div>
                 <div class="kpi-value">{_f_ag_fmt}</div>
                 <div class="kpi-sub">aprovados pendentes</div>
               </div>
