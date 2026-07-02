@@ -1435,23 +1435,6 @@ def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> 
     _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
     etapas_sorted = sorted(etapas.keys(), key=lambda e: (_order_idx.get(e, 999), -etapas.get(e, 0)))
 
-    n_antes = sum(etapas.get(e, 0) for e in _ETAPAS_ANTES)
-    n_corte = n_rep - n_antes
-    show_corte = n_corte > 0 and n_antes > 0
-
-    _SEP_ANT = (
-        "background:#1c1a0e;color:#d4b84a;font-size:10px;font-weight:700;"
-        "letter-spacing:0.5px;text-transform:uppercase;"
-        "padding:9px 12px 7px;border-top:10px solid #0d0c0a;"
-        "border-bottom:1px solid rgba(254,197,46,0.2);"
-    )
-    _SEP_DEP = (
-        "background:#0a1a2e;color:#93c5fd;font-size:10px;font-weight:700;"
-        "letter-spacing:0.5px;text-transform:uppercase;"
-        "padding:9px 12px 7px;border-top:10px solid #0d0c0a;"
-        "border-bottom:1px solid rgba(96,165,250,0.2);"
-    )
-
     thead = (
         "<thead><tr>"
         "<th>Etapa</th><th>Motivo de Reprovação</th>"
@@ -1461,31 +1444,19 @@ def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> 
 
     tbody_rows = []
     shade_idx  = -1
-    prev_group = None
 
     for etapa in etapas_sorted:
         if etapa not in etapa_motivos and etapas.get(etapa, 0) == 0:
             continue
-        is_antes = etapa in _ETAPAS_ANTES
-        group    = "antes" if is_antes else "depois"
-
-        if show_corte and group != prev_group:
-            label_sep = ("Antes do cliente clicar na proposta" if group == "antes"
-                         else "Depois do cliente clicar na proposta")
-            sep_style = _SEP_ANT if group == "antes" else _SEP_DEP
-            tbody_rows.append(f'<tr><td colspan="4" style="{sep_style}">{label_sep}</td></tr>')
-            prev_group = group
 
         motivos_etapa = sorted(etapa_motivos.get(etapa, {}).items(), key=lambda x: -x[1])
         if not motivos_etapa:
-            # etapa sem motivos detalhados — mostra total
             motivos_etapa = [("—", etapas.get(etapa, 0))]
 
         shade_idx += 1
         rc = "g0" if shade_idx % 2 == 0 else "g1"
-        denom = n_antes if is_antes else n_corte
         for i, (motivo, cnt) in enumerate(motivos_etapa):
-            pct = f"{100*cnt/denom:.1f}%" if denom else "—"
+            pct = f"{100*cnt/n_rep:.1f}%" if n_rep else "—"
             tbody_rows.append(
                 f'<tr class="{rc}">'
                 f"<td>{etapa if i == 0 else ''}</td>"
@@ -1509,12 +1480,11 @@ def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> 
 def _html_tabela_resumo_funil(rows: list) -> str:
     if not rows:
         return ""
-    _C_ANT = "#fb923c"
-    _C_DEP = "#60a5fa"
+    _C_ETG = "#60a5fa"
     _C_Z   = "#64748b"
     trs = []
     for r in rows:
-        cor     = _C_ANT if r["etapa"] in _ETAPAS_ANTES else (_C_DEP if r["rejeitados"] else _C_Z)
+        cor     = _C_ETG if r["rejeitados"] else _C_Z
         pct_str = f"{r['pct']:.1f}%" if r["rejeitados"] else "—"
         trs.append(
             f'<tr>'
