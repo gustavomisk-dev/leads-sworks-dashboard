@@ -331,6 +331,7 @@ def agregar(dias_raw: list) -> dict:
     etapas       = defaultdict(int)
     etapa_motivos = defaultdict(lambda: defaultdict(int))
     emp_motivos   = defaultdict(lambda: defaultdict(int))
+    novo_ctps     = defaultdict(int)
     emp_ap_stats_raw: dict = {}
     valores_cont     = []
     aguardando          = 0
@@ -404,6 +405,9 @@ def agregar(dias_raw: list) -> dict:
         for emp, mots in d.get("emp_motivos", {}).items():
             for label, cnt in mots.items():
                 emp_motivos[emp][label] += cnt
+
+        for k, v in d.get("novo_ctps_status", {}).items():
+            novo_ctps[k] += v
 
         for emp, s in d.get("emp_ap_stats", {}).items():
             if emp not in emp_ap_stats_raw:
@@ -529,6 +533,7 @@ def agregar(dias_raw: list) -> dict:
         "assinado_iof":         round(assinado_iof, 2),
         "pipeline_financeiro":  dias_raw[-1].get("pipeline_financeiro", {}) if dias_raw else {},
         "duplicatas_cpf":       dias_raw[-1].get("duplicatas_cpf", []) if dias_raw else [],
+        "novo_ctps_status":     dict(novo_ctps),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -1786,26 +1791,36 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             st.info("Sem dados de distribuição.")
 
     elif slide == 5:
-        _tv_h("Etapas de Reprovação — Visão Detalhada", periodo)
+        _tv_h("Etapas de Reprovação — Visão geral", periodo)
         etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
-            fig_d = _fig_etapas_split(etapas_d, n_rep)
-            if fig_d:
-                fig_d.update_traces(
-                    textfont=_TV_TXT,
-                    textposition="auto",
-                    selector=dict(type="bar"),
-                )
-                fig_d.update_layout(
-                    height=580,
-                    title=dict(text=""),
-                    uniformtext_minsize=25, uniformtext_mode="show",
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    legend=dict(font=dict(size=25, color="#94a3b8")),
-                    margin=dict(t=10, b=85, l=20, r=55),
-                )
-                st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
+            _order_idx_tv = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+            _ordered_tv = sorted(
+                [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
+                key=lambda x: _order_idx_tv.get(x[0], 999),
+            )
+            _max_v_tv = max(v for _, v in _ordered_tv) if _ordered_tv else 1
+            _y_tv  = [e for e, _ in reversed(_ordered_tv)]
+            _x_tv  = [v for _, v in reversed(_ordered_tv)]
+            _ps_tv = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in _ordered_tv])]
+            _sh_tv = [f"rgba(96,165,250,{0.40 + 0.55*(v/_max_v_tv):.2f})" for v in _x_tv]
+            fig_d = go.Figure(go.Bar(
+                x=_x_tv, y=_y_tv, orientation="h",
+                marker=dict(color=_sh_tv, line=dict(color="#0d0c0a", width=0.5)),
+                text=[f"{_nbr(v)} ({p})" for v, p in zip(_x_tv, _ps_tv)],
+                textposition="inside", insidetextanchor="end",
+                textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+                hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
+            ))
+            fig_d.update_layout(
+                template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                title=dict(text=""),
+                xaxis=dict(title="Ocorrências", tickfont=_TV_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+                yaxis=dict(tickfont=_TV_YTXT, automargin=True, zeroline=False),
+                uniformtext_minsize=20, uniformtext_mode="show",
+                margin=dict(t=10, b=30, l=20, r=55), height=580,
+            )
+            st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
@@ -2597,17 +2612,57 @@ try:
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 4. Evolução Temporal ──────────────────────────────────────────────────────
+            # ── 4. Status Novo — CTPS ─────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">4. Evolução Temporal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">4. Status Novo — CTPS</div>', unsafe_allow_html=True)
+            st.markdown(
+                "<p class='periodo'>Leads com Status <b>Novo</b> chegam via leilão CTPS e aguardam "
+                "o clique do cliente na proposta. Quando o cliente clica, a jornada no bot WhatsApp "
+                "é iniciada e os campos <code>DataHoraInicio</code> e <code>referenciaLogs</code> "
+                "são preenchidos (<em>etapa Inicializa Dados</em>). "
+                "Leads de outras origens com esses campos preenchidos já estão na esteira por "
+                "outros meios, sem passar pela jornada do bot.</p>",
+                unsafe_allow_html=True,
+            )
+            _ncs = agg.get("novo_ctps_status", {})
+            if _ncs:
+                _ctps_total = _ncs.get("ctps_total", 0)
+                _ctps_antes = _ncs.get("ctps_antes", 0)
+                _ctps_apos  = _ncs.get("ctps_apos", 0)
+                _outros_est = _ncs.get("outros_esteira", 0)
+                _pct_antes  = f"{100 * _ctps_antes / _ctps_total:.1f}%" if _ctps_total else "—"
+                _pct_apos   = f"{100 * _ctps_apos  / _ctps_total:.1f}%" if _ctps_total else "—"
+                st.markdown(f"""
+<div class="kpi-row" style="grid-template-columns: repeat(3, 1fr); max-width: 860px;">
+  <div class="kpi-card">
+    <div class="kpi-label">CTPS — Aguardando clique</div>
+    <div class="kpi-value">{_nbr(_ctps_antes)}</div>
+    <div class="kpi-sub">{_pct_antes} do total CTPS Novo · {_nbr(_ctps_total)} leads</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
+    <div class="kpi-value">{_nbr(_ctps_apos)}</div>
+    <div class="kpi-sub">{_pct_apos} do total · já na jornada</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Outros na esteira</div>
+    <div class="kpi-value">{_nbr(_outros_est)}</div>
+    <div class="kpi-sub">não-CTPS com início registrado · outros meios</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+            # ── 5. Evolução Temporal ──────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">5. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 5. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            # ── 6. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-            st.markdown('<div class="sec">5. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">6. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -2619,9 +2674,9 @@ try:
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 6. Etapa de Reprovação ────────────────────────────────────────────────────
+            # ── 7. Etapa de Reprovação ────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">6. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -2633,10 +2688,10 @@ try:
                 st.markdown(diagrama_html, unsafe_allow_html=True)
                 st.markdown("")
             
-            # 3 abas: Visão Geral | Visão Detalhada | Visão de Funil
+            # 2 abas: Visão geral | Visão de Funil
             if etapas_d and n_rep > 0:
-                tab_g, tab_d, tab_f = st.tabs(["Visão Geral", "Visão Detalhada", "Visão de Funil"])
-            
+                tab_g, tab_f = st.tabs(["Visão geral", "Visão de Funil"])
+
                 with tab_g:
                     _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
                     ordered = sorted(
@@ -2648,7 +2703,7 @@ try:
                     x  = [v for _, v in reversed(ordered)]
                     ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
                     shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
-            
+
                     fig_g = go.Figure(go.Bar(
                         x=x, y=y, orientation="h",
                         marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
@@ -2667,20 +2722,11 @@ try:
                         margin=dict(t=50, b=30, l=20, r=40), height=h,
                     )
                     st.plotly_chart(fig_g, use_container_width=True, config=_CONF)
-            
+
                     tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
                     if tbl_g:
                         st.markdown(tbl_g, unsafe_allow_html=True)
-            
-                with tab_d:
-                    fig_d = _fig_etapas_split(etapas_d, n_rep)
-                    if fig_d:
-                        st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
-            
-                    tbl_d = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
-                    if tbl_d:
-                        st.markdown(tbl_d, unsafe_allow_html=True)
-            
+
                 with tab_f:
                     result_f = _fig_funil_etapa(etapas_d, n_rep)
                     if result_f:
@@ -2692,9 +2738,9 @@ try:
             else:
                 st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
-            # ── 5. Motivos de Reprovação ──────────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">7. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            # ── 8. Motivos de Reprovação ──────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">8. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -2717,9 +2763,9 @@ try:
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
-            # ── 6. Bloqueios ──────────────────────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">8. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            # ── 9. Bloqueios ──────────────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">9. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
             if fig:
@@ -2729,9 +2775,9 @@ try:
             else:
                 st.info("Sem dados de bloqueios.")
             
-            # ── 7. Segmentação — Reprovados ───────────────────────────────────────────────
-            
-            st.markdown('<div class="sec">9. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            # ── 10. Segmentação — Reprovados ─────────────────────────────────────────────
+
+            st.markdown('<div class="sec">10. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -2791,9 +2837,9 @@ try:
                 else:
                     st.info("Sem dados de CBO dos reprovados.")
             
-            # ── 8. Aprovados — Empregadores e CBOs ───────────────────────────────────────
-            
-            st.markdown('<div class="sec">10. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            # ── 11. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+
+            st.markdown('<div class="sec">11. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
