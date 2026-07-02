@@ -984,10 +984,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
     rej_colors = []
     for r in rows_r:
         shade = 0.50 + 0.45 * (r["rejeitados"] / n_rep)
-        if r["etapa"] in _ETAPAS_ANTES:
-            rej_colors.append(f"rgba(251,146,60,{shade:.2f})")
-        else:
-            rej_colors.append(f"rgba(96,165,250,{shade:.2f})")
+        rej_colors.append(f"rgba(96,165,250,{shade:.2f})")
     rej_hover = [
         f"<b>{r['etapa']}</b><br>Chegaram: {_nbr(r['chegaram'])}<br>"
         f"Reprovados aqui: {_nbr(r['rejeitados'])} ({r['pct']:.1f}%)<br>"
