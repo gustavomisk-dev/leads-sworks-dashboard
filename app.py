@@ -2615,15 +2615,6 @@ try:
             # ── 4. Status Novo — CTPS ─────────────────────────────────────────────────────
 
             st.markdown('<div class="sec">4. Status Novo — CTPS</div>', unsafe_allow_html=True)
-            st.markdown(
-                "<p class='periodo'>Leads com Status <b>Novo</b> chegam via leilão CTPS e aguardam "
-                "o clique do cliente na proposta. Quando o cliente clica, a jornada no bot WhatsApp "
-                "é iniciada e os campos <code>DataHoraInicio</code> e <code>referenciaLogs</code> "
-                "são preenchidos (<em>etapa Inicializa Dados</em>). "
-                "Leads de outras origens com esses campos preenchidos já estão na esteira por "
-                "outros meios, sem passar pela jornada do bot.</p>",
-                unsafe_allow_html=True,
-            )
             _ncs = agg.get("novo_ctps_status", {})
             if _ncs:
                 _ctps_total = _ncs.get("ctps_total", 0)
