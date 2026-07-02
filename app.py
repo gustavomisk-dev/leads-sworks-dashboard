@@ -2617,31 +2617,32 @@ try:
             st.markdown('<div class="sec">4. Status Novo — CTPS</div>', unsafe_allow_html=True)
             _ncs = agg.get("novo_ctps_status", {})
             if _ncs:
-                _ctps_total       = _ncs.get("ctps_total", 0)
-                _ctps_antes       = _ncs.get("ctps_antes", 0)
-                _ctps_apos        = _ncs.get("ctps_apos", 0)
-                _ctps_outros_st   = _ncs.get("ctps_outros_status", 0)
-                _ctps_bot_total   = _ctps_apos + _ctps_outros_st
-                _outros_est       = _ncs.get("outros_esteira", 0)
-                _pct_antes        = f"{100 * _ctps_antes / _ctps_total:.1f}%" if _ctps_total else "—"
-                _ctps_grand_total = _ctps_total + _ctps_outros_st
-                _pct_bot          = f"{100 * _ctps_bot_total / _ctps_grand_total:.1f}%" if _ctps_grand_total else "—"
+                _ctps_total     = _ncs.get("ctps_total", 0)
+                _ctps_antes     = _ncs.get("ctps_antes", 0)
+                _ctps_apos      = _ncs.get("ctps_apos", 0)
+                _ctps_outros_st = _ncs.get("ctps_outros_status", 0)
+                _ctps_bot_total = _ctps_apos + _ctps_outros_st
+                _outros_all     = _ncs.get("outros_total_all", 0)
+                _grand_total    = _ctps_antes + _ctps_bot_total + _outros_all
+                _pct_antes      = f"{100 * _ctps_antes     / _grand_total:.1f}%" if _grand_total else "—"
+                _pct_bot        = f"{100 * _ctps_bot_total / _grand_total:.1f}%" if _grand_total else "—"
+                _pct_outros     = f"{100 * _outros_all     / _grand_total:.1f}%" if _grand_total else "—"
                 st.markdown(f"""
 <div class="kpi-row" style="grid-template-columns: repeat(3, 1fr); max-width: 860px;">
   <div class="kpi-card">
     <div class="kpi-label">CTPS — Aguardando clique</div>
     <div class="kpi-value">{_nbr(_ctps_antes)}</div>
-    <div class="kpi-sub">{_pct_antes} do total CTPS Novo · {_nbr(_ctps_total)} leads</div>
+    <div class="kpi-sub">{_pct_antes} do total · {_nbr(_ctps_total)} CTPS Novos</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
     <div class="kpi-value">{_nbr(_ctps_bot_total)}</div>
-    <div class="kpi-sub">{_pct_bot} do total CTPS · {_nbr(_ctps_outros_st)} em outros status</div>
+    <div class="kpi-sub">{_pct_bot} do total · {_nbr(_ctps_outros_st)} em outros status</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label">Outros na esteira</div>
-    <div class="kpi-value">{_nbr(_outros_est)}</div>
-    <div class="kpi-sub">não-CTPS com início registrado · outros meios</div>
+    <div class="kpi-value">{_nbr(_outros_all)}</div>
+    <div class="kpi-sub">{_pct_outros} do total · não-CTPS (todos os status)</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
