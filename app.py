@@ -1780,23 +1780,21 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             _x_tv  = [v for _, v in reversed(_ordered_tv)]
             _ps_tv = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in _ordered_tv])]
             _sh_tv = [f"rgba(96,165,250,{0.40 + 0.55*(v/_max_v_tv):.2f})" for v in _x_tv]
-            _max_x_tv  = max(_x_tv) if _x_tv else 1
-            _tpos_tv   = ["inside"  if v / _max_x_tv > 0.22 else "outside" for v in _x_tv]
-            _tcol_tv   = ["rgba(255,255,255,0.85)" if v / _max_x_tv > 0.22 else "#94a3b8" for v in _x_tv]
             fig_d = go.Figure(go.Bar(
                 x=_x_tv, y=_y_tv, orientation="h",
                 marker=dict(color=_sh_tv, line=dict(color="#0d0c0a", width=0.5)),
                 text=[f"{_nbr(v)} ({p})" for v, p in zip(_x_tv, _ps_tv)],
-                textposition=_tpos_tv, insidetextanchor="end",
+                textposition="auto",
+                insidetextanchor="end",
                 insidetextorientation="horizontal",
-                constraintext="none",
-                textfont=dict(size=13, color=_tcol_tv),
+                cliponaxis=False,
+                textfont=dict(size=13, color="#cbd5e1"),
                 hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
             ))
             fig_d.update_layout(
                 template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
                 title=dict(text=""),
-                xaxis=dict(title="Ocorrências", tickfont=_TV_AF, showgrid=True, gridcolor=_GRID, zeroline=False, cliponaxis=False),
+                xaxis=dict(title="Ocorrências", tickfont=_TV_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
                 yaxis=dict(tickfont=_TV_YTXT, automargin=True, zeroline=False),
                 margin=dict(t=10, b=30, l=20, r=160), height=580,
             )
