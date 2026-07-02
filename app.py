@@ -1669,6 +1669,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _term_fmt  = _nbr(funil["terminais"])
     _repro_fmt = _nbr(funil["reprovados"])
     _ag_fmt    = _nbr(_proj_count)
+    _ncs_tv       = agg.get("novo_ctps_status", {})
+    _ctps_antes_tv   = _ncs_tv.get("ctps_antes", 0)
+    _ctps_apos_tv    = _ncs_tv.get("ctps_apos", 0)
+    _ctps_outros_tv  = _ncs_tv.get("ctps_outros_status", 0)
+    _ctps_bot_tv     = _ctps_apos_tv + _ctps_outros_tv
     _kpi_html = f"""
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card"><div class="kpi-label">Total de leads</div>
@@ -1691,11 +1696,15 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
       <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
     </div>
-    <div class="kpi-row" style="display:flex;justify-content:center;gap:8px">
-      <div class="kpi-card" style="width:calc(25% - 6px)"><div class="kpi-label">Volume aprovado</div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
         <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
-      <div class="kpi-card" style="width:calc(25% - 6px)"><div class="kpi-label">Projeção de Desembolso</div>
+      <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
         <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">{_proj_sub}</div></div>
+      <div class="kpi-card"><div class="kpi-label">CTPS — Aguardando clique</div>
+        <div class="kpi-value">{_nbr(_ctps_antes_tv)}</div><div class="kpi-sub">Novos sem DataHoraInicio</div></div>
+      <div class="kpi-card"><div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
+        <div class="kpi-value">{_nbr(_ctps_bot_tv)}</div><div class="kpi-sub">{_nbr(_ctps_outros_tv)} em outros status</div></div>
     </div>
     """
 
