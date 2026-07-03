@@ -2826,16 +2826,16 @@ try:
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-            # Distribuição de taxa — aprovados do período (calculado dos emp_ap_stats)
-            _emp_stats_taxa = agg.get("emp_ap_stats", {})
-            if _emp_stats_taxa:
-                _dist_taxa: dict = defaultdict(int)
-                for _estats in _emp_stats_taxa.values():
+            # Distribuição de taxa — aprovados do período (taxa individual por lead)
+            _dist_taxa = agg.get("taxa_dist", {})
+            if not _dist_taxa:
+                # fallback: JSONs antigos sem taxa_dist usam média por empregador
+                for _estats in agg.get("emp_ap_stats", {}).values():
                     _mt = _estats.get("media_taxa")
                     _nt = _estats.get("n_taxa", 0)
                     if _mt and _nt:
-                        _dist_taxa[f"{_mt:.2f}"] += _nt
-                if _dist_taxa:
+                        _dist_taxa[f"{_mt:.2f}"] = _dist_taxa.get(f"{_mt:.2f}", 0) + _nt
+            if _dist_taxa:
                     _n_taxa_total = sum(_dist_taxa.values())
                     _taxa_sorted = dict(sorted(
                         ((f"{float(k):.2f}".replace(".", ",") + "% a.m.", v)
