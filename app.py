@@ -2510,7 +2510,29 @@ try:
             # ── 1. Projeção de Desembolso ────────────────────────────────────────────────
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
-            
+
+            # Breakdown por dia para as setinhas de expansão na tabela.
+            # carregar_dia é cached — não faz requests adicionais.
+            _pt_por_dia: dict = {}
+            for _ds2 in list(datas_sel) + list(datas_extra):
+                _dj2 = carregar_dia(_ds2)
+                if not _dj2:
+                    continue
+                for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
+                    if _ts2 == "BLOQUEIO_TEMPORARIO":
+                        continue
+                    if _v2.get("count", 0) > 0:
+                        if _ts2 not in _pt_por_dia:
+                            _pt_por_dia[_ts2] = {}
+                        _pt_por_dia[_ts2][_ds2] = {
+                            "count":    _v2.get("count", 0),
+                            "valor":    _v2.get("valor", 0.0),
+                            "liberado": _v2.get("liberado", 0.0),
+                            "iof":      _v2.get("iof", 0.0),
+                        }
+            # BT: breakdown já está keyed por dia Pix no JSON mais recente
+            _pt_por_dia["BLOQUEIO_TEMPORARIO"] = _ultimo_nm.get("bt_pix_days", {})
+
             _TIPO_LABEL_MAP = {
                 "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
                 "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
@@ -2539,16 +2561,33 @@ try:
                 _t_lib  = sum(d["liberado"] for d in _pt_sec.values())
                 _t_iof  = sum(d["iof"]      for d in _pt_sec.values())
             
-                _rows = "".join(
-                    f"<tr>"
-                    f"<td class='pj-lbl'>{_TIPO_LABEL_MAP.get(ts, ts)}</td>"
-                    f"<td class='pj-n'>{_n(d['count'])}</td>"
-                    f"<td class='pj-n'>{_r(d['valor'])}</td>"
-                    f"<td class='pj-n'>{_r(d['liberado'])}</td>"
-                    f"<td class='pj-n'>{_r(d['iof'])}</td>"
-                    f"</tr>"
-                    for ts, d in _sorted
-                )
+                _rows = ""
+                for ts, d in _sorted:
+                    _label   = _TIPO_LABEL_MAP.get(ts, ts)
+                    _dias_ts = _pt_por_dia.get(ts, {})
+                    if _dias_ts:
+                        _is_bt      = ts == "BLOQUEIO_TEMPORARIO"
+                        _det_inner  = "".join(
+                            f"<div class='pj-det-row'>"
+                            f"<span class='pj-det-dt'>{'Pix ' if _is_bt else ''}"
+                            f"{datetime.strptime(_ds3, '%Y%m%d').strftime('%d/%m/%Y')}</span>"
+                            f"<span class='pj-det-n'>{_n(_dv3['count'])} lead{'s' if _dv3['count'] != 1 else ''}</span>"
+                            f"<span class='pj-det-v'>{_r(_dv3['valor'])}</span>"
+                            f"</div>"
+                            for _ds3, _dv3 in sorted(_dias_ts.items())
+                        )
+                        _cell_lbl = f"<details class='pj-det'><summary>{_label}</summary>{_det_inner}</details>"
+                    else:
+                        _cell_lbl = _label
+                    _rows += (
+                        f"<tr>"
+                        f"<td class='pj-lbl'>{_cell_lbl}</td>"
+                        f"<td class='pj-n'>{_n(d['count'])}</td>"
+                        f"<td class='pj-n'>{_r(d['valor'])}</td>"
+                        f"<td class='pj-n'>{_r(d['liberado'])}</td>"
+                        f"<td class='pj-n'>{_r(d['iof'])}</td>"
+                        f"</tr>"
+                    )
             
                 st.markdown(f"""
             <style>
@@ -2564,6 +2603,18 @@ try:
             .pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
                         font-weight:700;border-top:2px solid #272420}}
             .pj-tot .pj-lbl{{color:#FEC52E}}
+            .pj-det{{cursor:pointer}}
+            .pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
+                             cursor:pointer;color:#cbd5e1;white-space:nowrap}}
+            .pj-det summary::-webkit-details-marker{{display:none}}
+            .pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
+                                     transition:transform .15s;flex-shrink:0}}
+            .pj-det[open] summary::before{{transform:rotate(90deg)}}
+            .pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
+                         color:#94a3b8;border-top:1px solid #272420}}
+            .pj-det-dt{{min-width:110px;color:#64748b}}
+            .pj-det-n{{min-width:80px}}
+            .pj-det-v{{font-variant-numeric:tabular-nums}}
             </style>
             <div class="pj-wrap">
             <table class="pj-tbl">
