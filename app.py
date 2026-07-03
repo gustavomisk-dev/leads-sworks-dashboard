@@ -1,4 +1,4 @@
-"""
+﻿"""
 Dashboard de leads SWorks — Streamlit Community Cloud.
 Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
@@ -2594,12 +2594,13 @@ try:
             if _pt_sec:
                 def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
                 def _n(v): return f"{v:,}".replace(",", ".")
+                _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
             
                 _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
                 _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
-                _t_val  = sum(d["valor"]    for d in _pt_sec.values())
-                _t_lib  = sum(d["liberado"] for d in _pt_sec.values())
-                _t_iof  = sum(d["iof"]      for d in _pt_sec.values())
+                _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                _t_iof  = sum(d["iof"]      for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
             
                 _rows = ""
                 for ts, d in _sorted:
@@ -2619,13 +2620,14 @@ try:
                         _cell_lbl = f"<details class='pj-det'><summary>{_label}</summary>{_det_inner}</details>"
                     else:
                         _cell_lbl = _label
+                    _hv = ts in _HIDE_VALOR_TIPOS
                     _rows += (
                         f"<tr>"
                         f"<td class='pj-lbl'>{_cell_lbl}</td>"
                         f"<td class='pj-n'>{_n(d['count'])}</td>"
-                        f"<td class='pj-n'>{_r(d['valor'])}</td>"
-                        f"<td class='pj-n'>{_r(d['liberado'])}</td>"
-                        f"<td class='pj-n'>{_r(d['iof'])}</td>"
+                        f"<td class='pj-n'>{'—' if _hv else _r(d['valor'])}</td>"
+                        f"<td class='pj-n'>{'—' if _hv else _r(d['liberado'])}</td>"
+                        f"<td class='pj-n'>{'—' if _hv else _r(d['iof'])}</td>"
                         f"</tr>"
                     )
             
