@@ -1640,11 +1640,23 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     vol      = fin.get("ValorContratacao", {})
     vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
     _pt_tv        = agg.get("projecao_tipos", {})
-    _proj_count   = sum(d["count"]    for d in _pt_tv.values())
+    # BT live: independente do período — data de referência baseada no horário BRT atual
+    _now_brt_tv  = datetime.utcnow() - timedelta(hours=3)
+    _pix_ab_tv   = _now_brt_tv.weekday() < 5 and (7, 0) <= (_now_brt_tv.hour, _now_brt_tv.minute) <= (18, 30)
+    _data_ref_tv = _now_brt_tv.date()
+    if not _pix_ab_tv:
+        _data_ref_tv += timedelta(days=1)
+        while _data_ref_tv.weekday() >= 5:
+            _data_ref_tv += timedelta(days=1)
+    _ref_str_tv   = _data_ref_tv.strftime("%Y%m%d")
+    _ref_label_tv = _data_ref_tv.strftime("%d/%m")
+    _ultimo_tv    = carregar_dia(max(datas)) if datas else {}
+    _bt_live_tv   = _ultimo_tv.get("bt_pix_days", {}).get(_ref_str_tv, {})
+    _proj_count   = sum(d["count"]    for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("count", 0)
     _proj_count_s = f"{_proj_count:,}".replace(",", ".")
-    _proj_valor   = sum(d["valor"]    for d in _pt_tv.values())
-    _proj_lib     = sum(d["liberado"] for d in _pt_tv.values())
-    _proj_iof_tv  = sum(d["iof"]      for d in _pt_tv.values())
+    _proj_valor   = sum(d["valor"]    for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("valor", 0.0)
+    _proj_lib     = sum(d["liberado"] for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("liberado", 0.0)
+    _proj_iof_tv  = sum(d["iof"]      for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("iof", 0.0)
     if _proj_valor:
         _proj_val_fmt_tv = ("R$ " + f"{_proj_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         _proj_lib_fmt_tv = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -1698,9 +1710,9 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div>
-        <div class="kpi-value">{_ag_fmt}</div><div class="kpi-sub">leads</div></div>
+        <div class="kpi-value">{_ag_fmt}</div><div class="kpi-sub">Pix {_ref_label_tv}</div></div>
       <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
-        <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">{_proj_sub}</div></div>
+        <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">Pix {_ref_label_tv} · {_proj_sub}</div></div>
       <div class="kpi-card"><div class="kpi-label">CTPS — Aguardando clique</div>
         <div class="kpi-value">{_nbr(_ctps_antes_tv)}</div><div class="kpi-sub">Novos sem DataHoraInicio</div></div>
       <div class="kpi-card"><div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
@@ -2393,12 +2405,25 @@ try:
             taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
             vol      = fin.get("ValorContratacao", {})
             vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
-            _pt_nm      = agg.get("projecao_tipos", {})
-            _proj_cnt   = sum(d["count"]    for d in _pt_nm.values())
+            _pt_nm       = agg.get("projecao_tipos", {})
+            # BT live: independente do período — data de referência baseada no horário BRT atual
+            _now_brt_nm  = datetime.utcnow() - timedelta(hours=3)
+            _pix_ab_nm   = _now_brt_nm.weekday() < 5 and (7, 0) <= (_now_brt_nm.hour, _now_brt_nm.minute) <= (18, 30)
+            _data_ref_nm = _now_brt_nm.date()
+            if not _pix_ab_nm:
+                _data_ref_nm += timedelta(days=1)
+                while _data_ref_nm.weekday() >= 5:
+                    _data_ref_nm += timedelta(days=1)
+            _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
+            _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
+            _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
+            _ultimo_nm     = carregar_dia(max(datas)) if datas else {}
+            _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
+            _proj_cnt   = sum(d["count"]    for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("count", 0)
             _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-            _proj_val   = sum(d["valor"]    for d in _pt_nm.values())
-            _proj_lib   = sum(d["liberado"] for d in _pt_nm.values())
-            _proj_iof   = sum(d["iof"]      for d in _pt_nm.values())
+            _proj_val   = sum(d["valor"]    for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("valor", 0.0)
+            _proj_lib   = sum(d["liberado"] for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("liberado", 0.0)
+            _proj_iof   = sum(d["iof"]      for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("iof", 0.0)
             if _proj_val:
                 _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -2445,12 +2470,12 @@ try:
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Leads a Desembolsar</div>
                 <div class="kpi-value">{_f_ag_fmt}</div>
-                <div class="kpi-sub">leads</div>
+                <div class="kpi-sub">Pix {_ref_short_nm}</div>
               </div>
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Desembolso</div>
                 <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
-                <div class="kpi-sub">{_proj_kpi_sub}</div>
+                <div class="kpi-sub">Pix {_ref_short_nm} · {_proj_kpi_sub}</div>
               </div>
             </div>
             <div class="kpi-row">
@@ -2495,11 +2520,15 @@ try:
                 "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
                 "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
                 "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
-                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h (Em Andamento)",
+                "BLOQUEIO_TEMPORARIO":       f"Aguardando 24h — Pix {_ref_label_nm}",
                 "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
             }
             
-            _pt_sec = agg.get("projecao_tipos", {})
+            # Tabela: tipos nao-BT do periodo + BT live (mesma logica das KPIs)
+            _pt_sec_base = {ts: d for ts, d in agg.get("projecao_tipos", {}).items() if ts != "BLOQUEIO_TEMPORARIO"}
+            if _bt_live_nm.get("count", 0) > 0:
+                _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
+            _pt_sec = _pt_sec_base
             if _pt_sec:
                 def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
                 def _n(v): return f"{v:,}".replace(",", ".")
