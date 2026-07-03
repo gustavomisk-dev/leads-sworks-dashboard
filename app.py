@@ -343,8 +343,6 @@ def agregar(dias_raw: list) -> dict:
     assinado_liberado   = 0.0
     assinado_iof        = 0.0
     projecao_tipos_agg  = defaultdict(lambda: {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
-    dist_taxa           = defaultdict(int)
-
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
             d_status[int(k)] += v
@@ -443,9 +441,6 @@ def agregar(dias_raw: list) -> dict:
             projecao_tipos_agg[_ts]["valor"]    += _v.get("valor", 0.0)
             projecao_tipos_agg[_ts]["liberado"] += _v.get("liberado", 0.0)
             projecao_tipos_agg[_ts]["iof"]      += _v.get("iof", 0.0)
-        for _tk, _tv in d.get("distribuicao_taxa", {}).items():
-            dist_taxa[_tk] += _tv
-
     aprovados  = d_status.get(3, 0)
     reprovados = d_status.get(4, 0)
     cancelados = d_status.get(8, 0)
@@ -492,6 +487,7 @@ def agregar(dias_raw: list) -> dict:
             "media_valor": _a["sum_valor"] / _a["n_valor"] if _a["n_valor"] else None,
             "media_prazo": _a["sum_prazo"] / _a["n_prazo"] if _a["n_prazo"] else None,
             "media_taxa":  _a["sum_taxa"]  / _a["n_taxa"]  if _a["n_taxa"]  else None,
+            "n_taxa":      _a["n_taxa"],
             "num_funcionarios": _a["num_funcionarios"],
             "faturamento":      _a["faturamento"],
             "dividas_ativas":   _a["dividas_ativas"],
@@ -537,7 +533,6 @@ def agregar(dias_raw: list) -> dict:
         "pipeline_financeiro":  dias_raw[-1].get("pipeline_financeiro", {}) if dias_raw else {},
         "duplicatas_cpf":       dias_raw[-1].get("duplicatas_cpf", []) if dias_raw else [],
         "novo_ctps_status":     dict(novo_ctps),
-        "distribuicao_taxa":    dict(dist_taxa),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -2809,25 +2804,32 @@ try:
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-            # Distribuição de taxa — aprovados do período
-            _dist_taxa_raw = agg.get("distribuicao_taxa", {})
-            if _dist_taxa_raw:
-                _n_taxa_total = sum(_dist_taxa_raw.values())
-                _taxa_sorted = dict(sorted(
-                    ((f"{float(k):.2f}".replace(".", ",") + "% a.m.", v)
-                     for k, v in _dist_taxa_raw.items()),
-                    key=lambda x: float(x[0].replace(",", ".").replace("% a.m.", ""))
-                ))
-                fig_taxa = _fig_barras_h(
-                    _taxa_sorted,
-                    "Distribuição de Taxa — Aprovados",
-                    "#3b82f6",
-                    n=50,
-                    pct_base=_n_taxa_total,
-                    show_abs=True,
-                )
-                if fig_taxa:
-                    st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
+            # Distribuição de taxa — aprovados do período (calculado dos emp_ap_stats)
+            _emp_stats_taxa = agg.get("emp_ap_stats", {})
+            if _emp_stats_taxa:
+                _dist_taxa: dict = defaultdict(int)
+                for _estats in _emp_stats_taxa.values():
+                    _mt = _estats.get("media_taxa")
+                    _nt = _estats.get("n_taxa", 0)
+                    if _mt and _nt:
+                        _dist_taxa[f"{_mt:.2f}"] += _nt
+                if _dist_taxa:
+                    _n_taxa_total = sum(_dist_taxa.values())
+                    _taxa_sorted = dict(sorted(
+                        ((f"{float(k):.2f}".replace(".", ",") + "% a.m.", v)
+                         for k, v in _dist_taxa.items()),
+                        key=lambda x: float(x[0].replace(",", ".").replace("% a.m.", ""))
+                    ))
+                    fig_taxa = _fig_barras_h(
+                        _taxa_sorted,
+                        "Distribuição de Taxa — Aprovados",
+                        "#3b82f6",
+                        n=50,
+                        pct_base=_n_taxa_total,
+                        show_abs=True,
+                    )
+                    if fig_taxa:
+                        st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
 
             # ── 7. Etapa de Reprovação ────────────────────────────────────────────────────
 
