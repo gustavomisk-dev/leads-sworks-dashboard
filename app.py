@@ -2576,7 +2576,7 @@ try:
             _TIPO_LABEL_MAP = {
                 "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
                 "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
-                "ASSINATURA":                "Aguardando CCB Único (Suspenso)",
+                "ASSINATURA":                "Aguardando Assinatura (Suspenso)",
                 "ENTREVISTA":                "Aguardando Entrevista Antifraude da Nuvidio (Suspenso)",
                 "FORMALIZACAO":              "Aguardando Aceite para Formalização (Suspenso)",
                 "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
