@@ -2555,33 +2555,26 @@ try:
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
-            # -- Filtro data Pix (seção 1) --
-            if "_proj_picker_ver" not in st.session_state:
-                st.session_state["_proj_picker_ver"] = 0
-            _picker_ver = st.session_state["_proj_picker_ver"]
-            _picker_key = f"proj_ref_picker_v{_picker_ver}"
-            _prl, _prd, _prb, _prr = st.columns([1.6, 1.8, 0.8, 5.8])
-            with _prl:
-                st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
-            with _prd:
-                _proj_picked_nm = st.date_input(
-                    "",
-                    value=_now_brt_nm.date(),
-                    min_value=data_min,
-                    max_value=_now_brt_nm.date() + timedelta(days=14),
-                    format="DD/MM/YYYY",
-                    label_visibility="collapsed",
-                    key=_picker_key,
-                )
-            # Snap fins de semana no cálculo (widget mantém o valor original)
-            _data_ref_nm = _proj_picked_nm
-            while _data_ref_nm.weekday() >= 5:
-                _data_ref_nm += timedelta(days=1)
-            with _prb:
-                if _data_ref_nm != _default_ref_nm:
-                    if st.button("↺", key="proj_ref_reset_nm", help="Resetar para hoje"):
-                        st.session_state["_proj_picker_ver"] = _picker_ver + 1
-                        st.rerun()
+            # -- Seletor data Pix (seção 1) --
+            _hoje_opt      = _now_brt_nm.date()
+            _prox_util_opt = _hoje_opt + timedelta(days=1)
+            while _prox_util_opt.weekday() >= 5:
+                _prox_util_opt += timedelta(days=1)
+            _lbl_hoje = f"Hoje  ·  {_hoje_opt.strftime('%d/%m')}"
+            _lbl_prox = f"Próximo dia útil  ·  {_prox_util_opt.strftime('%d/%m')}"
+            _pix_sel_nm = st.radio(
+                "📅 Data Pix projeção:",
+                options=["hoje", "prox"],
+                format_func=lambda x: _lbl_hoje if x == "hoje" else _lbl_prox,
+                horizontal=True,
+                key="_pix_radio_nm",
+            )
+            if _pix_sel_nm == "hoje":
+                _data_ref_nm = _hoje_opt
+                while _data_ref_nm.weekday() >= 5:
+                    _data_ref_nm += timedelta(days=1)
+            else:
+                _data_ref_nm = _prox_util_opt
             _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
             _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
