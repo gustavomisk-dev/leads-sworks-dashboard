@@ -2555,26 +2555,8 @@ try:
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
-            # -- Seletor data Pix (seção 1) --
-            _hoje_opt      = _now_brt_nm.date()
-            _prox_util_opt = _hoje_opt + timedelta(days=1)
-            while _prox_util_opt.weekday() >= 5:
-                _prox_util_opt += timedelta(days=1)
-            _lbl_hoje = f"Hoje  ·  {_hoje_opt.strftime('%d/%m')}"
-            _lbl_prox = f"Próximo dia útil  ·  {_prox_util_opt.strftime('%d/%m')}"
-            _pix_sel_nm = st.radio(
-                "📅 Data Pix projeção:",
-                options=["hoje", "prox"],
-                format_func=lambda x: _lbl_hoje if x == "hoje" else _lbl_prox,
-                horizontal=True,
-                key="_pix_radio_nm",
-            )
-            if _pix_sel_nm == "hoje":
-                _data_ref_nm = _hoje_opt
-                while _data_ref_nm.weekday() >= 5:
-                    _data_ref_nm += timedelta(days=1)
-            else:
-                _data_ref_nm = _prox_util_opt
+            # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
+            _data_ref_nm = _default_ref_nm
             _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
             _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
