@@ -2555,9 +2555,9 @@ try:
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
-            # -- Filtro data Pix (secao 1) --
+            # -- Filtro data Pix (seção 1) --
             if "proj_ref_picker_nm" not in st.session_state:
-                st.session_state["proj_ref_picker_nm"] = _data_ref_nm
+                st.session_state["proj_ref_picker_nm"] = _default_ref_nm
             _prl, _prd, _prb, _prr = st.columns([1.6, 1.8, 0.8, 5.8])
             with _prl:
                 st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
@@ -2569,19 +2569,15 @@ try:
                     label_visibility="collapsed",
                     key="proj_ref_picker_nm",
                 )
+            # Snap fins de semana no cálculo (widget mantém o valor original)
+            _data_ref_nm = _proj_picked_nm
+            while _data_ref_nm.weekday() >= 5:
+                _data_ref_nm += timedelta(days=1)
             with _prb:
                 if _data_ref_nm != _default_ref_nm:
                     if st.button("↺", key="proj_ref_reset_nm", help="Resetar para hoje"):
-                        st.session_state.pop("_proj_ref_nm", None)
                         st.session_state.pop("proj_ref_picker_nm", None)
                         st.rerun()
-            _proj_snapped_nm = _proj_picked_nm
-            while _proj_snapped_nm.weekday() >= 5:
-                _proj_snapped_nm += timedelta(days=1)
-            if _proj_snapped_nm != _data_ref_nm:
-                st.session_state["_proj_ref_nm"] = _proj_snapped_nm
-                st.session_state["proj_ref_picker_nm"] = _proj_snapped_nm
-                st.rerun()
             _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
             _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
