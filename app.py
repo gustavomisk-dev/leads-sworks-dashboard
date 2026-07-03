@@ -2586,11 +2586,11 @@ try:
             _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
             _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
-            # Breakdown por dia para as setinhas — mesma janela de 5 dias de hoje.
-            # carregar_dia é cached — não faz requests adicionais.
+            # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
+            _non_bt_sec_nm: dict = {}
             _pt_por_dia: dict = {}
             for _d5pd in range(5):
-                _s5pd = (_today_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
+                _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
                 if _s5pd not in datas:
                     continue
                 _dj2 = carregar_dia(_s5pd)
@@ -2600,6 +2600,12 @@ try:
                     if _ts2 == "BLOQUEIO_TEMPORARIO":
                         continue
                     if _v2.get("count", 0) > 0:
+                        if _ts2 not in _non_bt_sec_nm:
+                            _non_bt_sec_nm[_ts2] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0}
+                        _non_bt_sec_nm[_ts2]["count"]    += _v2.get("count", 0)
+                        _non_bt_sec_nm[_ts2]["valor"]    += _v2.get("valor", 0.0)
+                        _non_bt_sec_nm[_ts2]["liberado"] += _v2.get("liberado", 0.0)
+                        _non_bt_sec_nm[_ts2]["iof"]      += _v2.get("iof", 0.0)
                         if _ts2 not in _pt_por_dia:
                             _pt_por_dia[_ts2] = {}
                         _pt_por_dia[_ts2][_s5pd] = {
@@ -2625,7 +2631,7 @@ try:
             }
             
             # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
-            _pt_sec_base = dict(_non_bt_live_nm)
+            _pt_sec_base = dict(_non_bt_sec_nm)
             if _bt_live_nm.get("count", 0) > 0:
                 _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
             _pt_sec = _pt_sec_base
