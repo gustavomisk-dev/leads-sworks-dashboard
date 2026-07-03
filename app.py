@@ -2433,7 +2433,8 @@ try:
             _now_brt_nm  = datetime.utcnow() - timedelta(hours=3)
             _pix_ab_nm   = _now_brt_nm.weekday() < 5 and (7, 0) <= (_now_brt_nm.hour, _now_brt_nm.minute) <= (18, 30)
             _default_ref_nm = _now_brt_nm.date()
-            if not _pix_ab_nm:
+            _avancar_nm  = _now_brt_nm.weekday() >= 5 or (_now_brt_nm.hour, _now_brt_nm.minute) > (18, 30)
+            if _avancar_nm:
                 _default_ref_nm += timedelta(days=1)
                 while _default_ref_nm.weekday() >= 5:
                     _default_ref_nm += timedelta(days=1)
