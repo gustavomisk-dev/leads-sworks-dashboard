@@ -2215,6 +2215,24 @@ try:
             st.warning("Sem dados para o período selecionado.")
             st.stop()
         _agg_tv = agregar(_dias_raw_tv)
+        # Tipos não-BT dos 3 dias extras antes do período TV
+        _d_extra_ini_tv = _d_ini_tv - timedelta(days=3)
+        _datas_extra_tv = [d for d in datas
+                           if _d_extra_ini_tv <= datetime.strptime(d, "%Y%m%d").date() < _d_ini_tv]
+        for _d_extra_str in _datas_extra_tv:
+            _dia_extra_tv = carregar_dia(_d_extra_str)
+            if not _dia_extra_tv:
+                continue
+            for _ts_e, _v_e in _dia_extra_tv.get("projecao_tipos", {}).items():
+                if _ts_e == "BLOQUEIO_TEMPORARIO":
+                    continue
+                _ex = _agg_tv["projecao_tipos"].get(_ts_e, {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
+                _agg_tv["projecao_tipos"][_ts_e] = {
+                    "count":    _ex["count"]    + _v_e.get("count", 0),
+                    "valor":    _ex["valor"]    + _v_e.get("valor", 0.0),
+                    "liberado": _ex["liberado"] + _v_e.get("liberado", 0.0),
+                    "iof":      _ex["iof"]      + _v_e.get("iof", 0.0),
+                }
         _periodo_tv = (
             _d_ini_tv.strftime("%d/%m/%Y") if _d_ini_tv == data_max
             else f"{_d_ini_tv.strftime('%d/%m/%Y')} — {data_max.strftime('%d/%m/%Y')}"
@@ -2328,21 +2346,40 @@ try:
             
             datas_sel = [d for d in datas if d_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim]
             n_dias    = len(datas_sel)
-            
+
             if not datas_sel:
                 st.warning("Nenhum dado no período selecionado.")
                 st.stop()
-            
+
             # ── Carrega e agrega ──────────────────────────────────────────────────────────
-            
+            # Extra: 3 dias antes de d_ini para capturar tipos não-BT de leads antigos suspensos
+            _d_extra_ini = d_ini - timedelta(days=3)
+            datas_extra = [d for d in datas
+                           if _d_extra_ini <= datetime.strptime(d, "%Y%m%d").date() < d_ini]
+
             with st.spinner(f"Carregando {n_dias} dia(s)..."):
                 dias_raw = [d for d in [carregar_dia(d) for d in datas_sel] if d]
-            
+
             if not dias_raw:
                 st.warning("Sem dados para o período selecionado.")
                 st.stop()
-            
+
             agg = agregar(dias_raw)
+            # Tipos não-BT dos 3 dias extras: leads suspensos há mais dias que o início do período
+            for _d_extra_str in datas_extra:
+                _dia_extra = carregar_dia(_d_extra_str)
+                if not _dia_extra:
+                    continue
+                for _ts_e, _v_e in _dia_extra.get("projecao_tipos", {}).items():
+                    if _ts_e == "BLOQUEIO_TEMPORARIO":
+                        continue  # BT só conta se Pix day cai no período selecionado
+                    _ex = agg["projecao_tipos"].get(_ts_e, {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
+                    agg["projecao_tipos"][_ts_e] = {
+                        "count":    _ex["count"]    + _v_e.get("count", 0),
+                        "valor":    _ex["valor"]    + _v_e.get("valor", 0.0),
+                        "liberado": _ex["liberado"] + _v_e.get("liberado", 0.0),
+                        "iof":      _ex["iof"]      + _v_e.get("iof", 0.0),
+                    }
             f   = agg["funil"]
             fin = agg["financeiro"]
             
