@@ -2438,11 +2438,10 @@ try:
                 while _default_ref_nm.weekday() >= 5:
                     _default_ref_nm += timedelta(days=1)
             _data_ref_nm   = st.session_state.get("_proj_ref_nm", _default_ref_nm)
-            _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
-            _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
-            _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
-            _ultimo_nm     = carregar_dia(max(datas)) if datas else {}
-            _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
+            _ultimo_nm      = carregar_dia(max(datas)) if datas else {}
+            _ref_str_kpi    = _default_ref_nm.strftime("%Y%m%d")
+            _ref_short_kpi  = _default_ref_nm.strftime("%d/%m")
+            _bt_live_kpi_nm = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_kpi, {})
             # Non-BT live: últimos 5 dias a partir de hoje, independente do período
             _non_bt_live_nm: dict = {}
             _today_nm = _now_brt_nm.date()
@@ -2463,11 +2462,11 @@ try:
                         _non_bt_live_nm[_ts5nm]["valor"]    += _v5nm.get("valor", 0.0)
                         _non_bt_live_nm[_ts5nm]["liberado"] += _v5nm.get("liberado", 0.0)
                         _non_bt_live_nm[_ts5nm]["iof"]      += _v5nm.get("iof", 0.0)
-            _proj_cnt   = sum(d["count"]    for d in _non_bt_live_nm.values()) + _bt_live_nm.get("count", 0)
+            _proj_cnt   = sum(d["count"]    for d in _non_bt_live_nm.values()) + _bt_live_kpi_nm.get("count", 0)
             _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-            _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_nm.get("valor", 0.0)
-            _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_nm.get("liberado", 0.0)
-            _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_nm.get("iof", 0.0)
+            _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("valor", 0.0)
+            _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("liberado", 0.0)
+            _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("iof", 0.0)
             if _proj_val:
                 _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -2494,31 +2493,7 @@ try:
             _f_term_fmt  = _nbr(f["terminais"])
             _f_repro_fmt = _nbr(f["reprovados"])
             _f_ag_fmt    = _nbr(_proj_cnt)
-            # -- Filtro data Pix (modo normal) --
-            _prl, _prd, _prb, _prr = st.columns([1.6, 1.8, 0.8, 5.8])
-            with _prl:
-                st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
-            with _prd:
-                _proj_picked_nm = st.date_input(
-                    "", value=_data_ref_nm,
-                    min_value=data_min,
-                    max_value=_now_brt_nm.date() + timedelta(days=14),
-                    label_visibility="collapsed",
-                    key="proj_ref_picker_nm",
-                )
-            with _prb:
-                if _data_ref_nm != _default_ref_nm:
-                    if st.button("↺", key="proj_ref_reset_nm", help="Resetar para hoje"):
-                        st.session_state.pop("_proj_ref_nm", None)
-                        st.session_state.pop("proj_ref_picker_nm", None)
-                        st.rerun()
-            _proj_snapped_nm = _proj_picked_nm
-            while _proj_snapped_nm.weekday() >= 5:
-                _proj_snapped_nm += timedelta(days=1)
-            if _proj_snapped_nm != _data_ref_nm:
-                st.session_state["_proj_ref_nm"] = _proj_snapped_nm
-                st.session_state["proj_ref_picker_nm"] = _proj_snapped_nm
-                st.rerun()
+
             st.markdown(f"""
             <div class="kpi-row">
               <div class="kpi-card">
@@ -2539,12 +2514,12 @@ try:
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Leads a Desembolsar</div>
                 <div class="kpi-value">{_f_ag_fmt}</div>
-                <div class="kpi-sub">Pix {_ref_short_nm}</div>
+                <div class="kpi-sub">Pix {_ref_short_kpi}</div>
               </div>
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Desembolso</div>
                 <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
-                <div class="kpi-sub">Pix {_ref_short_nm} · {_proj_kpi_sub}</div>
+                <div class="kpi-sub">Pix {_ref_short_kpi} · {_proj_kpi_sub}</div>
               </div>
             </div>
             <div class="kpi-row">
@@ -2580,6 +2555,37 @@ try:
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
+            # -- Filtro data Pix (secao 1) --
+            if "proj_ref_picker_nm" not in st.session_state:
+                st.session_state["proj_ref_picker_nm"] = _data_ref_nm
+            _prl, _prd, _prb, _prr = st.columns([1.6, 1.8, 0.8, 5.8])
+            with _prl:
+                st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
+            with _prd:
+                _proj_picked_nm = st.date_input(
+                    "",
+                    min_value=data_min,
+                    max_value=_now_brt_nm.date() + timedelta(days=14),
+                    label_visibility="collapsed",
+                    key="proj_ref_picker_nm",
+                )
+            with _prb:
+                if _data_ref_nm != _default_ref_nm:
+                    if st.button("↺", key="proj_ref_reset_nm", help="Resetar para hoje"):
+                        st.session_state.pop("_proj_ref_nm", None)
+                        st.session_state.pop("proj_ref_picker_nm", None)
+                        st.rerun()
+            _proj_snapped_nm = _proj_picked_nm
+            while _proj_snapped_nm.weekday() >= 5:
+                _proj_snapped_nm += timedelta(days=1)
+            if _proj_snapped_nm != _data_ref_nm:
+                st.session_state["_proj_ref_nm"] = _proj_snapped_nm
+                st.session_state["proj_ref_picker_nm"] = _proj_snapped_nm
+                st.rerun()
+            _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
+            _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
+            _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
+            _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
             # Breakdown por dia para as setinhas — mesma janela de 5 dias de hoje.
             # carregar_dia é cached — não faz requests adicionais.
             _pt_por_dia: dict = {}
