@@ -1639,7 +1639,6 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
     vol      = fin.get("ValorContratacao", {})
     vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
-    _pt_tv        = agg.get("projecao_tipos", {})
     # BT live: independente do período — data de referência baseada no horário BRT atual
     _now_brt_tv  = datetime.utcnow() - timedelta(hours=3)
     _pix_ab_tv   = _now_brt_tv.weekday() < 5 and (7, 0) <= (_now_brt_tv.hour, _now_brt_tv.minute) <= (18, 30)
@@ -1652,11 +1651,31 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _ref_label_tv = _data_ref_tv.strftime("%d/%m")
     _ultimo_tv    = carregar_dia(max(datas)) if datas else {}
     _bt_live_tv   = _ultimo_tv.get("bt_pix_days", {}).get(_ref_str_tv, {})
-    _proj_count   = sum(d["count"]    for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("count", 0)
+    # Non-BT live: últimos 5 dias a partir de hoje, independente do período
+    _non_bt_live_tv: dict = {}
+    _today_tv = _now_brt_tv.date()
+    for _d5tv in range(5):
+        _s5tv = (_today_tv - timedelta(days=_d5tv)).strftime("%Y%m%d")
+        if _s5tv not in datas:
+            continue
+        _j5tv = carregar_dia(_s5tv)
+        if not _j5tv:
+            continue
+        for _ts5tv, _v5tv in _j5tv.get("projecao_tipos", {}).items():
+            if _ts5tv == "BLOQUEIO_TEMPORARIO":
+                continue
+            if _v5tv.get("count", 0) > 0:
+                if _ts5tv not in _non_bt_live_tv:
+                    _non_bt_live_tv[_ts5tv] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0}
+                _non_bt_live_tv[_ts5tv]["count"]    += _v5tv.get("count", 0)
+                _non_bt_live_tv[_ts5tv]["valor"]    += _v5tv.get("valor", 0.0)
+                _non_bt_live_tv[_ts5tv]["liberado"] += _v5tv.get("liberado", 0.0)
+                _non_bt_live_tv[_ts5tv]["iof"]      += _v5tv.get("iof", 0.0)
+    _proj_count   = sum(d["count"]    for d in _non_bt_live_tv.values()) + _bt_live_tv.get("count", 0)
     _proj_count_s = f"{_proj_count:,}".replace(",", ".")
-    _proj_valor   = sum(d["valor"]    for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("valor", 0.0)
-    _proj_lib     = sum(d["liberado"] for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("liberado", 0.0)
-    _proj_iof_tv  = sum(d["iof"]      for ts, d in _pt_tv.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_tv.get("iof", 0.0)
+    _proj_valor   = sum(d["valor"]    for d in _non_bt_live_tv.values()) + _bt_live_tv.get("valor", 0.0)
+    _proj_lib     = sum(d["liberado"] for d in _non_bt_live_tv.values()) + _bt_live_tv.get("liberado", 0.0)
+    _proj_iof_tv  = sum(d["iof"]      for d in _non_bt_live_tv.values()) + _bt_live_tv.get("iof", 0.0)
     if _proj_valor:
         _proj_val_fmt_tv = ("R$ " + f"{_proj_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         _proj_lib_fmt_tv = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -2405,7 +2424,6 @@ try:
             taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
             vol      = fin.get("ValorContratacao", {})
             vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
-            _pt_nm       = agg.get("projecao_tipos", {})
             # BT live: independente do período — data de referência baseada no horário BRT atual
             _now_brt_nm  = datetime.utcnow() - timedelta(hours=3)
             _pix_ab_nm   = _now_brt_nm.weekday() < 5 and (7, 0) <= (_now_brt_nm.hour, _now_brt_nm.minute) <= (18, 30)
@@ -2419,11 +2437,31 @@ try:
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
             _ultimo_nm     = carregar_dia(max(datas)) if datas else {}
             _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
-            _proj_cnt   = sum(d["count"]    for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("count", 0)
+            # Non-BT live: últimos 5 dias a partir de hoje, independente do período
+            _non_bt_live_nm: dict = {}
+            _today_nm = _now_brt_nm.date()
+            for _d5nm in range(5):
+                _s5nm = (_today_nm - timedelta(days=_d5nm)).strftime("%Y%m%d")
+                if _s5nm not in datas:
+                    continue
+                _j5nm = carregar_dia(_s5nm)
+                if not _j5nm:
+                    continue
+                for _ts5nm, _v5nm in _j5nm.get("projecao_tipos", {}).items():
+                    if _ts5nm == "BLOQUEIO_TEMPORARIO":
+                        continue
+                    if _v5nm.get("count", 0) > 0:
+                        if _ts5nm not in _non_bt_live_nm:
+                            _non_bt_live_nm[_ts5nm] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0}
+                        _non_bt_live_nm[_ts5nm]["count"]    += _v5nm.get("count", 0)
+                        _non_bt_live_nm[_ts5nm]["valor"]    += _v5nm.get("valor", 0.0)
+                        _non_bt_live_nm[_ts5nm]["liberado"] += _v5nm.get("liberado", 0.0)
+                        _non_bt_live_nm[_ts5nm]["iof"]      += _v5nm.get("iof", 0.0)
+            _proj_cnt   = sum(d["count"]    for d in _non_bt_live_nm.values()) + _bt_live_nm.get("count", 0)
             _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-            _proj_val   = sum(d["valor"]    for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("valor", 0.0)
-            _proj_lib   = sum(d["liberado"] for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("liberado", 0.0)
-            _proj_iof   = sum(d["iof"]      for ts, d in _pt_nm.items() if ts != "BLOQUEIO_TEMPORARIO") + _bt_live_nm.get("iof", 0.0)
+            _proj_val   = sum(d["valor"]    for d in _non_bt_live_nm.values()) + _bt_live_nm.get("valor", 0.0)
+            _proj_lib   = sum(d["liberado"] for d in _non_bt_live_nm.values()) + _bt_live_nm.get("liberado", 0.0)
+            _proj_iof   = sum(d["iof"]      for d in _non_bt_live_nm.values()) + _bt_live_nm.get("iof", 0.0)
             if _proj_val:
                 _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
                 _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -2511,11 +2549,14 @@ try:
             
             st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
 
-            # Breakdown por dia para as setinhas de expansão na tabela.
+            # Breakdown por dia para as setinhas — mesma janela de 5 dias de hoje.
             # carregar_dia é cached — não faz requests adicionais.
             _pt_por_dia: dict = {}
-            for _ds2 in list(datas_sel) + list(datas_extra):
-                _dj2 = carregar_dia(_ds2)
+            for _d5pd in range(5):
+                _s5pd = (_today_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
+                if _s5pd not in datas:
+                    continue
+                _dj2 = carregar_dia(_s5pd)
                 if not _dj2:
                     continue
                 for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
@@ -2524,7 +2565,7 @@ try:
                     if _v2.get("count", 0) > 0:
                         if _ts2 not in _pt_por_dia:
                             _pt_por_dia[_ts2] = {}
-                        _pt_por_dia[_ts2][_ds2] = {
+                        _pt_por_dia[_ts2][_s5pd] = {
                             "count":    _v2.get("count", 0),
                             "valor":    _v2.get("valor", 0.0),
                             "liberado": _v2.get("liberado", 0.0),
@@ -2546,8 +2587,8 @@ try:
                 "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
             }
             
-            # Tabela: tipos nao-BT do periodo + BT live (mesma logica das KPIs)
-            _pt_sec_base = {ts: d for ts, d in agg.get("projecao_tipos", {}).items() if ts != "BLOQUEIO_TEMPORARIO"}
+            # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
+            _pt_sec_base = dict(_non_bt_live_nm)
             if _bt_live_nm.get("count", 0) > 0:
                 _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
             _pt_sec = _pt_sec_base
