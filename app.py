@@ -2596,7 +2596,7 @@ try:
                 def _n(v): return f"{v:,}".replace(",", ".")
                 _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
             
-                _sorted = sorted(_pt_sec.items(), key=lambda x: -x[1]["valor"])
+                _sorted = sorted(_pt_sec.items(), key=lambda x: (x[0] in _HIDE_VALOR_TIPOS, -x[1]["valor"]))
                 _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
                 _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
                 _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
