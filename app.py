@@ -1647,12 +1647,11 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     # BT live: independente do período — data de referência baseada no horário BRT atual
     _now_brt_tv  = datetime.utcnow() - timedelta(hours=3)
     _pix_ab_tv   = _now_brt_tv.weekday() < 5 and (7, 0) <= (_now_brt_tv.hour, _now_brt_tv.minute) <= (18, 30)
-    _default_ref_tv = _now_brt_tv.date()
+    _data_ref_tv = _now_brt_tv.date()
     if not _pix_ab_tv:
-        _default_ref_tv += timedelta(days=1)
-        while _default_ref_tv.weekday() >= 5:
-            _default_ref_tv += timedelta(days=1)
-    _data_ref_tv  = st.session_state.get("_proj_ref_tv", _default_ref_tv)
+        _data_ref_tv += timedelta(days=1)
+        while _data_ref_tv.weekday() >= 5:
+            _data_ref_tv += timedelta(days=1)
     _ref_str_tv   = _data_ref_tv.strftime("%Y%m%d")
     _ref_label_tv = _data_ref_tv.strftime("%d/%m")
     _ultimo_tv    = carregar_dia(max(datas)) if datas else {}
@@ -1747,30 +1746,6 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     if slide == 0:
         _tv_h("KPIs", periodo)
-        _crl, _crd, _crb, _crr = st.columns([1.4, 1.7, 0.8, 6.1])
-        with _crl:
-            st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
-        with _crd:
-            _proj_picked = st.date_input(
-                "", value=_data_ref_tv,
-                min_value=data_min,
-                max_value=_now_brt_tv.date() + timedelta(days=14),
-                label_visibility="collapsed",
-                key="proj_ref_picker",
-            )
-        with _crb:
-            if _data_ref_tv != _default_ref_tv:
-                if st.button("↺", key="proj_ref_reset", help="Resetar para hoje"):
-                    st.session_state.pop("_proj_ref_tv", None)
-                    st.session_state.pop("proj_ref_picker", None)
-                    st.rerun()
-        _proj_snapped = _proj_picked
-        while _proj_snapped.weekday() >= 5:
-            _proj_snapped += timedelta(days=1)
-        if _proj_snapped != _data_ref_tv:
-            st.session_state["_proj_ref_tv"] = _proj_snapped
-            st.session_state["proj_ref_picker"] = _proj_snapped
-            st.rerun()
         st.markdown(_kpi_html, unsafe_allow_html=True)
 
     elif slide == 1:
@@ -2457,11 +2432,12 @@ try:
             # BT live: independente do período — data de referência baseada no horário BRT atual
             _now_brt_nm  = datetime.utcnow() - timedelta(hours=3)
             _pix_ab_nm   = _now_brt_nm.weekday() < 5 and (7, 0) <= (_now_brt_nm.hour, _now_brt_nm.minute) <= (18, 30)
-            _data_ref_nm = _now_brt_nm.date()
+            _default_ref_nm = _now_brt_nm.date()
             if not _pix_ab_nm:
-                _data_ref_nm += timedelta(days=1)
-                while _data_ref_nm.weekday() >= 5:
-                    _data_ref_nm += timedelta(days=1)
+                _default_ref_nm += timedelta(days=1)
+                while _default_ref_nm.weekday() >= 5:
+                    _default_ref_nm += timedelta(days=1)
+            _data_ref_nm   = st.session_state.get("_proj_ref_nm", _default_ref_nm)
             _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
             _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
             _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
@@ -2518,6 +2494,31 @@ try:
             _f_term_fmt  = _nbr(f["terminais"])
             _f_repro_fmt = _nbr(f["reprovados"])
             _f_ag_fmt    = _nbr(_proj_cnt)
+            # -- Filtro data Pix (modo normal) --
+            _prl, _prd, _prb, _prr = st.columns([1.6, 1.8, 0.8, 5.8])
+            with _prl:
+                st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
+            with _prd:
+                _proj_picked_nm = st.date_input(
+                    "", value=_data_ref_nm,
+                    min_value=data_min,
+                    max_value=_now_brt_nm.date() + timedelta(days=14),
+                    label_visibility="collapsed",
+                    key="proj_ref_picker_nm",
+                )
+            with _prb:
+                if _data_ref_nm != _default_ref_nm:
+                    if st.button("↺", key="proj_ref_reset_nm", help="Resetar para hoje"):
+                        st.session_state.pop("_proj_ref_nm", None)
+                        st.session_state.pop("proj_ref_picker_nm", None)
+                        st.rerun()
+            _proj_snapped_nm = _proj_picked_nm
+            while _proj_snapped_nm.weekday() >= 5:
+                _proj_snapped_nm += timedelta(days=1)
+            if _proj_snapped_nm != _data_ref_nm:
+                st.session_state["_proj_ref_nm"] = _proj_snapped_nm
+                st.session_state["proj_ref_picker_nm"] = _proj_snapped_nm
+                st.rerun()
             st.markdown(f"""
             <div class="kpi-row">
               <div class="kpi-card">
