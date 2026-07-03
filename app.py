@@ -339,6 +339,7 @@ def agregar(dias_raw: list) -> dict:
     emp_motivos   = defaultdict(lambda: defaultdict(int))
     novo_ctps     = defaultdict(int)
     emp_ap_stats_raw: dict = {}
+    taxa_dist: dict = {}
     valores_cont     = []
     aguardando          = 0
     aguardando_valor    = 0.0
@@ -433,6 +434,17 @@ def agregar(dias_raw: list) -> dict:
                 if a[_pj] is None and s.get(_pj) is not None:
                     a[_pj] = s[_pj]
 
+        if d.get("taxa_dist"):
+            for _tk, _cnt in d["taxa_dist"].items():
+                taxa_dist[_tk] = taxa_dist.get(_tk, 0) + _cnt
+        else:
+            for _s in d.get("emp_ap_stats", {}).values():
+                _nt = _s.get("n_taxa", 0)
+                _st = _s.get("sum_taxa", 0.0)
+                if _nt and _st:
+                    _tk = f"{_st / _nt:.2f}"
+                    taxa_dist[_tk] = taxa_dist.get(_tk, 0) + _nt
+
         valores_cont.extend(d.get("valores_contratacao", []))
         aguardando          += d.get("aguardando", 0)
         aguardando_valor    += d.get("aguardando_valor", 0.0)
@@ -518,6 +530,7 @@ def agregar(dias_raw: list) -> dict:
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
         "emp_ap_stats":      emp_ap_stats_final,
+        "taxa_dist":         taxa_dist,
         "valores_contratacao": valores_cont,
         "projecao_tipos": {
             ts: {
@@ -2826,15 +2839,8 @@ try:
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
-            # Distribuição de taxa — aprovados do período (taxa individual por lead)
+            # Distribuição de taxa — taxa média por empregador por dia, agregada pelo dash
             _dist_taxa = agg.get("taxa_dist", {})
-            if not _dist_taxa:
-                # fallback: JSONs antigos sem taxa_dist usam média por empregador
-                for _estats in agg.get("emp_ap_stats", {}).values():
-                    _mt = _estats.get("media_taxa")
-                    _nt = _estats.get("n_taxa", 0)
-                    if _mt and _nt:
-                        _dist_taxa[f"{_mt:.2f}"] = _dist_taxa.get(f"{_mt:.2f}", 0) + _nt
             if _dist_taxa:
                     _n_taxa_total = sum(_dist_taxa.values())
                     _taxa_sorted = dict(sorted(
