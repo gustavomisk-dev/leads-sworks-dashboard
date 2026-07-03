@@ -75,6 +75,12 @@ div[data-testid="stForm"]{background:transparent!important;border:none!important
     border-radius:0!important;padding:0!important}
 /* Collapse CookieController iframe — JS still runs with height:0 (no display:none) */
 iframe{height:0!important;min-height:0!important;overflow:hidden!important}
+/* Grey out weekend days in Streamlit date picker calendar */
+[data-baseweb="calendar"] button[aria-label*="Saturday"],
+[data-baseweb="calendar"] button[aria-label*="Sunday"],
+[data-baseweb="calendar"] [role="gridcell"]:first-child button,
+[data-baseweb="calendar"] [role="gridcell"]:last-child button{
+    opacity:.25!important;pointer-events:none!important;cursor:not-allowed!important}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1641,11 +1647,12 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     # BT live: independente do período — data de referência baseada no horário BRT atual
     _now_brt_tv  = datetime.utcnow() - timedelta(hours=3)
     _pix_ab_tv   = _now_brt_tv.weekday() < 5 and (7, 0) <= (_now_brt_tv.hour, _now_brt_tv.minute) <= (18, 30)
-    _data_ref_tv = _now_brt_tv.date()
+    _default_ref_tv = _now_brt_tv.date()
     if not _pix_ab_tv:
-        _data_ref_tv += timedelta(days=1)
-        while _data_ref_tv.weekday() >= 5:
-            _data_ref_tv += timedelta(days=1)
+        _default_ref_tv += timedelta(days=1)
+        while _default_ref_tv.weekday() >= 5:
+            _default_ref_tv += timedelta(days=1)
+    _data_ref_tv  = st.session_state.get("_proj_ref_tv", _default_ref_tv)
     _ref_str_tv   = _data_ref_tv.strftime("%Y%m%d")
     _ref_label_tv = _data_ref_tv.strftime("%d/%m")
     _ultimo_tv    = carregar_dia(max(datas)) if datas else {}
@@ -1740,6 +1747,30 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     if slide == 0:
         _tv_h("KPIs", periodo)
+        _crl, _crd, _crb, _crr = st.columns([1.4, 1.7, 0.8, 6.1])
+        with _crl:
+            st.markdown("<p style='margin:7px 0 0;color:#94a3b8;font-size:13px'>&#128197; Data Pix projeção:</p>", unsafe_allow_html=True)
+        with _crd:
+            _proj_picked = st.date_input(
+                "", value=_data_ref_tv,
+                min_value=data_min,
+                max_value=_now_brt_tv.date() + timedelta(days=14),
+                label_visibility="collapsed",
+                key="proj_ref_picker",
+            )
+        with _crb:
+            if _data_ref_tv != _default_ref_tv:
+                if st.button("↺", key="proj_ref_reset", help="Resetar para hoje"):
+                    st.session_state.pop("_proj_ref_tv", None)
+                    st.session_state.pop("proj_ref_picker", None)
+                    st.rerun()
+        _proj_snapped = _proj_picked
+        while _proj_snapped.weekday() >= 5:
+            _proj_snapped += timedelta(days=1)
+        if _proj_snapped != _data_ref_tv:
+            st.session_state["_proj_ref_tv"] = _proj_snapped
+            st.session_state["proj_ref_picker"] = _proj_snapped
+            st.rerun()
         st.markdown(_kpi_html, unsafe_allow_html=True)
 
     elif slide == 1:
