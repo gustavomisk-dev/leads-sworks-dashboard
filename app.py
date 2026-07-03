@@ -2677,6 +2677,7 @@ try:
                 </tr>
               </tbody>
             </table>
+            <p style='color:#475569;font-size:.8em;margin:6px 0 0'>* Etapas consideram leads dos últimos 5 dias a partir de hoje, independente do período selecionado.</p>
             </div>
             """, unsafe_allow_html=True)
             else:
