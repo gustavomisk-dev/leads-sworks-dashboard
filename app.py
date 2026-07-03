@@ -3061,9 +3061,12 @@ try:
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
         
-except Exception:
+except Exception as _exc:
+    import traceback as _tb
     st.warning(
         "⚠️ **Plataforma em manutenção** — houve um erro inesperado. "
         "Aguarde alguns minutos e recarregue a página."
     )
+    with st.expander("🔍 Detalhes do erro (debug)"):
+        st.code(_tb.format_exc(), language="python")
     st.stop()
