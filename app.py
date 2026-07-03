@@ -2554,7 +2554,7 @@ try:
             
             # ── 1. Projeção de Desembolso ────────────────────────────────────────────────
             
-            st.markdown('<div class="sec">1. Projeção de Desembolso</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sec">1. Projeção de Desembolso ({_default_ref_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
 
             # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
             _data_ref_nm = _default_ref_nm
