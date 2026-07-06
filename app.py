@@ -2590,21 +2590,29 @@ try:
                         continue
                     if _v2.get("count", 0) > 0:
                         if _ts2 not in _non_bt_sec_nm:
-                            _non_bt_sec_nm[_ts2] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0}
+                            _non_bt_sec_nm[_ts2] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0, "taxa_sum": 0.0, "taxa_n": 0}
                         _non_bt_sec_nm[_ts2]["count"]    += _v2.get("count", 0)
                         _non_bt_sec_nm[_ts2]["valor"]    += _v2.get("valor", 0.0)
                         _non_bt_sec_nm[_ts2]["liberado"] += _v2.get("liberado", 0.0)
                         _non_bt_sec_nm[_ts2]["iof"]      += _v2.get("iof", 0.0)
+                        _non_bt_sec_nm[_ts2]["taxa_sum"] += (_v2.get("taxa_media") or 0.0) * _v2.get("taxa_n", 0)
+                        _non_bt_sec_nm[_ts2]["taxa_n"]   += _v2.get("taxa_n", 0)
                         if _ts2 not in _pt_por_dia:
                             _pt_por_dia[_ts2] = {}
                         _pt_por_dia[_ts2][_s5pd] = {
-                            "count":    _v2.get("count", 0),
-                            "valor":    _v2.get("valor", 0.0),
-                            "liberado": _v2.get("liberado", 0.0),
-                            "iof":      _v2.get("iof", 0.0),
+                            "count":      _v2.get("count", 0),
+                            "valor":      _v2.get("valor", 0.0),
+                            "liberado":   _v2.get("liberado", 0.0),
+                            "iof":        _v2.get("iof", 0.0),
+                            "taxa_media": _v2.get("taxa_media"),
+                            "taxa_n":     _v2.get("taxa_n", 0),
                         }
             # BT: breakdown já está keyed por dia Pix no JSON mais recente
             _pt_por_dia["BLOQUEIO_TEMPORARIO"] = _ultimo_nm.get("bt_pix_days", {})
+            # Derivar taxa_media por etapa (média ponderada sobre os 5 dias acumulados)
+            for _ts3 in _non_bt_sec_nm:
+                _tn3 = _non_bt_sec_nm[_ts3].get("taxa_n", 0)
+                _non_bt_sec_nm[_ts3]["taxa_media"] = (_non_bt_sec_nm[_ts3]["taxa_sum"] / _tn3) if _tn3 > 0 else None
 
             _TIPO_LABEL_MAP = {
                 "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
@@ -2627,6 +2635,7 @@ try:
             if _pt_sec:
                 def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
                 def _n(v): return f"{v:,}".replace(",", ".")
+                def _pct(v): return (f"{v:.2f}".replace(".", ",") + "% a.m.") if v else "—"
                 _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
             
                 _sorted = sorted(_pt_sec.items(), key=lambda x: (x[0] in _HIDE_VALOR_TIPOS, -x[1]["valor"]))
@@ -2634,6 +2643,9 @@ try:
                 _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
                 _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
                 _t_iof  = sum(d["iof"]      for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                _t_taxa_n   = sum((d.get("taxa_n") or 0) for d in _pt_sec.values())
+                _t_taxa_sum = sum((d.get("taxa_media") or 0) * (d.get("taxa_n") or 0) for d in _pt_sec.values())
+                _t_taxa     = _t_taxa_sum / _t_taxa_n if _t_taxa_n > 0 else None
             
                 _rows = ""
                 for ts, d in _sorted:
@@ -2647,6 +2659,7 @@ try:
                             f"{datetime.strptime(_ds3, '%Y%m%d').strftime('%d/%m/%Y')}</span>"
                             f"<span class='pj-det-n'>{_n(_dv3['count'])} lead{'s' if _dv3['count'] != 1 else ''}</span>"
                             f"<span class='pj-det-v'>{_r(_dv3['valor'])}</span>"
+                            f"<span class='pj-det-x'>{_pct(_dv3.get('taxa_media'))}</span>"
                             f"</div>"
                             for _ds3, _dv3 in sorted(_dias_ts.items())
                         )
@@ -2658,6 +2671,7 @@ try:
                         f"<tr>"
                         f"<td class='pj-lbl'>{_cell_lbl}</td>"
                         f"<td class='pj-n'>{_n(d['count'])}</td>"
+                        f"<td class='pj-n'>{_pct(d.get('taxa_media'))}</td>"
                         f"<td class='pj-n'>{'—' if _hv else _r(d['valor'])}</td>"
                         f"<td class='pj-n'>{'—' if _hv else _r(d['liberado'])}</td>"
                         f"<td class='pj-n'>{'—' if _hv else _r(d['iof'])}</td>"
@@ -2690,12 +2704,14 @@ try:
             .pj-det-dt{{min-width:110px;color:#64748b}}
             .pj-det-n{{min-width:80px}}
             .pj-det-v{{font-variant-numeric:tabular-nums}}
+            .pj-det-x{{color:#64748b;font-variant-numeric:tabular-nums}}
             </style>
             <div class="pj-wrap">
             <table class="pj-tbl">
               <thead><tr>
                 <th>Etapa</th>
                 <th class="pj-n">Leads</th>
+                <th class="pj-n">Taxa Média</th>
                 <th class="pj-n">Valor Total</th>
                 <th class="pj-n">Liberado</th>
                 <th class="pj-n">IOF</th>
@@ -2705,6 +2721,7 @@ try:
                 <tr class="pj-tot">
                   <td class="pj-lbl">Total</td>
                   <td class="pj-n">{_n(_t_cnt)}</td>
+                  <td class="pj-n">{_pct(_t_taxa)}</td>
                   <td class="pj-n">{_r(_t_val)}</td>
                   <td class="pj-n">{_r(_t_lib)}</td>
                   <td class="pj-n">{_r(_t_iof)}</td>
