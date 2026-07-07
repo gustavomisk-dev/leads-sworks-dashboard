@@ -2659,7 +2659,7 @@ try:
                 ))
                 _fig_desemb.update_layout(
                     template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                    title=dict(text="Evolução de Desembolsos — por data de desembolso (PaymentDate)", font=_TF),
+                    title=dict(text="Evolução Temporal de Desembolsos", font=_TF),
                     xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
                     yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
                     showlegend=False,
@@ -2961,17 +2961,28 @@ try:
                 if _alto_valor:
                     _av_rows = ""
                     for _cpf_v, _dv in _alto_valor:
+                        def _fmt_d(d):
+                            if not d:
+                                return "—"
+                            try:
+                                return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
+                            except ValueError:
+                                return d
                         _det_hdr = (
                             "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
                             "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
                             "<span class='pj-det-dt'>CCB</span>"
                             "<span class='pj-det-n'>C&#243;digo do Lead</span>"
+                            "<span class='pj-det-n'>Data do Lead</span>"
+                            "<span class='pj-det-n'>Data Desembolso</span>"
                             "</div>"
                         )
                         _det_inner = _det_hdr + "".join(
                             f"<div class='pj-det-row'>"
                             f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb(_ld.get('ccb',''))}</span>"
                             f"<span class='pj-det-n'>{_ld.get('codigo','—')}</span>"
+                            f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_criacao'))}</span>"
+                            f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_desembolso'))}</span>"
                             f"</div>"
                             for _ld in _dv["leads"]
                         )
