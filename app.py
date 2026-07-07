@@ -2437,6 +2437,33 @@ try:
                 else f"{d_ini.strftime('%d/%m/%Y')} — {d_fim.strftime('%d/%m/%Y')}"
             )
             
+            # ── Pré-computa desembolsos (usa cache de carregar_dia) ───────────────────────
+            _d_desemb_ini = d_ini - timedelta(days=7)
+            _d_desemb_datas = [
+                d for d in datas
+                if _d_desemb_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim
+            ]
+            _desemb_agg: dict = {}
+            for _dd in _d_desemb_datas:
+                _dj = carregar_dia(_dd)
+                if not _dj:
+                    continue
+                for _pd, _pv in _dj.get("desembolsos_por_data", {}).items():
+                    try:
+                        _pd_date = datetime.strptime(_pd, "%Y%m%d").date()
+                    except ValueError:
+                        continue
+                    if not (d_ini <= _pd_date <= d_fim):
+                        continue
+                    if _pd not in _desemb_agg:
+                        _desemb_agg[_pd] = {"count": 0, "valor": 0.0, "liberado": 0.0}
+                    _desemb_agg[_pd]["count"]    += _pv.get("count", 0)
+                    _desemb_agg[_pd]["valor"]    += _pv.get("valor", 0.0)
+                    _desemb_agg[_pd]["liberado"] += _pv.get("liberado", 0.0)
+            _desemb_tot_count = sum(v["count"]    for v in _desemb_agg.values())
+            _desemb_tot_valor = sum(v["valor"]    for v in _desemb_agg.values())
+            _desemb_tot_lib   = sum(v["liberado"] for v in _desemb_agg.values())
+
             # ── KPIs ──────────────────────────────────────────────────────────────────────
             
             taxa     = f"{f['taxa_aprovacao']:.1f}%" if f.get("terminais") else "—"
@@ -2564,10 +2591,103 @@ try:
               </div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # ── 1. Projeção de Desembolso ────────────────────────────────────────────────
-            
-            st.markdown(f'<div class="sec">1. Projeção de Desembolso ({_default_ref_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
+
+            # ── KPI: Desembolsos realizados ────────────────────────────────────────────────
+            _desemb_kpi_val_s = ("R$ " + f"{_desemb_tot_valor:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_valor else "—"
+            _desemb_kpi_lib_s = ("R$ " + f"{_desemb_tot_lib:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_lib else "—"
+            _desemb_ticket_s     = ("R$ " + f"{_desemb_tot_valor/_desemb_tot_count:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_count else "—"
+            _desemb_ticket_lib_s = ("R$ " + f"{_desemb_tot_lib/_desemb_tot_count:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_count else "—"
+            st.markdown(f"""
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Contratos Desembolsados</div>
+                <div class="kpi-value" style="color:#10b981">{_nbr(_desemb_tot_count) if _desemb_tot_count else "—"}</div>
+                <div class="kpi-sub">{periodo_label}</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Total Desembolsado</div>
+                <div class="kpi-value" style="color:#10b981">{_desemb_kpi_val_s}</div>
+                <div class="kpi-sub">valor contratado · data desembolso</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Liberado ao Cliente</div>
+                <div class="kpi-value">{_desemb_kpi_lib_s}</div>
+                <div class="kpi-sub">valor líquido</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Ticket Médio Desembolsado</div>
+                <div class="kpi-value">{_desemb_ticket_s}</div>
+                <div class="kpi-sub">valor contratado por contrato</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Ticket Médio Líquido</div>
+                <div class="kpi-value">{_desemb_ticket_lib_s}</div>
+                <div class="kpi-sub">liberado por contrato</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ── 1. Desembolsos no Período ─────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">1. Desembolsos no Período</div>', unsafe_allow_html=True)
+
+            if _desemb_agg:
+                _desemb_sorted = dict(sorted(_desemb_agg.items()))
+                _d_x    = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _desemb_sorted]
+                _d_y_val = [round(v["valor"],    2) for v in _desemb_sorted.values()]
+                _d_y_cnt = [v["count"]              for v in _desemb_sorted.values()]
+                _d_y_lib = [round(v["liberado"],  2) for v in _desemb_sorted.values()]
+                _cap_val_s = "R$ " + f"{_desemb_tot_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                _fig_desemb = go.Figure()
+                _fig_desemb.add_trace(go.Bar(
+                    x=_d_x,
+                    y=_d_y_val,
+                    name="Valor Contratado",
+                    marker_color="#10b981",
+                    opacity=0.85,
+                    customdata=list(zip(_d_y_cnt, _d_y_lib)),
+                    hovertemplate=(
+                        "<b>%{x}</b><br>"
+                        "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
+                        "Contratos: <b>%{customdata[0]}</b><br>"
+                        "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
+                        "<extra></extra>"
+                    ),
+                ))
+                _fig_desemb.update_layout(
+                    title=dict(
+                        text="Evolução de Desembolsos — organizado por data de desembolso (PaymentDate)",
+                        font=dict(size=13, color="#e2e8f0"), x=0,
+                    ),
+                    plot_bgcolor="#0d0c0a",
+                    paper_bgcolor="#0d0c0a",
+                    font=dict(color="#94a3b8", size=11),
+                    xaxis=dict(showgrid=False, tickfont=dict(size=11, color="#94a3b8")),
+                    yaxis=dict(
+                        showgrid=True, gridcolor="#1c1a18",
+                        tickformat=",.0f", tickprefix="R$ ",
+                        tickfont=dict(size=10, color="#94a3b8"),
+                    ),
+                    showlegend=False,
+                    margin=dict(l=10, r=10, t=40, b=10),
+                    height=320,
+                    bargap=0.25,
+                )
+                st.plotly_chart(_fig_desemb, use_container_width=True, config=_CONF)
+                st.caption(
+                    f"Inclui leads criados até 7 dias antes do período filtrado · "
+                    f"{_desemb_tot_count} contrato(s) · {_cap_val_s}"
+                )
+            else:
+                st.info(
+                    "Sem desembolsos registrados no período selecionado. "
+                    "Os JSONs precisam ser re-exportados com o campo desembolsos_por_data "
+                    "(execute publicar_dados.py após a atualização do exporter)."
+                )
+
+            # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
+
+            st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_default_ref_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
 
             # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
             _data_ref_nm = _default_ref_nm
@@ -2737,9 +2857,9 @@ try:
                     unsafe_allow_html=True,
                 )
             
-            # ── 2. Leads Aguardando Desembolso ───────────────────────────────────────────
+            # ── 3. Leads Aguardando Desembolso ───────────────────────────────────────────
 
-            st.markdown('<div class="sec">2. Leads Aguardando Desembolso</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">3. Leads Aguardando Desembolso</div>', unsafe_allow_html=True)
 
             _pf = agg.get("pipeline_financeiro", {})
             _dup = agg.get("duplicatas_cpf", [])
@@ -2785,9 +2905,9 @@ try:
                     unsafe_allow_html=True,
                 )
 
-            # ── 3. Distribuição por Status ────────────────────────────────────────────────
+            # ── 4. Distribuição por Status ────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">3. Distribuição por Status</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">4. Distribuição por Status</div>', unsafe_allow_html=True)
             
             col_d, col_f = st.columns(2)
             with col_d:
@@ -2799,9 +2919,9 @@ try:
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 4. Status Novo — CTPS ─────────────────────────────────────────────────────
+            # ── 5. Status Novo — CTPS ─────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">4. Status Novo — CTPS</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">5. Status Novo — CTPS</div>', unsafe_allow_html=True)
             _ncs = agg.get("novo_ctps_status", {})
             if _ncs:
                 _ctps_total     = _ncs.get("ctps_total", 0)
@@ -2834,17 +2954,17 @@ try:
 </div>
 """, unsafe_allow_html=True)
 
-            # ── 5. Evolução Temporal ──────────────────────────────────────────────────────
+            # ── 6. Evolução Temporal ──────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">5. Evolução Temporal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">6. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 6. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            # ── 7. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-            st.markdown('<div class="sec">6. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -2876,9 +2996,9 @@ try:
                     if fig_taxa:
                         st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
 
-            # ── 7. Etapa de Reprovação ────────────────────────────────────────────────────
+            # ── 8. Etapa de Reprovação ────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">7. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">8. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -2940,9 +3060,9 @@ try:
             else:
                 st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
-            # ── 8. Motivos de Reprovação ──────────────────────────────────────────────────
+            # ── 9. Motivos de Reprovação ──────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">8. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">9. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -2965,9 +3085,9 @@ try:
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
-            # ── 9. Bloqueios ──────────────────────────────────────────────────────────────
+            # ── 10. Bloqueios ─────────────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">9. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">10. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
             if fig:
@@ -2977,9 +3097,9 @@ try:
             else:
                 st.info("Sem dados de bloqueios.")
             
-            # ── 10. Segmentação — Reprovados ─────────────────────────────────────────────
+            # ── 11. Segmentação — Reprovados ─────────────────────────────────────────────
 
-            st.markdown('<div class="sec">10. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">11. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -3039,9 +3159,9 @@ try:
                 else:
                     st.info("Sem dados de CBO dos reprovados.")
             
-            # ── 11. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+            # ── 12. Aprovados — Empregadores e CBOs ──────────────────────────────────────
 
-            st.markdown('<div class="sec">11. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">12. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
