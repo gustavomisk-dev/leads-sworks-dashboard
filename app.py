@@ -2639,12 +2639,15 @@ try:
                 _d_y_lib = [round(v["liberado"],  2) for v in _desemb_sorted.values()]
                 _cap_val_s = "R$ " + f"{_desemb_tot_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
                 _fig_desemb = go.Figure()
-                _fig_desemb.add_trace(go.Bar(
+                _fig_desemb.add_trace(go.Scatter(
                     x=_d_x,
                     y=_d_y_val,
                     name="Valor Contratado",
-                    marker_color="#10b981",
-                    opacity=0.85,
+                    mode="lines+markers",
+                    line=dict(color="#10b981", width=2),
+                    marker=dict(size=6, color="#10b981"),
+                    fill="tozeroy",
+                    fillcolor="rgba(16,185,129,0.08)",
                     customdata=list(zip(_d_y_cnt, _d_y_lib)),
                     hovertemplate=(
                         "<b>%{x}</b><br>"
@@ -2655,23 +2658,14 @@ try:
                     ),
                 ))
                 _fig_desemb.update_layout(
-                    title=dict(
-                        text="Evolução de Desembolsos — organizado por data de desembolso (PaymentDate)",
-                        font=dict(size=13, color="#e2e8f0"), x=0,
-                    ),
-                    plot_bgcolor="#0d0c0a",
-                    paper_bgcolor="#0d0c0a",
-                    font=dict(color="#94a3b8", size=11),
-                    xaxis=dict(showgrid=False, tickfont=dict(size=11, color="#94a3b8")),
-                    yaxis=dict(
-                        showgrid=True, gridcolor="#1c1a18",
-                        tickformat=",.0f", tickprefix="R$ ",
-                        tickfont=dict(size=10, color="#94a3b8"),
-                    ),
+                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                    title=dict(text="Evolução de Desembolsos — por data de desembolso (PaymentDate)", font=_TF),
+                    xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                    yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
                     showlegend=False,
-                    margin=dict(l=10, r=10, t=40, b=10),
-                    height=320,
-                    bargap=0.25,
+                    margin=dict(t=50, b=40, l=10, r=10),
+                    height=360,
+                    hovermode="x unified",
                 )
                 st.plotly_chart(_fig_desemb, use_container_width=True, config=_CONF)
                 st.caption(
