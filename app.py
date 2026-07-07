@@ -2907,6 +2907,7 @@ try:
                         _cpfs_periodo.add(_cpf_k)
 
             if _cpfs_periodo:
+                # Agrega todos os dias, deduplicando por lead ID para evitar dupla contagem
                 _aprov_glob: dict = {}
                 for _dd_all in datas:
                     _dj_all = carregar_dia(_dd_all)
@@ -2916,12 +2917,36 @@ try:
                         if not _cpf_k:
                             continue
                         if _cpf_k not in _aprov_glob:
-                            _aprov_glob[_cpf_k] = {"nome": _vk.get("nome", ""), "n": 0, "valor": 0.0, "liberado": 0.0}
-                        _aprov_glob[_cpf_k]["n"]        += _vk.get("n", 0)
-                        _aprov_glob[_cpf_k]["valor"]    += _vk.get("valor", 0.0)
-                        _aprov_glob[_cpf_k]["liberado"] += _vk.get("liberado", 0.0)
+                            _aprov_glob[_cpf_k] = {"nome": _vk.get("nome", ""), "valor": 0.0, "liberado": 0.0, "_seen": set(), "leads": []}
                         if not _aprov_glob[_cpf_k]["nome"] and _vk.get("nome"):
                             _aprov_glob[_cpf_k]["nome"] = _vk["nome"]
+                        for _lv in (_vk.get("leads") or []):
+                            _lid = _lv.get("id", "")
+                            if _lid and _lid in _aprov_glob[_cpf_k]["_seen"]:
+                                continue
+                            if _lid:
+                                _aprov_glob[_cpf_k]["_seen"].add(_lid)
+                            _aprov_glob[_cpf_k]["valor"]    += _lv.get("valor", 0.0)
+                            _aprov_glob[_cpf_k]["liberado"] += _lv.get("liberado", 0.0)
+                            _aprov_glob[_cpf_k]["leads"].append(_lv)
+
+                def _mask_cpf(c):
+                    c = str(c).strip().zfill(11)
+                    return f"{c[:3]}.***.***-**"
+
+                def _mask_nome(n):
+                    parts = str(n).strip().split()
+                    if not parts:
+                        return "—"
+                    return parts[0].capitalize() + (" *" if len(parts) > 1 else "")
+
+                def _mask_ccb(c):
+                    c = str(c).strip()
+                    if len(c) <= 4:
+                        return c
+                    return c[:3] + "*" * (len(c) - 4) + c[-1]
+
+                _brl3 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
                 _alto_valor = sorted(
                     [
@@ -2934,32 +2959,41 @@ try:
                 )
 
                 if _alto_valor:
-                    _brl3 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    _av_rows = []
-                    for _i, (_cpf_v, _dv) in enumerate(_alto_valor):
-                        _rc = "g0" if _i % 2 == 0 else "g1"
-                        _av_rows.append(
-                            f'<tr class="{_rc}">'
-                            f'<td>{_cpf_v}</td>'
-                            f'<td>{_dv["nome"] or "—"}</td>'
-                            f'<td class="r">{_dv["n"]}</td>'
-                            f'<td class="r">{_brl3(_dv["valor"])}</td>'
-                            f'<td class="r">{_brl3(_dv["liberado"])}</td>'
-                            f'</tr>'
-                        )
-                    _av_html = (
-                        '<div class="dtbl-title" style="color:#FEC52E">'
-                        '&#9733; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)'
-                        '</div>'
-                        '<div class="dtbl-wrap"><table class="dtbl">'
-                        '<thead><tr>'
-                        '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
-                        '<th class="r">Total Contratado</th><th class="r">Total Liberado</th>'
-                        '</tr></thead>'
-                        '<tbody>' + "".join(_av_rows) + '</tbody>'
-                        '</table></div>'
+                    st.markdown(
+                        '<div class="dtbl-title" style="color:#f59e0b">'
+                        '&#9888; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)'
+                        '</div>',
+                        unsafe_allow_html=True,
                     )
-                    st.markdown(_av_html, unsafe_allow_html=True)
+                    for _cpf_v, _dv in _alto_valor:
+                        _exp_label = (
+                            f"{_mask_cpf(_cpf_v)} &nbsp;·&nbsp; "
+                            f"{_mask_nome(_dv['nome'])} &nbsp;·&nbsp; "
+                            f"{len(_dv['leads'])} contrato(s) &nbsp;·&nbsp; "
+                            f"Total: {_brl3(_dv['valor'])}"
+                        )
+                        with st.expander(_exp_label):
+                            _lead_rows = []
+                            for _li, _ld in enumerate(_dv["leads"]):
+                                _rc = "g0" if _li % 2 == 0 else "g1"
+                                _lead_rows.append(
+                                    f'<tr class="{_rc}">'
+                                    f'<td style="font-family:monospace">{_mask_ccb(_ld.get("ccb",""))}</td>'
+                                    f'<td style="font-family:monospace">{_ld.get("codigo","—")}</td>'
+                                    f'<td class="r">{_brl3(_ld.get("valor",0))}</td>'
+                                    f'<td class="r">{_brl3(_ld.get("liberado",0))}</td>'
+                                    f'</tr>'
+                                )
+                            _lead_html = (
+                                '<div class="dtbl-wrap"><table class="dtbl">'
+                                '<thead><tr>'
+                                '<th>CCB</th><th>Código Lead</th>'
+                                '<th class="r">Contratado</th><th class="r">Liberado</th>'
+                                '</tr></thead>'
+                                '<tbody>' + "".join(_lead_rows) + '</tbody>'
+                                '</table></div>'
+                            )
+                            st.markdown(_lead_html, unsafe_allow_html=True)
 
             # ── 4. Distribuição por Status ────────────────────────────────────────────────
 
