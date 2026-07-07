@@ -2959,68 +2959,61 @@ try:
                 )
 
                 if _alto_valor:
-                    _COLS = "16px 9em 1fr 5em 9em 9em"
-                    _av_det_rows = []
-                    for _i, (_cpf_v, _dv) in enumerate(_alto_valor):
-                        _bg = "background:#18161498" if _i % 2 == 1 else ""
-                        _sub_rows = "".join(
-                            f'<tr>'
-                            f'<td style="font-family:monospace;padding:2px 10px 2px 0;color:#cbd5e1">{_mask_ccb(_ld.get("ccb",""))}</td>'
-                            f'<td style="font-family:monospace;padding:2px 0;color:#94a3b8">{_ld.get("codigo","—")}</td>'
-                            f'</tr>'
+                    _av_rows = ""
+                    for _cpf_v, _dv in _alto_valor:
+                        _det_inner = "".join(
+                            f"<div class='pj-det-row'>"
+                            f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb(_ld.get('ccb',''))}</span>"
+                            f"<span class='pj-det-n'>{_ld.get('codigo','—')}</span>"
+                            f"</div>"
                             for _ld in _dv["leads"]
                         )
-                        _sub_hdr = (
-                            '<tr>'
-                            '<td style="font-size:.7em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 10px 4px 0">CCB</td>'
-                            '<td style="font-size:.7em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 0 4px">Código Lead</td>'
-                            '</tr>'
+                        _name_cell = (
+                            f"<details class='pj-det'><summary>{_mask_nome(_dv['nome'])}</summary>"
+                            f"{_det_inner}</details>"
                         )
-                        _av_det_rows.append(
-                            f'<details class="av-det" style="{_bg}">'
-                            f'<summary>'
-                            f'<span class="av-arr">&#9654;</span>'
-                            f'<span style="font-family:monospace;font-size:.9em">{_mask_cpf(_cpf_v)}</span>'
-                            f'<span>{_mask_nome(_dv["nome"])}</span>'
-                            f'<span class="av-r">{len(_dv["leads"])}</span>'
-                            f'<span class="av-r">{_brl3(_dv["valor"])}</span>'
-                            f'<span class="av-r">{_brl3(_dv["liberado"])}</span>'
-                            f'</summary>'
-                            f'<div class="av-sub">'
-                            f'<table style="border-collapse:collapse;font-size:.84em">'
-                            f'<tbody>{_sub_hdr}{_sub_rows}</tbody>'
-                            f'</table></div>'
-                            f'</details>'
+                        _av_rows += (
+                            f"<tr>"
+                            f"<td class='pj-lbl'>{_name_cell}</td>"
+                            f"<td class='pj-n' style='font-family:monospace'>{_mask_cpf(_cpf_v)}</td>"
+                            f"<td class='pj-n'>{len(_dv['leads'])}</td>"
+                            f"<td class='pj-n'>{_brl3(_dv['valor'])}</td>"
+                            f"<td class='pj-n'>{_brl3(_dv['liberado'])}</td>"
+                            f"</tr>"
                         )
                     _av_html = f"""
 <style>
 .av-wrap{{overflow-x:auto;margin:6px 0 18px}}
-.av-hdr{{display:grid;grid-template-columns:{_COLS};padding:8px 12px;
-         background:#1c1a17;color:#94a3b8;font-size:.75em;font-weight:600;
-         letter-spacing:.04em;text-transform:uppercase;
-         border-bottom:2px solid #272420;gap:0 8px;align-items:center}}
-.av-r{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
-.av-det{{border-bottom:1px solid #1c1a17}}
-.av-det summary{{display:grid;grid-template-columns:{_COLS};list-style:none;
-                 cursor:pointer;padding:7px 12px;color:#e2e8f0;
-                 align-items:center;gap:0 8px}}
-.av-det summary::-webkit-details-marker{{display:none}}
-.av-det[open] summary,.av-det:not([open]) summary:hover{{background:#1a181598}}
-.av-arr{{font-size:.55em;color:#64748b;transition:transform .15s;justify-self:center}}
-.av-det[open] .av-arr{{transform:rotate(90deg);color:#FEC52E}}
-.av-sub{{padding:5px 12px 10px 44px}}
+.av-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
+.av-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
+            text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
+.av-tbl th.pj-n{{text-align:right}}
+.av-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
+.av-tbl tr:hover td{{background:#1a1815}}
+.pj-lbl{{color:#cbd5e1;white-space:nowrap}}
+.pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+.pj-det{{cursor:pointer}}
+.pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
+                 cursor:pointer;color:#cbd5e1;white-space:nowrap}}
+.pj-det summary::-webkit-details-marker{{display:none}}
+.pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
+                          transition:transform .15s;flex-shrink:0}}
+.pj-det[open] summary::before{{transform:rotate(90deg)}}
+.pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
+             color:#94a3b8;border-top:1px solid #272420}}
+.pj-det-dt{{min-width:120px;color:#64748b}}
+.pj-det-n{{min-width:80px}}
 </style>
 <div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)</div>
-<div class="av-wrap">
-  <div class="av-hdr">
-    <span></span>
-    <span>CPF</span><span>Nome</span>
-    <span style="text-align:right">Contratos</span>
-    <span style="text-align:right">Total Contratado</span>
-    <span style="text-align:right">Total Liberado</span>
-  </div>
-  {"".join(_av_det_rows)}
-</div>"""
+<div class="av-wrap"><table class="av-tbl">
+<thead><tr>
+  <th>Nome</th><th>CPF</th>
+  <th class="pj-n">Contratos</th>
+  <th class="pj-n">Total Contratado</th>
+  <th class="pj-n">Total Liberado</th>
+</tr></thead>
+<tbody>{_av_rows}</tbody>
+</table></div>"""
                     st.markdown(_av_html, unsafe_allow_html=True)
 
             # ── 4. Distribuição por Status ────────────────────────────────────────────────
