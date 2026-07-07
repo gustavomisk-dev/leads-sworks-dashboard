@@ -2959,58 +2959,68 @@ try:
                 )
 
                 if _alto_valor:
-                    _av_rows = []
+                    _COLS = "16px 9em 1fr 5em 9em 9em"
+                    _av_det_rows = []
                     for _i, (_cpf_v, _dv) in enumerate(_alto_valor):
-                        _rc = "g0" if _i % 2 == 0 else "g1"
-                        _sub_rows = []
-                        for _ld in _dv["leads"]:
-                            _sub_rows.append(
-                                f'<tr>'
-                                f'<td style="font-family:monospace;padding:2px 8px 2px 0;font-size:.85em;color:#cbd5e1">{_mask_ccb(_ld.get("ccb",""))}</td>'
-                                f'<td style="font-family:monospace;padding:2px 8px 2px 0;font-size:.85em;color:#94a3b8">{_ld.get("codigo","—")}</td>'
-                                f'<td style="text-align:right;padding:2px 0;font-size:.85em;color:#e2e8f0;white-space:nowrap">{_brl3(_ld.get("valor",0))}</td>'
-                                f'<td style="text-align:right;padding:2px 0 2px 12px;font-size:.85em;color:#94a3b8;white-space:nowrap">{_brl3(_ld.get("liberado",0))}</td>'
-                                f'</tr>'
-                            )
+                        _bg = "background:#18161498" if _i % 2 == 1 else ""
+                        _sub_rows = "".join(
+                            f'<tr>'
+                            f'<td style="font-family:monospace;padding:2px 10px 2px 0;color:#cbd5e1">{_mask_ccb(_ld.get("ccb",""))}</td>'
+                            f'<td style="font-family:monospace;padding:2px 0;color:#94a3b8">{_ld.get("codigo","—")}</td>'
+                            f'</tr>'
+                            for _ld in _dv["leads"]
+                        )
                         _sub_hdr = (
                             '<tr>'
-                            '<td style="font-size:.72em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px 2px 0">CCB</td>'
-                            '<td style="font-size:.72em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 8px 2px 0">Código Lead</td>'
-                            '<td style="font-size:.72em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 0 2px;text-align:right">Contratado</td>'
-                            '<td style="font-size:.72em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 0 2px 12px;text-align:right">Liberado</td>'
+                            '<td style="font-size:.7em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 10px 4px 0">CCB</td>'
+                            '<td style="font-size:.7em;color:#475569;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:0 0 4px">Código Lead</td>'
                             '</tr>'
                         )
-                        _name_cell = (
-                            f'<details style="cursor:pointer">'
-                            f'<summary style="list-style:none;display:flex;align-items:center;gap:6px">'
-                            f'<span style="font-size:9px;color:#64748b">&#9654;</span>'
-                            f'{_mask_nome(_dv["nome"])}'
+                        _av_det_rows.append(
+                            f'<details class="av-det" style="{_bg}">'
+                            f'<summary>'
+                            f'<span class="av-arr">&#9654;</span>'
+                            f'<span style="font-family:monospace;font-size:.9em">{_mask_cpf(_cpf_v)}</span>'
+                            f'<span>{_mask_nome(_dv["nome"])}</span>'
+                            f'<span class="av-r">{len(_dv["leads"])}</span>'
+                            f'<span class="av-r">{_brl3(_dv["valor"])}</span>'
+                            f'<span class="av-r">{_brl3(_dv["liberado"])}</span>'
                             f'</summary>'
-                            f'<div style="margin:6px 0 4px 14px">'
-                            f'<table style="width:100%;border-collapse:collapse">'
-                            f'<tbody>{_sub_hdr}{"".join(_sub_rows)}</tbody>'
+                            f'<div class="av-sub">'
+                            f'<table style="border-collapse:collapse;font-size:.84em">'
+                            f'<tbody>{_sub_hdr}{_sub_rows}</tbody>'
                             f'</table></div>'
                             f'</details>'
                         )
-                        _av_rows.append(
-                            f'<tr class="{_rc}">'
-                            f'<td style="font-family:monospace">{_mask_cpf(_cpf_v)}</td>'
-                            f'<td class="wrap">{_name_cell}</td>'
-                            f'<td class="r">{len(_dv["leads"])}</td>'
-                            f'<td class="r">{_brl3(_dv["valor"])}</td>'
-                            f'<td class="r">{_brl3(_dv["liberado"])}</td>'
-                            f'</tr>'
-                        )
-                    _av_html = (
-                        '<div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)</div>'
-                        '<div class="dtbl-wrap"><table class="dtbl">'
-                        '<thead><tr>'
-                        '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
-                        '<th class="r">Total Contratado</th><th class="r">Total Liberado</th>'
-                        '</tr></thead>'
-                        '<tbody>' + "".join(_av_rows) + '</tbody>'
-                        '</table></div>'
-                    )
+                    _av_html = f"""
+<style>
+.av-wrap{{overflow-x:auto;margin:6px 0 18px}}
+.av-hdr{{display:grid;grid-template-columns:{_COLS};padding:8px 12px;
+         background:#1c1a17;color:#94a3b8;font-size:.75em;font-weight:600;
+         letter-spacing:.04em;text-transform:uppercase;
+         border-bottom:2px solid #272420;gap:0 8px;align-items:center}}
+.av-r{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+.av-det{{border-bottom:1px solid #1c1a17}}
+.av-det summary{{display:grid;grid-template-columns:{_COLS};list-style:none;
+                 cursor:pointer;padding:7px 12px;color:#e2e8f0;
+                 align-items:center;gap:0 8px}}
+.av-det summary::-webkit-details-marker{{display:none}}
+.av-det[open] summary,.av-det:not([open]) summary:hover{{background:#1a181598}}
+.av-arr{{font-size:.55em;color:#64748b;transition:transform .15s;justify-self:center}}
+.av-det[open] .av-arr{{transform:rotate(90deg);color:#FEC52E}}
+.av-sub{{padding:5px 12px 10px 44px}}
+</style>
+<div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)</div>
+<div class="av-wrap">
+  <div class="av-hdr">
+    <span></span>
+    <span>CPF</span><span>Nome</span>
+    <span style="text-align:right">Contratos</span>
+    <span style="text-align:right">Total Contratado</span>
+    <span style="text-align:right">Total Liberado</span>
+  </div>
+  {"".join(_av_det_rows)}
+</div>"""
                     st.markdown(_av_html, unsafe_allow_html=True)
 
             # ── 4. Distribuição por Status ────────────────────────────────────────────────
