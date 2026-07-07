@@ -2328,13 +2328,7 @@ try:
         </script>
         """, height=0)
 
-        # Pré-coleta origens disponíveis dos dias mais recentes (cache hit — rápido)
-        _origins_avail_set: set = set()
-        for _d_pre in (datas or [])[-7:]:
-            _dj_pre = carregar_dia(_d_pre)
-            if _dj_pre:
-                _origins_avail_set.update(_dj_pre.get("origens", []))
-        _origins_avail = ["Todas"] + sorted(_origins_avail_set)
+        _origins_avail = ["Todas", "B2B", "B2B-API", "B2C", "B2C-CT", "CTPS"]
 
         with _slot.container():
 
