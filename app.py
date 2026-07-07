@@ -2601,12 +2601,12 @@ try:
             <div class="kpi-row">
               <div class="kpi-card">
                 <div class="kpi-label">Contratos Desembolsados</div>
-                <div class="kpi-value" style="color:#10b981">{_nbr(_desemb_tot_count) if _desemb_tot_count else "—"}</div>
+                <div class="kpi-value" style="color:#FEC52E">{_nbr(_desemb_tot_count) if _desemb_tot_count else "—"}</div>
                 <div class="kpi-sub">{periodo_label}</div>
               </div>
               <div class="kpi-card">
                 <div class="kpi-label">Total Desembolsado</div>
-                <div class="kpi-value" style="color:#10b981">{_desemb_kpi_val_s}</div>
+                <div class="kpi-value" style="color:#FEC52E">{_desemb_kpi_val_s}</div>
                 <div class="kpi-sub">valor contratado · data desembolso</div>
               </div>
               <div class="kpi-card">
