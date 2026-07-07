@@ -2328,7 +2328,7 @@ try:
         </script>
         """, height=0)
 
-        _origins_avail = ["Todas", "B2B", "B2B-API", "B2C", "B2C-CT", "CTPS"]
+        _origins_avail = ["B2B", "B2B-API", "B2C", "B2C-CT", "CTPS"]
 
         with _slot.container():
 
@@ -2398,12 +2398,10 @@ try:
                     _origem_raw = st.multiselect(
                         "Origem",
                         options=_origins_avail,
-                        default=["Todas"],
+                        default=[],
                         key="origem_sel",
-                        placeholder="Selecionar…",
+                        placeholder="Todas",
                     )
-                    # Normaliza: vazio → Todas
-                    _origem_raw = _origem_raw or ["Todas"]
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
@@ -2438,10 +2436,8 @@ try:
 
             agg = agregar(dias_raw)
 
-            # Origens selecionadas (Todas → sem filtro; lista específica → filtra funil)
-            _ori_ativas = None  # None = sem filtro
-            if "Todas" not in _origem_raw:
-                _ori_ativas = [o for o in _origem_raw if o != "Todas"] or None
+            # Origens selecionadas (vazio → sem filtro; lista específica → filtra funil)
+            _ori_ativas = _origem_raw or None
             if _ori_ativas:
                 _fpo = agg.get("funil_por_origem", {})
                 _ap_f  = sum(_fpo.get(o, {}).get("aprovados",  0) for o in _ori_ativas)
