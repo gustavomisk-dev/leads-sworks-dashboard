@@ -232,10 +232,12 @@ _STATUS_NOMES = {
     0: "Novo", 1: "Pendente", 2: "Em Processamento", 3: "Aprovado",
     4: "Reprovado", 5: "Suspenso", 6: "Pendente Manual",
     7: "Pendente Falha", 8: "Cancelado",
+    -1: "Em andamento",  # bucket sintético para donut quando filtro de origem ativo
 }
 _STATUS_CORES = {
     3: "#22c55e", 4: "#ef4444", 5: "#f59e0b", 2: "#3b82f6",
     0: "#94a3b8", 7: "#a855f7", 8: "#64748b", 1: "#6366f1", 6: "#ec4899",
+    -1: "#94a3b8",
 }
 
 _ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"})
@@ -2455,7 +2457,7 @@ try:
                     "em_curso":        _ec_f,
                     "taxa_aprovacao":  _ap_f / _trm_f * 100 if _trm_f else 0.0,
                     "taxa_reprovacao": _rp_f / _trm_f * 100 if _trm_f else 0.0,
-                    "_d_status":       {},
+                    "_d_status":       {3: _ap_f, 4: _rp_f, 8: _ca_f, -1: _ec_f},
                 }
 
             # Tipos não-BT dos 3 dias extras: leads suspensos há mais dias que o início do período
@@ -2578,6 +2580,10 @@ try:
             _f_term_fmt  = _nbr(f["terminais"])
             _f_repro_fmt = _nbr(f["reprovados"])
             _f_ag_fmt    = _nbr(_proj_cnt)
+            _proj_global_tag = (
+                " · <span style='color:#64748b;font-size:0.82em'>global</span>"
+                if _ori_ativas else ""
+            )
 
             st.markdown(f"""
             <div class="kpi-row">
@@ -2599,12 +2605,12 @@ try:
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Leads a Desembolsar</div>
                 <div class="kpi-value">{_f_ag_fmt}</div>
-                <div class="kpi-sub">Pix {_ref_short_kpi}</div>
+                <div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag}</div>
               </div>
               <div class="kpi-card">
                 <div class="kpi-label">Projeção de Desembolso</div>
                 <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div>
-                <div class="kpi-sub">Pix {_ref_short_kpi} · {_proj_kpi_sub}</div>
+                <div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag} · {_proj_kpi_sub}</div>
               </div>
             </div>
             <div class="kpi-row">
