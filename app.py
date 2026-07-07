@@ -2961,7 +2961,14 @@ try:
                 if _alto_valor:
                     _av_rows = ""
                     for _cpf_v, _dv in _alto_valor:
-                        _det_inner = "".join(
+                        _det_hdr = (
+                            "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
+                            "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
+                            "<span class='pj-det-dt'>CCB</span>"
+                            "<span class='pj-det-n'>C&#243;digo do Lead</span>"
+                            "</div>"
+                        )
+                        _det_inner = _det_hdr + "".join(
                             f"<div class='pj-det-row'>"
                             f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb(_ld.get('ccb',''))}</span>"
                             f"<span class='pj-det-n'>{_ld.get('codigo','—')}</span>"
