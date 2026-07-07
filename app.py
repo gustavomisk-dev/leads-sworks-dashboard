@@ -2873,10 +2873,14 @@ try:
                         f'{c["codigo"] or c["identificador"][:8]} — {c["etapa"]} — {_brl2(c["valor"])}'
                         for c in _item["contratos"]
                     )
+                    _cpf_d = str(_item["cpf"]).strip().zfill(11)
+                    _cpf_d_mask = f"{_cpf_d[:3]}.***.***-**"
+                    _nome_d = str(_item["nome"]).strip().split()
+                    _nome_d_mask = (_nome_d[0].capitalize() + (" *" if len(_nome_d) > 1 else "")) if _nome_d else "—"
                     _dup_rows.append(
                         f'<tr class="{_rc}">'
-                        f'<td>{_item["cpf"]}</td>'
-                        f'<td>{_item["nome"]}</td>'
+                        f'<td style="font-family:monospace">{_cpf_d_mask}</td>'
+                        f'<td>{_nome_d_mask}</td>'
                         f'<td class="r">{len(_item["contratos"])}</td>'
                         f'<td class="r">{_brl2(_item["total"])}</td>'
                         f'<td style="font-size:.82em;line-height:1.5">{_conts}</td>'
