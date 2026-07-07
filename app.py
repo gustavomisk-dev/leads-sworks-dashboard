@@ -2866,6 +2866,42 @@ try:
 
             if _dup:
                 _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+                # Pre-load historical approved leads for each CPF in _dup
+                _dup_cpf_set = {str(_it["cpf"]).strip().zfill(11) for _it in _dup}
+                _dup_hist: dict = {}
+                for _dd_h in datas:
+                    _dj_h = carregar_dia(_dd_h)
+                    if not _dj_h:
+                        continue
+                    for _cpf_h, _vh in (_dj_h.get("aprovados_por_cpf") or {}).items():
+                        _cpf_h_z = str(_cpf_h).strip().zfill(11)
+                        if _cpf_h_z not in _dup_cpf_set:
+                            continue
+                        if _cpf_h_z not in _dup_hist:
+                            _dup_hist[_cpf_h_z] = {"_seen": set(), "leads": []}
+                        for _lh in (_vh.get("leads") or []):
+                            _lid_h = _lh.get("id", "")
+                            if _lid_h and _lid_h in _dup_hist[_cpf_h_z]["_seen"]:
+                                continue
+                            if _lid_h:
+                                _dup_hist[_cpf_h_z]["_seen"].add(_lid_h)
+                            _dup_hist[_cpf_h_z]["leads"].append(_lh)
+
+                def _mask_ccb_dup(c):
+                    c = str(c).strip()
+                    if len(c) <= 4:
+                        return c
+                    return c[:3] + "*" * (len(c) - 4) + c[-1]
+
+                def _fmt_d_dup(d):
+                    if not d:
+                        return "—"
+                    try:
+                        return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
+                    except ValueError:
+                        return d
+
                 _dup_rows = []
                 for _i, _item in enumerate(_dup):
                     _rc = "g0" if _i % 2 == 0 else "g1"
@@ -2877,10 +2913,38 @@ try:
                     _cpf_d_mask = f"{_cpf_d[:3]}.***.***-**"
                     _nome_d = str(_item["nome"]).strip().split()
                     _nome_d_mask = (_nome_d[0].capitalize() + (" *" if len(_nome_d) > 1 else "")) if _nome_d else "—"
+
+                    _hist_leads = _dup_hist.get(_cpf_d, {}).get("leads", [])
+                    if _hist_leads:
+                        _dup_det_hdr = (
+                            "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
+                            "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
+                            "<span class='pj-det-dt'>CCB</span>"
+                            "<span class='pj-det-n'>C&#243;digo do Lead</span>"
+                            "<span class='pj-det-n'>Data do Lead</span>"
+                            "<span class='pj-det-n'>Data Desembolso</span>"
+                            "</div>"
+                        )
+                        _dup_det_body = "".join(
+                            f"<div class='pj-det-row'>"
+                            f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb_dup(_lh.get('ccb',''))}</span>"
+                            f"<span class='pj-det-n'>{_lh.get('codigo','—')}</span>"
+                            f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_criacao'))}</span>"
+                            f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_desembolso'))}</span>"
+                            f"</div>"
+                            for _lh in _hist_leads
+                        )
+                        _nome_cell = (
+                            f"<details class='pj-det'><summary>{_nome_d_mask}</summary>"
+                            f"{_dup_det_hdr}{_dup_det_body}</details>"
+                        )
+                    else:
+                        _nome_cell = _nome_d_mask
+
                     _dup_rows.append(
                         f'<tr class="{_rc}">'
                         f'<td style="font-family:monospace">{_cpf_d_mask}</td>'
-                        f'<td>{_nome_d_mask}</td>'
+                        f'<td>{_nome_cell}</td>'
                         f'<td class="r">{len(_item["contratos"])}</td>'
                         f'<td class="r">{_brl2(_item["total"])}</td>'
                         f'<td style="font-size:.82em;line-height:1.5">{_conts}</td>'
