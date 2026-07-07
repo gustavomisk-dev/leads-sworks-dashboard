@@ -338,6 +338,8 @@ def agregar(dias_raw: list) -> dict:
     etapa_motivos = defaultdict(lambda: defaultdict(int))
     emp_motivos   = defaultdict(lambda: defaultdict(int))
     novo_ctps     = defaultdict(int)
+    funil_orig_acc: dict = {}
+    origens_all: set = set()
     emp_ap_stats_raw: dict = {}
     taxa_dist: dict = {}
     valores_cont     = []
@@ -414,6 +416,13 @@ def agregar(dias_raw: list) -> dict:
 
         for k, v in d.get("novo_ctps_status", {}).items():
             novo_ctps[k] += v
+
+        for _orig, _ov in d.get("funil_por_origem", {}).items():
+            if _orig not in funil_orig_acc:
+                funil_orig_acc[_orig] = {"total": 0, "aprovados": 0, "reprovados": 0, "cancelados": 0, "em_curso": 0}
+            for _k in ("total", "aprovados", "reprovados", "cancelados", "em_curso"):
+                funil_orig_acc[_orig][_k] += _ov.get(_k, 0)
+        origens_all.update(d.get("origens", []))
 
         for emp, s in d.get("emp_ap_stats", {}).items():
             if emp not in emp_ap_stats_raw:
@@ -552,6 +561,8 @@ def agregar(dias_raw: list) -> dict:
         "pipeline_financeiro":  dias_raw[-1].get("pipeline_financeiro", {}) if dias_raw else {},
         "duplicatas_cpf":       dias_raw[-1].get("duplicatas_cpf", []) if dias_raw else [],
         "novo_ctps_status":     dict(novo_ctps),
+        "funil_por_origem":     dict(funil_orig_acc),
+        "origens":              sorted(origens_all),
     }
 
 # ── Chart builders ────────────────────────────────────────────────────────────
@@ -573,7 +584,6 @@ def _fig_donut(d_status: dict):
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-        title=dict(text="Distribuição por Status", font=_TF),
         legend=dict(
             font=dict(size=13, color="#94a3b8"),
             bgcolor="rgba(13,12,10,0.85)",
@@ -582,7 +592,7 @@ def _fig_donut(d_status: dict):
             x=0.60, y=0.50,
             xanchor="left", yanchor="middle",
         ),
-        margin=dict(t=50, b=10, l=10, r=200), height=360,
+        margin=dict(t=10, b=10, l=10, r=200), height=360,
         annotations=[dict(
             text=f"<b>{_nbr(total)}</b><br>leads",
             x=0.275,                 # center of pie domain [0, 0.55]
@@ -2317,6 +2327,15 @@ try:
         } catch(e) {}
         </script>
         """, height=0)
+
+        # Pré-coleta origens disponíveis dos dias mais recentes (cache hit — rápido)
+        _origins_avail_set: set = set()
+        for _d_pre in (datas or [])[-7:]:
+            _dj_pre = carregar_dia(_d_pre)
+            if _dj_pre:
+                _origins_avail_set.update(_dj_pre.get("origens", []))
+        _origins_avail = ["Todas"] + sorted(_origins_avail_set)
+
         with _slot.container():
 
             # ── Header + seletor ──────────────────────────────────────────────────────────
@@ -2373,7 +2392,7 @@ try:
                         st.rerun()
             
             with col_picker:
-                _cp_dat, _cp_ref = st.columns([4, 1])
+                _cp_dat, _cp_orig, _cp_ref = st.columns([2.5, 2, 0.5])
                 with _cp_dat:
                     intervalo = st.date_input(
                         "Período de análise",
@@ -2381,6 +2400,16 @@ try:
                         min_value=data_min, max_value=data_max,
                         format="DD/MM/YYYY",
                     )
+                with _cp_orig:
+                    _origem_raw = st.multiselect(
+                        "Origem",
+                        options=_origins_avail,
+                        default=["Todas"],
+                        key="origem_sel",
+                        placeholder="Selecionar…",
+                    )
+                    # Normaliza: vazio → Todas
+                    _origem_raw = _origem_raw or ["Todas"]
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
@@ -2414,6 +2443,31 @@ try:
                 st.stop()
 
             agg = agregar(dias_raw)
+
+            # Origens selecionadas (Todas → sem filtro; lista específica → filtra funil)
+            _ori_ativas = None  # None = sem filtro
+            if "Todas" not in _origem_raw:
+                _ori_ativas = [o for o in _origem_raw if o != "Todas"] or None
+            if _ori_ativas:
+                _fpo = agg.get("funil_por_origem", {})
+                _ap_f  = sum(_fpo.get(o, {}).get("aprovados",  0) for o in _ori_ativas)
+                _rp_f  = sum(_fpo.get(o, {}).get("reprovados", 0) for o in _ori_ativas)
+                _ca_f  = sum(_fpo.get(o, {}).get("cancelados", 0) for o in _ori_ativas)
+                _ec_f  = sum(_fpo.get(o, {}).get("em_curso",   0) for o in _ori_ativas)
+                _tot_f = _ap_f + _rp_f + _ca_f + _ec_f
+                _trm_f = _ap_f + _rp_f + _ca_f
+                agg["funil"] = {
+                    "total":           _tot_f,
+                    "aprovados":       _ap_f,
+                    "reprovados":      _rp_f,
+                    "cancelados":      _ca_f,
+                    "terminais":       _trm_f,
+                    "em_curso":        _ec_f,
+                    "taxa_aprovacao":  _ap_f / _trm_f * 100 if _trm_f else 0.0,
+                    "taxa_reprovacao": _rp_f / _trm_f * 100 if _trm_f else 0.0,
+                    "_d_status":       {},
+                }
+
             # Tipos não-BT dos 3 dias extras: leads suspensos há mais dias que o início do período
             for _d_extra_str in datas_extra:
                 _dia_extra = carregar_dia(_d_extra_str)
@@ -2864,6 +2918,10 @@ try:
                 if n_dias > 1:
                     st.caption("*Dados do dia mais recente selecionado")
 
+            # ── 4. Alertas ────────────────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">4. Alertas</div>', unsafe_allow_html=True)
+
             if _dup:
                 _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -2881,6 +2939,8 @@ try:
                         if _cpf_h_z not in _dup_hist:
                             _dup_hist[_cpf_h_z] = {"_seen": set(), "leads": []}
                         for _lh in (_vh.get("leads") or []):
+                            if _ori_ativas and (_lh.get("origem") or "Outros") not in _ori_ativas:
+                                continue
                             _lid_h = _lh.get("id", "")
                             if _lid_h and _lid_h in _dup_hist[_cpf_h_z]["_seen"]:
                                 continue
@@ -2951,11 +3011,11 @@ try:
                         f'</tr>'
                     )
                 _dup_html = (
-                    '<div class="dtbl-title" style="color:#f59e0b">&#9888; CPFs com múltiplos contratos &mdash; total &gt; R$&nbsp;15k</div>'
+                    '<div class="dtbl-title" style="color:#f59e0b">&#9888; CPFs com múltiplos contratos &mdash; total liberado &gt; R$&nbsp;15k</div>'
                     '<div class="dtbl-wrap"><table class="dtbl">'
                     '<thead><tr>'
                     '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
-                    '<th class="r">Total</th><th>Detalhes</th>'
+                    '<th class="r">Liberado</th><th>Detalhes</th>'
                     '</tr></thead>'
                     '<tbody>' + "".join(_dup_rows) + '</tbody>'
                     '</table></div>'
@@ -2989,6 +3049,8 @@ try:
                         if not _aprov_glob[_cpf_k]["nome"] and _vk.get("nome"):
                             _aprov_glob[_cpf_k]["nome"] = _vk["nome"]
                         for _lv in (_vk.get("leads") or []):
+                            if _ori_ativas and (_lv.get("origem") or "Outros") not in _ori_ativas:
+                                continue
                             _lid = _lv.get("id", "")
                             if _lid and _lid in _aprov_glob[_cpf_k]["_seen"]:
                                 continue
@@ -3020,9 +3082,9 @@ try:
                     [
                         (cpf, d)
                         for cpf, d in _aprov_glob.items()
-                        if cpf in _cpfs_periodo and d["valor"] > 15_000
+                        if cpf in _cpfs_periodo and d["liberado"] > 15_000
                     ],
-                    key=lambda x: x[1]["valor"],
+                    key=lambda x: x[1]["liberado"],
                     reverse=True,
                 )
 
@@ -3090,7 +3152,7 @@ try:
 .pj-det-dt{{min-width:120px;color:#64748b}}
 .pj-det-n{{min-width:80px}}
 </style>
-<div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)</div>
+<div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total liberado &gt; R$&nbsp;15k (histórico completo)</div>
 <div class="av-wrap"><table class="av-tbl">
 <thead><tr>
   <th>Nome</th><th>CPF</th>
@@ -3102,9 +3164,9 @@ try:
 </table></div>"""
                     st.markdown(_av_html, unsafe_allow_html=True)
 
-            # ── 4. Distribuição por Status ────────────────────────────────────────────────
+            # ── 5. Distribuição por Status ────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">4. Distribuição por Status</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">5. Distribuição por Status</div>', unsafe_allow_html=True)
             
             col_d, col_f = st.columns(2)
             with col_d:
@@ -3116,9 +3178,9 @@ try:
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 5. Status Novo — CTPS ─────────────────────────────────────────────────────
+            # ── 6. Status Novo — CTPS ─────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">5. Status Novo — CTPS</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">6. Status Novo — CTPS</div>', unsafe_allow_html=True)
             _ncs = agg.get("novo_ctps_status", {})
             if _ncs:
                 _ctps_total     = _ncs.get("ctps_total", 0)
@@ -3151,17 +3213,17 @@ try:
 </div>
 """, unsafe_allow_html=True)
 
-            # ── 6. Evolução Temporal ──────────────────────────────────────────────────────
+            # ── 7. Evolução Temporal ──────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">6. Evolução Temporal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 7. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            # ── 8. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-            st.markdown('<div class="sec">7. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">8. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -3193,9 +3255,9 @@ try:
                     if fig_taxa:
                         st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
 
-            # ── 8. Etapa de Reprovação ────────────────────────────────────────────────────
+            # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">8. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">9. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -3257,9 +3319,9 @@ try:
             else:
                 st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
-            # ── 9. Motivos de Reprovação ──────────────────────────────────────────────────
+            # ── 10. Motivos de Reprovação ──────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">9. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">10. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -3282,9 +3344,9 @@ try:
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
-            # ── 10. Bloqueios ─────────────────────────────────────────────────────────────
+            # ── 11. Bloqueios ─────────────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">10. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">11. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
             if fig:
@@ -3294,9 +3356,9 @@ try:
             else:
                 st.info("Sem dados de bloqueios.")
             
-            # ── 11. Segmentação — Reprovados ─────────────────────────────────────────────
+            # ── 12. Segmentação — Reprovados ─────────────────────────────────────────────
 
-            st.markdown('<div class="sec">11. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">12. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -3356,9 +3418,9 @@ try:
                 else:
                     st.info("Sem dados de CBO dos reprovados.")
             
-            # ── 12. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+            # ── 13. Aprovados — Empregadores e CBOs ──────────────────────────────────────
 
-            st.markdown('<div class="sec">12. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">13. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
