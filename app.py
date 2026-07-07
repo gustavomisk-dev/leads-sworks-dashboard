@@ -2899,6 +2899,68 @@ try:
                     unsafe_allow_html=True,
                 )
 
+            # ── Clientes aprovados com total histórico > 15k ──────────────────────────
+            _cpfs_periodo: set = set()
+            for _dj_p in dias_raw:
+                for _cpf_k in (_dj_p.get("aprovados_por_cpf") or {}).keys():
+                    if _cpf_k:
+                        _cpfs_periodo.add(_cpf_k)
+
+            if _cpfs_periodo:
+                _aprov_glob: dict = {}
+                for _dd_all in datas:
+                    _dj_all = carregar_dia(_dd_all)
+                    if not _dj_all:
+                        continue
+                    for _cpf_k, _vk in (_dj_all.get("aprovados_por_cpf") or {}).items():
+                        if not _cpf_k:
+                            continue
+                        if _cpf_k not in _aprov_glob:
+                            _aprov_glob[_cpf_k] = {"nome": _vk.get("nome", ""), "n": 0, "valor": 0.0, "liberado": 0.0}
+                        _aprov_glob[_cpf_k]["n"]        += _vk.get("n", 0)
+                        _aprov_glob[_cpf_k]["valor"]    += _vk.get("valor", 0.0)
+                        _aprov_glob[_cpf_k]["liberado"] += _vk.get("liberado", 0.0)
+                        if not _aprov_glob[_cpf_k]["nome"] and _vk.get("nome"):
+                            _aprov_glob[_cpf_k]["nome"] = _vk["nome"]
+
+                _alto_valor = sorted(
+                    [
+                        (cpf, d)
+                        for cpf, d in _aprov_glob.items()
+                        if cpf in _cpfs_periodo and d["valor"] > 15_000
+                    ],
+                    key=lambda x: x[1]["valor"],
+                    reverse=True,
+                )
+
+                if _alto_valor:
+                    _brl3 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    _av_rows = []
+                    for _i, (_cpf_v, _dv) in enumerate(_alto_valor):
+                        _rc = "g0" if _i % 2 == 0 else "g1"
+                        _av_rows.append(
+                            f'<tr class="{_rc}">'
+                            f'<td>{_cpf_v}</td>'
+                            f'<td>{_dv["nome"] or "—"}</td>'
+                            f'<td class="r">{_dv["n"]}</td>'
+                            f'<td class="r">{_brl3(_dv["valor"])}</td>'
+                            f'<td class="r">{_brl3(_dv["liberado"])}</td>'
+                            f'</tr>'
+                        )
+                    _av_html = (
+                        '<div class="dtbl-title" style="color:#FEC52E">'
+                        '&#9733; Clientes aprovados com total contratado &gt; R$&nbsp;15k (histórico completo)'
+                        '</div>'
+                        '<div class="dtbl-wrap"><table class="dtbl">'
+                        '<thead><tr>'
+                        '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
+                        '<th class="r">Total Contratado</th><th class="r">Total Liberado</th>'
+                        '</tr></thead>'
+                        '<tbody>' + "".join(_av_rows) + '</tbody>'
+                        '</table></div>'
+                    )
+                    st.markdown(_av_html, unsafe_allow_html=True)
+
             # ── 4. Distribuição por Status ────────────────────────────────────────────────
 
             st.markdown('<div class="sec">4. Distribuição por Status</div>', unsafe_allow_html=True)
