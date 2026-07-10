@@ -2619,8 +2619,8 @@ try:
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
               <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor líquido</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor contratado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total Desembolsado</div><div class="kpi-value" style="color:#FEC52E">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado · data desembolso</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Líquido</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">liberado por contrato</div></div>
               <div class="kpi-card" style="visibility:hidden"></div>
