@@ -331,6 +331,92 @@ def carregar_dia(dia_str: str) -> dict:
 
 # ── Agregacao ─────────────────────────────────────────────────────────────────
 
+def _merge_segmentos(segs: list) -> dict:
+    """Combina segmentos por-origem (mesma forma dos campos globais do JSON) em um
+    único dict com a MESMA forma que `agregar` lê por dia. Usado para reconstruir um
+    dia filtrado somando apenas as origens selecionadas."""
+    _flat = ["taxa_dist", "etapas", "bloqueios", "top_motivos", "top_motivos_det",
+             "top_empregadores", "top_cbos", "top_empregadores_rep", "top_cnaes",
+             "top_cbos_rep", "top_ufs"]
+    out: dict = {f: {} for f in _flat}
+    out["etapa_motivos"] = {}
+    out["emp_motivos"] = {}
+    out["emp_ap_stats"] = {}
+    out["valores_contratacao"] = []
+    _fin: dict = {}
+    for seg in segs:
+        for f in _flat:
+            for k, v in seg.get(f, {}).items():
+                out[f][k] = out[f].get(k, 0) + v
+        out["valores_contratacao"].extend(seg.get("valores_contratacao", []))
+        for etapa, mots in seg.get("etapa_motivos", {}).items():
+            dst = out["etapa_motivos"].setdefault(etapa, {})
+            for lbl, cnt in mots.items():
+                dst[lbl] = dst.get(lbl, 0) + cnt
+        for emp, mots in seg.get("emp_motivos", {}).items():
+            dst = out["emp_motivos"].setdefault(emp, {})
+            for lbl, cnt in mots.items():
+                dst[lbl] = dst.get(lbl, 0) + cnt
+        for campo, s in seg.get("financeiro", {}).items():
+            n = s.get("n", 0)
+            if n <= 0:
+                continue
+            fd = _fin.setdefault(campo, {"n": 0, "total": 0.0, "_med_sum": 0.0,
+                                         "min": float("inf"), "max": float("-inf")})
+            fd["n"]       += n
+            fd["total"]   += s.get("total", 0.0)
+            fd["_med_sum"] += s.get("mediana", 0.0) * n
+            fd["min"] = min(fd["min"], s.get("min", float("inf")))
+            fd["max"] = max(fd["max"], s.get("max", float("-inf")))
+            if "weighted_sum" in s:
+                fd["weighted_sum"] = fd.get("weighted_sum", 0.0) + s["weighted_sum"]
+                fd["weight_sum"]   = fd.get("weight_sum", 0.0) + s["weight_sum"]
+        for emp, s in seg.get("emp_ap_stats", {}).items():
+            ed = out["emp_ap_stats"].setdefault(emp, {
+                "n": 0, "n_tempo": 0, "sum_tempo": 0.0, "n_renda": 0, "sum_renda": 0.0,
+                "n_valor": 0, "sum_valor": 0.0, "n_prazo": 0, "sum_prazo": 0.0,
+                "n_taxa": 0, "sum_taxa": 0.0, "num_funcionarios": None,
+                "faturamento": None, "dividas_ativas": None, "capital_social": None})
+            ed["n"] += s.get("n", 0)
+            for c in ("tempo", "renda", "valor", "prazo", "taxa"):
+                ed[f"n_{c}"]   += s.get(f"n_{c}", 0)
+                ed[f"sum_{c}"] += s.get(f"sum_{c}", 0.0)
+            for pj in ("num_funcionarios", "faturamento", "dividas_ativas", "capital_social"):
+                if ed[pj] is None and s.get(pj) is not None:
+                    ed[pj] = s[pj]
+    # finaliza financeiro na forma que `agregar` lê por dia (n/total/mediana/min/max[/weighted])
+    fin_out: dict = {}
+    for campo, fd in _fin.items():
+        n = fd["n"]
+        item = {"n": n, "total": fd["total"],
+                "mediana": (fd["_med_sum"] / n) if n else 0.0,
+                "min": fd["min"], "max": fd["max"]}
+        if "weight_sum" in fd:
+            item["weighted_sum"] = fd["weighted_sum"]
+            item["weight_sum"]   = fd["weight_sum"]
+        fin_out[campo] = item
+    out["financeiro"] = fin_out
+    return out
+
+
+def _apply_origem(d: dict, origens) -> dict:
+    """Cópia rasa do dia com os campos segmentáveis substituídos pela soma das origens
+    selecionadas (de d['por_origem']). Campos fora do segmento (funil, evolucao,
+    projecao, desembolsos, funil_por_origem, etc.) permanecem globais. Não muta `d`
+    (que vem do cache de carregar_dia)."""
+    po = d.get("por_origem")
+    if not po:
+        # Dia sem 'por_origem' (JSON pré-mudança — só num skew transitório entre os
+        # repos): mantém os valores GLOBAIS do dia em vez de zerar as seções 8–13.
+        # (Se 'por_origem' existe mas a origem selecionada não teve leads no dia, o
+        # merge retorna vazio e o dia contribui 0 — que é o correto.)
+        return d
+    merged = _merge_segmentos([po[o] for o in origens if o in po])
+    d2 = dict(d)
+    d2.update(merged)
+    return d2
+
+
 def agregar(dias_raw: list) -> dict:
     d_status     = defaultdict(int)
     fin_n            = defaultdict(int)
@@ -2531,10 +2617,14 @@ try:
                 st.warning("Sem dados para o período selecionado.")
                 st.stop()
 
-            agg = agregar(dias_raw)
-
-            # Origens selecionadas (vazio → sem filtro; lista específica → filtra funil)
+            # Origens selecionadas (vazio → sem filtro). Quando ativo, reconstrói cada
+            # dia com a soma das origens selecionadas (por_origem) e re-agrega — assim
+            # financeiro + segmentações (seções 8–13) também respeitam o filtro.
             _ori_ativas = _origem_raw or None
+            _dias_agg = ([_apply_origem(_d, _ori_ativas) for _d in dias_raw]
+                         if _ori_ativas else dias_raw)
+            agg = agregar(_dias_agg)
+
             if _ori_ativas:
                 _fpo = agg.get("funil_por_origem", {})
                 _ap_f  = sum(_fpo.get(o, {}).get("aprovados",  0) for o in _ori_ativas)
