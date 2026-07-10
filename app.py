@@ -99,7 +99,7 @@ _HEADERS_JSON = {"Authorization": f"Bearer {_TOKEN}", "Cache-Control": "no-cache
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 _COOKIE_NAME          = "zileads_session"
-_COOKIE_MAX_AGE       = 7_200   # 2h — expiração por inatividade
+_COOKIE_MAX_AGE       = 21_600  # 6h — expiração por inatividade
 _COOKIE_REFRESH_AFTER = 900     # re-emite cookie a cada 15min de atividade
 _login_attempts: dict = {}    # {email: {"count": int, "blocked_until": float|None}}
 
