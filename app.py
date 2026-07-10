@@ -342,6 +342,8 @@ def _merge_segmentos(segs: list) -> dict:
     out["etapa_motivos"] = {}
     out["emp_motivos"] = {}
     out["emp_ap_stats"] = {}
+    out["evolucao_diaria"] = {}
+    out["evolucao_horaria"] = {}
     out["valores_contratacao"] = []
     _fin: dict = {}
     for seg in segs:
@@ -353,6 +355,11 @@ def _merge_segmentos(segs: list) -> dict:
             dst = out["etapa_motivos"].setdefault(etapa, {})
             for lbl, cnt in mots.items():
                 dst[lbl] = dst.get(lbl, 0) + cnt
+        for _ev in ("evolucao_diaria", "evolucao_horaria"):
+            for _k, _sm in seg.get(_ev, {}).items():
+                _dst = out[_ev].setdefault(_k, {})
+                for _sk, _cnt in _sm.items():
+                    _dst[_sk] = _dst.get(_sk, 0) + _cnt
         for emp, mots in seg.get("emp_motivos", {}).items():
             dst = out["emp_motivos"].setdefault(emp, {})
             for lbl, cnt in mots.items():
@@ -2805,7 +2812,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
               <div class="kpi-card"><div class="kpi-label">Prazo médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-              <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor líquido</div></div>
+              <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor desembolsado por contrato</div></div>
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
               <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
