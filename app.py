@@ -2607,24 +2607,24 @@ try:
             _desemb_ticket_lib_s = ("R$ " + f"{_desemb_tot_lib/_desemb_tot_count:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_count else "—"
             _desemb_cnt_s        = _nbr(_desemb_tot_count) if _desemb_tot_count else "—"
 
-            # Grid 4x4 (col1=tickets medios | col2=funil | col3=taxas/contratos | col4=desembolso $)
+            # Grid 4x4 (col1=tickets medios | col2=taxas/contratos | col3=funil | col4=desembolso $)
             st.markdown(f"""
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor contratado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div></div>
               <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div><div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag} · {_proj_kpi_sub}</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
               <div class="kpi-card"><div class="kpi-label">Prazo médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total Desembolsado</div><div class="kpi-value" style="color:#FEC52E">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado · data desembolso</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor contratado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
               <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
               <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor líquido</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Líquido</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">liberado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag}</div></div>
               <div class="kpi-card" style="visibility:hidden"></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag}</div></div>
               <div class="kpi-card"><div class="kpi-label">Volume aprovado</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
             </div>
             """, unsafe_allow_html=True)
