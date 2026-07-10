@@ -2757,6 +2757,7 @@ try:
             # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
             _non_bt_sec_nm: dict = {}
             _pt_por_dia: dict = {}
+            _hm_ts: dict = {}   # heatmap: timestamps de ultima_atualizacao por etapa (5 dias)
             for _d5pd in range(5):
                 _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
                 if _s5pd not in datas:
@@ -2764,6 +2765,8 @@ try:
                 _dj2 = carregar_dia(_s5pd)
                 if not _dj2:
                     continue
+                for _tsh, _lst in (_dj2.get("heatmap_ts", {}) or {}).items():
+                    _hm_ts.setdefault(_tsh, []).extend(_lst)
                 for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
                     if _ts2 == "BLOQUEIO_TEMPORARIO":
                         continue
@@ -2922,6 +2925,69 @@ try:
             <p style='color:#475569;font-size:.8em;margin:6px 0 0'>* Etapas consideram leads dos últimos 5 dias a partir de hoje, independente do período selecionado.</p>
             </div>
             """, unsafe_allow_html=True)
+
+                # ── Heatmap: tempo desde a ultima_atualizacao, por etapa ──────────
+                _FAIXAS = [
+                    ("<1h", 0, 1), ("1–3h", 1, 3), ("3–6h", 3, 6), ("6–12h", 6, 12),
+                    ("12–24h", 12, 24), ("1–2d", 24, 48), ("2–3d", 48, 72),
+                    ("3–4d", 72, 96), ("4–5d", 96, 120), (">5d", 120, None),
+                ]
+                def _faixa_idx(h):
+                    for _i, (_fl, _lo, _hi) in enumerate(_FAIXAS):
+                        if h >= _lo and (_hi is None or h < _hi):
+                            return _i
+                    return len(_FAIXAS) - 1
+                _hm_mat = {}
+                for _tsh, _lst in _hm_ts.items():
+                    if _tsh == "BLOQUEIO_TEMPORARIO":
+                        continue  # BT = countdown de 24h (nao staleness); contagem diverge da tabela
+                    _row = [0] * len(_FAIXAS)
+                    for _tsraw in _lst:
+                        try:
+                            _dt = datetime.fromisoformat(str(_tsraw)[:19])
+                        except (ValueError, TypeError):
+                            continue
+                        _idade_h = (_now_brt_nm - _dt).total_seconds() / 3600.0
+                        _row[_faixa_idx(max(0.0, _idade_h))] += 1
+                    if sum(_row):
+                        _hm_mat[_tsh] = _row
+                if _hm_mat:
+                    _hm_max = max(max(r) for r in _hm_mat.values()) or 1
+                    def _hm_cell(v):
+                        if not v:
+                            return '<td class="hm-c hm-0">·</td>'
+                        _a = 0.12 + 0.88 * (v / _hm_max)
+                        return '<td class="hm-c" style="background:rgba(254,197,46,%.2f)">%d</td>' % (_a, v)
+                    _hrows = ""
+                    for _t in sorted(_hm_mat, key=lambda t: -sum(_hm_mat[t])):
+                        _lblt = _TIPO_LABEL_MAP.get(_t, _t)
+                        _hrows += ('<tr><td class="hm-lbl">' + _lblt + '</td>'
+                                   + "".join(_hm_cell(v) for v in _hm_mat[_t])
+                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td></tr>')
+                    _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
+                    _hm_css = """
+            <style>
+            .hm-wrap{overflow-x:auto;margin:2px 0 18px}
+            .hm-tbl{border-collapse:collapse;font-size:.85em}
+            .hm-tbl th{background:#1c1a17;color:#94a3b8;font-weight:600;padding:6px 9px;text-align:center;border-bottom:2px solid #272420;white-space:nowrap}
+            .hm-tbl th.hm-lbl-h{text-align:left}
+            .hm-lbl{color:#cbd5e1;white-space:nowrap;padding:5px 12px 5px 4px;border-bottom:1px solid #1c1a17}
+            .hm-c{text-align:center;padding:5px 9px;border-bottom:1px solid #1c1a17;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:46px}
+            .hm-0{color:#3f3b35}
+            .hm-tot{text-align:center;padding:5px 11px;color:#FEC52E;font-weight:700;border-bottom:1px solid #1c1a17;border-left:2px solid #272420}
+            </style>
+            """
+                    st.markdown(
+                        _hm_css
+                        + '<div class="sec" style="font-size:.95em">Tempo desde a última atualização (por etapa)</div>'
+                        + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção.</p>"
+                        + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
+                        + _hhead + '<th class="hm-c">Total</th></tr></thead><tbody>'
+                        + _hrows + "</tbody></table></div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
             else:
                 st.markdown(
                     "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
