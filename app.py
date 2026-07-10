@@ -229,10 +229,10 @@ def _login_page(cookies: CookieController) -> None:
 # ── Constantes ────────────────────────────────────────────────────────────────
 
 _STATUS_NOMES = {
-    0: "Novo", 1: "Pendente", 2: "Em Processamento", 3: "Aprovado",
+    0: "Novo", 1: "Pendente", 2: "Em andamento", 3: "Aprovado",
     4: "Reprovado", 5: "Suspenso", 6: "Pendente Manual",
     7: "Pendente Falha", 8: "Cancelado",
-    -1: "Em andamento",  # bucket sintético para donut quando filtro de origem ativo
+    -1: "Em andamento (geral)",  # bucket sintético para donut quando filtro de origem ativo (agrega todos os não-terminais)
 }
 _STATUS_CORES = {
     3: "#22c55e", 4: "#ef4444", 5: "#f59e0b", 2: "#3b82f6",
