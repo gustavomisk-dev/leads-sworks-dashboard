@@ -904,6 +904,38 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
     return fig
 
 
+def _fig_barras_reais(data_dict: dict, titulo: str, hex_color: str, n: int = 12):
+    """Barras horizontais com rótulos em R$. data_dict = {label: valor_float} (ordem desc)."""
+    items = [(k, v) for k, v in data_dict.items() if v][:n]
+    if not items:
+        return None
+    labels = [k for k, _ in items]
+    values = [round(v, 2) for _, v in items]
+    max_v  = max(values) if values else 1
+    _h = hex_color.lstrip("#")
+    _r, _g, _b = (int(_h[i:i + 2], 16) for i in (0, 2, 4))
+    shades = [f"rgba({_r},{_g},{_b},{0.40 + 0.55 * (v / max_v):.2f})" for v in values]
+    texts  = ["R$ " + f"{v:,.0f}".replace(",", ".") for v in values]
+    fig = go.Figure(go.Bar(
+        x=values, y=labels, orientation="h",
+        marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
+        text=texts, textposition="outside",
+        textfont=dict(size=13, color="#94a3b8"),
+        hovertemplate="%{y}: <b>R$ %{x:,.2f}</b><extra></extra>",
+    ))
+    h = max(280, len(items) * 34 + 80)
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+        separators=",.",  # BR: vírgula decimal, ponto de milhar (alinha eixo/hover aos rótulos)
+        title=dict(text=titulo, font=_TF),
+        xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False,
+                   tickprefix="R$ ", tickformat=",.0f"),
+        yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
+        margin=dict(t=50, b=20, l=20, r=100), height=h,
+    )
+    return fig
+
+
 def _fig_histograma(valores: list):
     if len(valores) < 3:
         return None
@@ -1155,6 +1187,54 @@ def _html_tabela_ranking(data_dict: dict, titulo_col: str, n_total: int,
         + '<tbody>' + "".join(rows_html) + '</tbody>'
         + '</table></div>'
     )
+
+
+def _html_tabela_desemb(items: list, titulo_col: str, n_total: int,
+                        code_col_title: str = "", n: int = 15) -> str:
+    """Ranking de desembolsados: #, [código,] nome, Contratos, %, Contratado (R$), Liberado (R$).
+    items: lista de dicts {label, n, valor, liberado} já ordenada."""
+    if not items:
+        return ""
+    _SEP = " — "
+    _items = items[:n]
+    has_sep = bool(code_col_title) and any(_SEP in str(it.get("label", "")) for it in _items[:5])
+
+    def _brl(v):
+        return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+
+    rows_html = []
+    for i, it in enumerate(_items):
+        rc  = "g0" if i % 2 == 0 else "g1"
+        lbl = str(it.get("label", "") or "")
+        pct = f"{100 * it['n'] / n_total:.1f}%" if n_total else "—"
+        if has_sep and _SEP in lbl:
+            code, desc = lbl.split(_SEP, 1)
+            name_cells = (f'<td style="color:#94a3b8;white-space:nowrap">{code}</td>'
+                          f'<td class="wrap">{desc}</td>')
+        elif has_sep:
+            name_cells = f'<td style="color:#64748b">—</td><td class="wrap">{lbl or "—"}</td>'
+        else:
+            name_cells = f'<td class="wrap">{lbl or "—"}</td>'
+        rows_html.append(
+            f'<tr class="{rc}">'
+            f'<td class="c" style="color:#64748b;width:28px">{i + 1}</td>'
+            f'{name_cells}'
+            f'<td class="r">{_nbr(it["n"])}</td>'
+            f'<td class="r" style="color:#94a3b8">{pct}</td>'
+            f'<td class="r" style="color:#FEC52E">{_brl(it.get("valor", 0.0))}</td>'
+            f'<td class="r" style="color:#10b981">{_brl(it.get("liberado", 0.0))}</td>'
+            f'</tr>'
+        )
+    if has_sep:
+        thead = (f'<thead><tr><th class="c">#</th><th>{code_col_title}</th><th>{titulo_col}</th>'
+                 '<th class="r">Contratos</th><th class="r">%</th>'
+                 '<th class="r">Contratado</th><th class="r">Liberado</th></tr></thead>')
+    else:
+        thead = (f'<thead><tr><th class="c">#</th><th>{titulo_col}</th>'
+                 '<th class="r">Contratos</th><th class="r">%</th>'
+                 '<th class="r">Contratado</th><th class="r">Liberado</th></tr></thead>')
+    return ('<div class="dtbl-wrap"><table class="dtbl">' + thead
+            + '<tbody>' + "".join(rows_html) + '</tbody></table></div>')
 
 
 def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 15) -> str:
@@ -2504,26 +2584,44 @@ try:
                 d for d in datas
                 if _d_desemb_ini <= datetime.strptime(d, "%Y%m%d").date() <= d_fim
             ]
-            _desemb_agg: dict = {}
+            # Detalhe por contrato desembolsado (data de desembolso `pd` no período),
+            # já aplicando o filtro de Origem — `desembolsos_detalhe` carrega o campo
+            # `origem` por registro. Toda a informação de desembolso do dash (KPIs do
+            # topo, seção 1 e seção 14) é derivada daqui, então tudo respeita o filtro.
+            _ori_set = set(_ori_ativas) if _ori_ativas else None
+            _desemb_det: list = []
             for _dd in _d_desemb_datas:
                 _dj = carregar_dia(_dd)
                 if not _dj:
                     continue
-                for _pd, _pv in _dj.get("desembolsos_por_data", {}).items():
+                for _det in _dj.get("desembolsos_detalhe", []):
+                    _pdk = _det.get("pd")
+                    if not _pdk:
+                        continue
                     try:
-                        _pd_date = datetime.strptime(_pd, "%Y%m%d").date()
-                    except ValueError:
+                        _pdk_date = datetime.strptime(str(_pdk), "%Y%m%d").date()
+                    except (ValueError, TypeError):
                         continue
-                    if not (d_ini <= _pd_date <= d_fim):
+                    if not (d_ini <= _pdk_date <= d_fim):
                         continue
-                    if _pd not in _desemb_agg:
-                        _desemb_agg[_pd] = {"count": 0, "valor": 0.0, "liberado": 0.0}
-                    _desemb_agg[_pd]["count"]    += _pv.get("count", 0)
-                    _desemb_agg[_pd]["valor"]    += _pv.get("valor", 0.0)
-                    _desemb_agg[_pd]["liberado"] += _pv.get("liberado", 0.0)
-            _desemb_tot_count = sum(v["count"]    for v in _desemb_agg.values())
-            _desemb_tot_valor = sum(v["valor"]    for v in _desemb_agg.values())
-            _desemb_tot_lib   = sum(v["liberado"] for v in _desemb_agg.values())
+                    if _ori_set is not None and (_det.get("origem") or "Outros") not in _ori_set:
+                        continue
+                    _desemb_det.append(_det)
+            # Agregado por data de desembolso (para a seção 1 e os KPIs), derivado do
+            # detalhe filtrado — por isso reflete o filtro de Origem.
+            _desemb_agg: dict = {}
+            for _det in _desemb_det:
+                _pd = _det.get("pd")
+                if not _pd:
+                    continue
+                if _pd not in _desemb_agg:
+                    _desemb_agg[_pd] = {"count": 0, "valor": 0.0, "liberado": 0.0}
+                _desemb_agg[_pd]["count"]    += 1
+                _desemb_agg[_pd]["valor"]    += _det.get("valor", 0.0) or 0.0
+                _desemb_agg[_pd]["liberado"] += _det.get("liberado", 0.0) or 0.0
+            _desemb_tot_count = len(_desemb_det)
+            _desemb_tot_valor = sum((_d.get("valor", 0.0) or 0.0) for _d in _desemb_det)
+            _desemb_tot_lib   = sum((_d.get("liberado", 0.0) or 0.0) for _d in _desemb_det)
 
             # ── KPIs ──────────────────────────────────────────────────────────────────────
             
@@ -2675,11 +2773,8 @@ try:
                     f"{_desemb_tot_count} contrato(s) · {_cap_val_s}"
                 )
             else:
-                st.info(
-                    "Sem desembolsos registrados no período selecionado. "
-                    "Os JSONs precisam ser re-exportados com o campo desembolsos_por_data "
-                    "(execute publicar_dados.py após a atualização do exporter)."
-                )
+                _msg_ori = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
 
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
 
@@ -3470,7 +3565,133 @@ try:
                 tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
-        
+
+            # ── 14. Desembolsados no Período — Segmentação ──────────────────────────────
+
+            st.markdown('<div class="sec">14. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
+
+            if not _desemb_det:
+                _msg_ori14 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori14}.")
+            else:
+                # ── Agrega por dimensão (soma contratos, valor contratado e liberado) ──────
+                _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
+                _iof_tot = 0.0
+                _prz_vals, _tx_vals = [], []
+
+                def _bump(_m, _k, _rec):
+                    if not _k:
+                        return
+                    _a = _m.setdefault(_k, {"n": 0, "valor": 0.0, "liberado": 0.0})
+                    _a["n"]        += 1
+                    _a["valor"]    += _rec.get("valor", 0.0) or 0.0
+                    _a["liberado"] += _rec.get("liberado", 0.0) or 0.0
+
+                for _rec in _desemb_det:
+                    _bump(_emp_d,  _rec.get("emp"),    _rec)
+                    _bump(_cbo_d,  _rec.get("cbo"),    _rec)
+                    _bump(_cnae_d, _rec.get("cnae"),   _rec)
+                    _bump(_ori_d,  _rec.get("origem"), _rec)
+                    _bump(_uf_d,   _rec.get("uf"),     _rec)
+                    _iof_tot += _rec.get("iof", 0.0) or 0.0
+                    if _rec.get("prazo"):
+                        _prz_vals.append(_rec["prazo"])
+                    if _rec.get("taxa"):
+                        _tx_vals.append(_rec["taxa"])
+
+                _n_det   = len(_desemb_det)
+                _sum_val = sum((r.get("valor", 0.0) or 0.0) for r in _desemb_det)
+                _sum_lib = sum((r.get("liberado", 0.0) or 0.0) for r in _desemb_det)
+                _ticket  = (_sum_val / _n_det) if _n_det else 0.0
+                _prz_med = (sum(_prz_vals) / len(_prz_vals)) if _prz_vals else 0.0
+                _tx_med  = (sum(_tx_vals) / len(_tx_vals)) if _tx_vals else 0.0
+
+                def _brl2(v):
+                    return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+
+                # ── Mini-KPIs específicos dos desembolsados ────────────────────────────────
+                st.markdown(f"""
+                <div class="kpi-row" style="grid-template-columns:repeat(6,1fr)">
+                  <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_nbr(_n_det)}</div><div class="kpi-sub">{periodo_label}</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Total Contratado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_val)}</div><div class="kpi-sub">valor do empréstimo</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Total Liberado</div><div class="kpi-value" style="color:#10b981">{_brl2(_sum_lib)}</div><div class="kpi-sub">valor líquido ao cliente</div></div>
+                  <div class="kpi-card"><div class="kpi-label">IOF Total</div><div class="kpi-value">{_brl2(_iof_tot)}</div><div class="kpi-sub">soma do período</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">{_brl2(_ticket)}</div><div class="kpi-sub">contratado por contrato</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Prazo · Taxa Médios</div><div class="kpi-value">{f'{_prz_med:.0f}m' if _prz_med else '—'} · {(f'{_tx_med:.2f}'.replace('.', ',') + '%') if _tx_med else '—'}</div><div class="kpi-sub">meses · a.m.</div></div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.caption(
+                    "Contratos com data de desembolso (Pix) dentro do período filtrado · "
+                    "inclui leads criados até 7 dias antes do início do período."
+                )
+
+                # ── Ordenações ─────────────────────────────────────────────────────────────
+                def _items(_m, by="valor"):
+                    return [
+                        {"label": k, "n": v["n"], "valor": v["valor"], "liberado": v["liberado"]}
+                        for k, v in sorted(_m.items(), key=lambda x: -x[1][by])
+                    ]
+
+                def _trunc(s, m=42):
+                    s = str(s)
+                    return s if len(s) <= m else s[:m - 1].rstrip() + "…"
+
+                _emp_items  = _items(_emp_d,  "valor")   # empregadores: por R$ contratado
+                _cbo_items  = _items(_cbo_d,  "n")       # CBOs / CNAEs: por nº de contratos
+                _cnae_items = _items(_cnae_d, "n")
+                _ori_items  = _items(_ori_d,  "n")
+                _uf_items   = _items(_uf_d,   "n")
+
+                # ── Top Empregadores (R$) | Top CBOs (contratos) ───────────────────────────
+                col_e2, col_c2 = st.columns(2)
+                with col_e2:
+                    # soma na colisão de rótulo truncado (não sobrescreve), igual _sem_codigo
+                    _emp_chart: dict = {}
+                    for it in _emp_items[:12]:
+                        _k = _trunc(it["label"])
+                        _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
+                    fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#22c55e")
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                with col_c2:
+                    _cbo_chart = _sem_codigo({it["label"]: it["n"] for it in _cbo_items})
+                    fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+
+                # ── Top CNAEs (largura total) ──────────────────────────────────────────────
+                _cnae_chart = _sem_codigo({it["label"]: it["n"] for it in _cnae_items})
+                fig = _fig_barras_h(_cnae_chart, "Top CNAEs · Nº de Contratos", "#a855f7",
+                                    pct_base=_n_det, show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_desemb(_cnae_items, "Descrição CNAE", _n_det, code_col_title="Código CNAE")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+
+                # ── Por Origem | Por UF ────────────────────────────────────────────────────
+                col_o2, col_u2 = st.columns(2)
+                with col_o2:
+                    _ori_chart = {it["label"]: it["n"] for it in _ori_items}
+                    fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                with col_u2:
+                    _uf_chart = {it["label"]: it["n"] for it in _uf_items}
+                    fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
 except Exception as _exc:
     import traceback as _tb
     st.warning(
