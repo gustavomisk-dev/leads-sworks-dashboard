@@ -242,7 +242,6 @@ _STATUS_CORES = {
 
 # Tooltips (balãozinho no "i") por etapa da tabela de Projeção de Desembolso.
 # Keyed pelo código do tipo (ts, o mesmo de _TIPO_LABEL_MAP).
-# PLACEHOLDER — trocar os valores pelos textos definitivos quando chegarem.
 _ETAPA_TOOLTIPS = {
     "BLOQUEIO_TEMPORARIO":       "São leads originados no leilão cujos perfis não são aderentes à proposta inicial enviada e que, por essa razão, devem aguardar 24h para receberem uma nova proposta, adequada aos seus perfis e não mais via leilão.",
     "PAGAMENTO":                 "São leads cujos perfis foram aprovados, já possuem CCB assinada e cujos tomadores estão apenas aguardando o recebimento do empréstimo via PIX.",
@@ -2795,16 +2794,16 @@ try:
                 _non_bt_sec_nm[_ts3]["taxa_media"] = (_non_bt_sec_nm[_ts3]["taxa_sum"] / _tn3) if _tn3 > 0 else None
 
             _TIPO_LABEL_MAP = {
-                "PAGAMENTO":                 "Aguardando Pagamento Pix (Suspenso)",
-                "ASSINADO":                  "Falha Pós-Assinatura (Pendente Falha)",
-                "ASSINATURA":                "Aguardando Assinatura (Suspenso)",
-                "ENTREVISTA":                "Aguardando Entrevista Antifraude da Nuvidio (Suspenso)",
-                "FORMALIZACAO":              "Aguardando Aceite para Formalização (Suspenso)",
-                "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
-                "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
-                "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
-                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h",
-                "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
+                "PAGAMENTO":                 "Aguardando próxima janela de pagamento PIX (Suspenso)",
+                "ASSINADO":                  "Falha em etapa pós-assinatura de CCB (Pendente Falha)",
+                "ASSINATURA":                "Aguardando assinatura do cliente na CCB enviada (Suspenso)",
+                "ENTREVISTA":                "Aguardando realização de entrevista anti-fraude da Nuvidio (Suspenso)",
+                "FORMALIZACAO":              "Aguardando aceite do cliente na etapa de formalização (Suspenso)",
+                "PRE_APROVADO":              "Aguardando aceite do cliente quanto à proposta inicial (Suspenso)",
+                "SIMULACAO":                 "Aguardando aceite do cliente quanto a uma nova proposta simulada (Suspenso)",
+                "PENDENTE_DADOS_PAGAMENTO":  "Falha em dados de pagamento do cliente (Suspenso)",
+                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h para envio de nova proposta (Em andamento)",
+                "AVERBACAO_PENDENTE_MANUAL": "Falha na etapa de averbação (Pendente Manual)",
             }
             
             # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
