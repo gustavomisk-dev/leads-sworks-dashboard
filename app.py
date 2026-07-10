@@ -240,6 +240,22 @@ _STATUS_CORES = {
     -1: "#94a3b8",
 }
 
+# Tooltips (balãozinho no "i") por etapa da tabela de Projeção de Desembolso.
+# Keyed pelo código do tipo (ts, o mesmo de _TIPO_LABEL_MAP).
+# PLACEHOLDER — trocar os valores pelos textos definitivos quando chegarem.
+_ETAPA_TOOLTIPS = {
+    "BLOQUEIO_TEMPORARIO":       "São leads originados no leilão cujos perfis não são aderentes à proposta inicial enviada e que, por essa razão, devem aguardar 24h para receberem uma nova proposta, adequada aos seus perfis e não mais via leilão.",
+    "PAGAMENTO":                 "São leads cujos perfis foram aprovados, já possuem CCB assinada e cujos tomadores estão apenas aguardando o recebimento do empréstimo via PIX.",
+    "ASSINATURA":                "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, mas cujos tomadores ainda não assinaram a CCB gerada e enviada a eles.",
+    "ASSINADO":                  "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, cujos tomadores já assinaram a CCB gerada e enviada a eles, mas houve alguma falha pós-assinatura, a ser investigada.",
+    "ENTREVISTA":                "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, cujos tomadores já assinaram a CCB gerada e enviada a eles, mas não realizaram ainda a entrevista anti-fraude da Nuvidio.",
+    "FORMALIZACAO":              "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, mas cujos tomadores ainda não deram o aceite na etapa de formalização.",
+    "PRE_APROVADO":              "São leads cujos perfis foram aprovados pelo motor de crédito, mas cujas propostas iniciais, enviadas ao tomador, ainda não foram aceitas.",
+    "SIMULACAO":                 "São leads cujos perfis foram aprovados pelo motor de crédito, mas cujas propostas iniciais não foram aceitas pelo tomador. Nesse contexto, foram simuladas e enviadas novas propostas que aguardam aceite dos tomadores.",
+    "PENDENTE_DADOS_PAGAMENTO":  "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, cujos tomadores já assinaram a CCB gerada e enviada a eles, mas houve alguma pendência, relacionada aos dados de pagamento, na tentativa de realizar o desembolso, a ser investigada.",
+    "AVERBACAO_PENDENTE_MANUAL": "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, cujos tomadores já assinaram a CCB gerada e enviada a eles, mas houve alguma falha na etapa de Averbação, a ser investigada.",
+}
+
 _ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"})
 
 _ETAPA_WORKFLOW_ORDER = [
@@ -2787,7 +2803,7 @@ try:
                 "PRE_APROVADO":              "Aguardando Aceite de Proposta Enviada (Suspenso)",
                 "SIMULACAO":                 "Aguardando nova Simulação de Proposta (Suspenso)",
                 "PENDENTE_DADOS_PAGAMENTO":  "Aguardando Resolução de Pendência em Dados de Pagamento (Suspenso)",
-                "BLOQUEIO_TEMPORARIO":       f"Aguardando 24h — Pix {_ref_label_nm}",
+                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h",
                 "AVERBACAO_PENDENTE_MANUAL": "Pendente de Averbação Manual (Pendente Manual)",
             }
             
@@ -2800,6 +2816,13 @@ try:
                 def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
                 def _n(v): return f"{v:,}".replace(",", ".")
                 def _pct(v): return (f"{v:.2f}".replace(".", ",") + "% a.m.") if v else "—"
+                def _tip(ts):
+                    _tx = _ETAPA_TOOLTIPS.get(ts, "")
+                    if not _tx:
+                        return ""
+                    _tx = (_tx.replace("&", "&amp;").replace('"', "&quot;")
+                              .replace("<", "&lt;").replace(">", "&gt;"))
+                    return f"<span class='pj-i' title=\"{_tx}\">i</span>"
                 _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
             
                 _sorted = sorted(_pt_sec.items(), key=lambda x: (x[0] in _HIDE_VALOR_TIPOS, -x[1]["valor"]))
@@ -2827,9 +2850,9 @@ try:
                             f"</div>"
                             for _ds3, _dv3 in sorted(_dias_ts.items())
                         )
-                        _cell_lbl = f"<details class='pj-det'><summary>{_label}</summary>{_det_inner}</details>"
+                        _cell_lbl = f"<details class='pj-det'><summary>{_label}{_tip(ts)}</summary>{_det_inner}</details>"
                     else:
-                        _cell_lbl = _label
+                        _cell_lbl = f"{_label}{_tip(ts)}"
                     _hv = ts in _HIDE_VALOR_TIPOS
                     _rows += (
                         f"<tr>"
@@ -2869,6 +2892,11 @@ try:
             .pj-det-n{{min-width:80px}}
             .pj-det-v{{font-variant-numeric:tabular-nums}}
             .pj-det-x{{color:#64748b;font-variant-numeric:tabular-nums}}
+            .pj-i{{display:inline-flex;align-items:center;justify-content:center;
+                   width:13px;height:13px;margin-left:5px;border-radius:50%;
+                   background:#334155;color:#cbd5e1;font:italic 700 8px Georgia,serif;
+                   vertical-align:super;line-height:1;cursor:help;flex-shrink:0}}
+            .pj-i:hover{{background:#FEC52E;color:#1c1a17}}
             </style>
             <div class="pj-wrap">
             <table class="pj-tbl">
