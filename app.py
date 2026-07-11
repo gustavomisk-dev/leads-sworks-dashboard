@@ -529,8 +529,8 @@ def agregar(dias_raw: list) -> dict:
 
         for _orig, _ov in d.get("funil_por_origem", {}).items():
             if _orig not in funil_orig_acc:
-                funil_orig_acc[_orig] = {"total": 0, "aprovados": 0, "reprovados": 0, "cancelados": 0, "em_curso": 0}
-            for _k in ("total", "aprovados", "reprovados", "cancelados", "em_curso"):
+                funil_orig_acc[_orig] = {"total": 0, "novos": 0, "aprovados": 0, "reprovados": 0, "cancelados": 0, "em_curso": 0}
+            for _k in ("total", "novos", "aprovados", "reprovados", "cancelados", "em_curso"):
                 funil_orig_acc[_orig][_k] += _ov.get(_k, 0)
         origens_all.update(d.get("origens", []))
 
@@ -594,6 +594,7 @@ def agregar(dias_raw: list) -> dict:
         "em_curso":        em_curso,
         "taxa_aprovacao":  aprovados  / terminais * 100 if terminais else 0.0,
         "taxa_reprovacao": reprovados / terminais * 100 if terminais else 0.0,
+        "novos":           d_status.get(0, 0),
         "_d_status":       dict(d_status),
     }
 
@@ -2638,6 +2639,7 @@ try:
                 _rp_f  = sum(_fpo.get(o, {}).get("reprovados", 0) for o in _ori_ativas)
                 _ca_f  = sum(_fpo.get(o, {}).get("cancelados", 0) for o in _ori_ativas)
                 _ec_f  = sum(_fpo.get(o, {}).get("em_curso",   0) for o in _ori_ativas)
+                _nv_f  = sum(_fpo.get(o, {}).get("novos",      0) for o in _ori_ativas)
                 _tot_f = _ap_f + _rp_f + _ca_f + _ec_f
                 _trm_f = _ap_f + _rp_f + _ca_f
                 agg["funil"] = {
@@ -2647,9 +2649,10 @@ try:
                     "cancelados":      _ca_f,
                     "terminais":       _trm_f,
                     "em_curso":        _ec_f,
+                    "novos":           _nv_f,
                     "taxa_aprovacao":  _ap_f / _trm_f * 100 if _trm_f else 0.0,
                     "taxa_reprovacao": _rp_f / _trm_f * 100 if _trm_f else 0.0,
-                    "_d_status":       {3: _ap_f, 4: _rp_f, 8: _ca_f, -1: _ec_f},
+                    "_d_status":       {3: _ap_f, 4: _rp_f, 8: _ca_f, -1: _ec_f, 0: _nv_f},
                 }
 
             # Tipos não-BT dos 3 dias extras: leads suspensos há mais dias que o início do período
@@ -2787,8 +2790,15 @@ try:
             
             _f_total_fmt = _nbr(f["total"])
             _f_aprov_fmt = _nbr(f["aprovados"])
+            _f_novos_fmt = _nbr(f.get("novos", 0))
             _f_term_fmt  = _nbr(f["terminais"])
             _f_repro_fmt = _nbr(f["reprovados"])
+            # % em relação ao total de leads (vírgula decimal, 2 casas): "34,21%"
+            def _pct_tot(v):
+                return (f"{100 * v / f['total']:.2f}".replace(".", ",") + "%") if f.get("total") else "—"
+            _pct_novos_s = _pct_tot(f.get("novos", 0))
+            _pct_aprov_s = _pct_tot(f["aprovados"])
+            _pct_repro_s = _pct_tot(f["reprovados"])
             _f_ag_fmt    = _nbr(_proj_cnt)
             _proj_global_tag = (
                 " · <span style='color:#64748b;font-size:0.82em'>global</span>"
@@ -2810,15 +2820,15 @@ try:
               <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Volume aprovado</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s}</div></div>
               <div class="kpi-card"><div class="kpi-label">Prazo médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor desembolsado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{f['taxa_reprovacao']:.1f}% dos finalizados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s}</div></div>
               <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total Desembolsado</div><div class="kpi-value" style="color:#FEC52E">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado · data desembolso</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Liberado</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">valor liberado por contrato</div></div>
-              <div class="kpi-card" style="visibility:hidden"></div>
+              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s}</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag}</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div><div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag} · {_proj_kpi_sub}</div></div>
             </div>
