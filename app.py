@@ -1339,7 +1339,7 @@ def _html_tabela_desemb(items: list, titulo_col: str, n_total: int,
             f'<td class="r">{_nbr(it["n"])}</td>'
             f'<td class="r" style="color:#94a3b8">{pct}</td>'
             f'<td class="r" style="color:#FEC52E">{_brl(it.get("valor", 0.0))}</td>'
-            f'<td class="r" style="color:#10b981">{_brl(it.get("liberado", 0.0))}</td>'
+            f'<td class="r" style="color:#FEC52E">{_brl(it.get("liberado", 0.0))}</td>'
             f'</tr>'
         )
     if has_sep:
@@ -3746,7 +3746,7 @@ try:
                 <div class="kpi-row" style="grid-template-columns:repeat(6,1fr)">
                   <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_nbr(_n_det)}</div><div class="kpi-sub">{periodo_label}</div></div>
                   <div class="kpi-card"><div class="kpi-label">Total Contratado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_val)}</div><div class="kpi-sub">valor do empréstimo</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Total Liberado</div><div class="kpi-value" style="color:#10b981">{_brl2(_sum_lib)}</div><div class="kpi-sub">valor líquido ao cliente</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Total Liberado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_lib)}</div><div class="kpi-sub">valor líquido ao cliente</div></div>
                   <div class="kpi-card"><div class="kpi-label">IOF Total</div><div class="kpi-value">{_brl2(_iof_tot)}</div><div class="kpi-sub">soma do período</div></div>
                   <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">{_brl2(_ticket)}</div><div class="kpi-sub">contratado por contrato</div></div>
                   <div class="kpi-card"><div class="kpi-label">Prazo · Taxa Médios</div><div class="kpi-value">{f'{_prz_med:.0f}m' if _prz_med else '—'} · {(f'{_tx_med:.2f}'.replace('.', ',') + '%') if _tx_med else '—'}</div><div class="kpi-sub">meses · a.m.</div></div>
@@ -3783,7 +3783,7 @@ try:
                     for it in _emp_items[:12]:
                         _k = _trunc(it["label"])
                         _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
-                    fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#22c55e")
+                    fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
                     if fig:
                         st.plotly_chart(fig, use_container_width=True, config=_CONF)
                     tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
