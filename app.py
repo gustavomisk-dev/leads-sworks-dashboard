@@ -2921,7 +2921,21 @@ try:
             # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
             _non_bt_sec_nm: dict = {}
             _pt_por_dia: dict = {}
-            _hm_ts: dict = {}   # heatmap: timestamps de ultima_atualizacao por etapa (5 dias)
+            # Heatmap: ultima_atualizacao por etapa. Janela AMPLA (30 dias) p/ capturar
+            # leads antigos ainda nao-terminais e preencher as faixas mais longas
+            # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
+            # ficam em cache permanente, entao so pesa no 1o load da sessao.
+            _hm_ts: dict = {}
+            for _dhm in range(30):
+                _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
+                if _shm not in datas:
+                    continue
+                _djhm = carregar_dia(_shm)
+                if not _djhm:
+                    continue
+                for _tsh, _lst in (_djhm.get("heatmap_ts", {}) or {}).items():
+                    _hm_ts.setdefault(_tsh, []).extend(_lst)
+            # 5 dias — projecao / breakdown da secao 1 (separado do heatmap)
             for _d5pd in range(5):
                 _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
                 if _s5pd not in datas:
@@ -2929,8 +2943,6 @@ try:
                 _dj2 = carregar_dia(_s5pd)
                 if not _dj2:
                     continue
-                for _tsh, _lst in (_dj2.get("heatmap_ts", {}) or {}).items():
-                    _hm_ts.setdefault(_tsh, []).extend(_lst)
                 for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
                     if _ts2 == "BLOQUEIO_TEMPORARIO":
                         continue
