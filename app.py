@@ -2619,8 +2619,9 @@ try:
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
+                        # Só os recentes (mutáveis) + a lista de datas. Históricos são
+                        # imutáveis — re-baixá-los a cada clique só traria de volta a lentidão.
                         _carregar_dia_recente.clear()
-                        _carregar_dia_hist.clear()
                         listar_datas.clear()
                         st.rerun()
             
