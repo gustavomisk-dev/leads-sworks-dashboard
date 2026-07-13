@@ -321,13 +321,36 @@ def listar_datas() -> list:
     return sorted(datas)
 
 
-@st.cache_data(ttl=300)
-def carregar_dia(dia_str: str) -> dict:
+# Dias recentes (últimos _DIAS_MUTAVEIS) ainda mudam — o coletor atualiza hoje + retro
+# e publica ~8 dias — então usam TTL curto. Dias mais antigos são congelados (nunca mais
+# mudam) → cache permanente: baixam 1x e reusam pela vida do app (compartilhado entre
+# sessões). Isso elimina o "Running carregar_dia" nas interações repetidas.
+_DIAS_MUTAVEIS = 8
+
+
+def _fetch_dia(dia_str: str) -> dict:
     url = f"https://api.github.com/repos/{_REPO}/contents/dados/{dia_str}.json"
     r = requests.get(url, headers=_HEADERS_RAW, timeout=15)
     if r.status_code != 200:
         raise RuntimeError(f"GitHub API retornou {r.status_code}")
     return json.loads(r.text)
+
+
+@st.cache_data(ttl=1800, max_entries=30)   # recentes: 30 min (coletor publica a cada ~30 min)
+def _carregar_dia_recente(dia_str: str) -> dict:
+    return _fetch_dia(dia_str)
+
+
+@st.cache_data(max_entries=400)            # históricos: sem TTL = cache permanente
+def _carregar_dia_hist(dia_str: str) -> dict:
+    return _fetch_dia(dia_str)
+
+
+def carregar_dia(dia_str: str) -> dict:
+    # BRT (Brasil sem horário de verão desde 2019). Comparação lexicográfica de "YYYYMMDD"
+    # = cronológica. Dia dentro da janela mutável → cache curto; senão → permanente.
+    _limite = (datetime.utcnow() - timedelta(hours=3) - timedelta(days=_DIAS_MUTAVEIS)).strftime("%Y%m%d")
+    return _carregar_dia_recente(dia_str) if dia_str >= _limite else _carregar_dia_hist(dia_str)
 
 # ── Agregacao ─────────────────────────────────────────────────────────────────
 
@@ -2596,7 +2619,8 @@ try:
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
-                        carregar_dia.clear()
+                        _carregar_dia_recente.clear()
+                        _carregar_dia_hist.clear()
                         listar_datas.clear()
                         st.rerun()
             
