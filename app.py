@@ -2921,12 +2921,12 @@ try:
             # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
             _non_bt_sec_nm: dict = {}
             _pt_por_dia: dict = {}
-            # Heatmap: ultima_atualizacao por etapa. Janela AMPLA (30 dias) p/ capturar
+            # Heatmap: ultima_atualizacao por etapa. Janela de 15 dias p/ capturar
             # leads antigos ainda nao-terminais e preencher as faixas mais longas
             # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
             # ficam em cache permanente, entao so pesa no 1o load da sessao.
             _hm_ts: dict = {}
-            for _dhm in range(30):
+            for _dhm in range(15):
                 _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
                 if _shm not in datas:
                     continue
