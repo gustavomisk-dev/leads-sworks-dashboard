@@ -3183,9 +3183,125 @@ try:
                 if n_dias > 1:
                     st.caption("*Dados do dia mais recente selecionado")
 
-            # ── 4. Alertas ────────────────────────────────────────────────────────────────
+            # ── 4. Evolução Temporal — Médias por Dia ──────────────────────────────────
 
-            st.markdown('<div class="sec">4. Alertas</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">4. Evolução Temporal — Médias por Dia</div>', unsafe_allow_html=True)
+
+            # Mesma lógica das KPIs do topo:
+            #  · Taxa / Prazo / Valor da Parcela  -> média de `financeiro` de cada dia
+            #    (ValorParcela é média ponderada pelo prazo, igual à KPI "Ticket médio da
+            #    parcela"). Fonte: _dias_agg (payloads do período, já com filtro de Origem).
+            #  · Valor liberado médio -> liberado/contratos dos desembolsados (KPI "Ticket
+            #    Médio Liberado"), por data de desembolso. Fonte: _desemb_agg (respeita Origem).
+            def _fig_media(_x, _y, _cnt, _titulo, _ytitle, _tickfmt,
+                           _xtitle="Data", _tickpref="", _ticksuf="", _hval=""):
+                _figm = go.Figure()
+                _figm.add_trace(go.Scatter(
+                    x=_x, y=_y, name=_titulo, mode="lines+markers",
+                    line=dict(color="#10b981", width=2),
+                    marker=dict(size=6, color="#10b981"),
+                    fill="tozeroy", fillcolor="rgba(16,185,129,0.08)",
+                    connectgaps=True, customdata=_cnt,
+                    hovertemplate=(f"<b>%{{x}}</b><br>{_titulo}: <b>{_hval}</b><br>"
+                                   "Contratos: <b>%{customdata}</b><extra></extra>"),
+                ))
+                _figm.update_layout(
+                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                    title=dict(text=_titulo, font=_TF),
+                    xaxis=dict(title=_xtitle, tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                    yaxis=dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
+                               tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf),
+                    showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
+                    height=360, hovermode="x unified",
+                )
+                return _figm
+
+            # Série de `financeiro` por dia (Taxa/Prazo/ValorParcela).
+            _fin_por_dia = {}
+            for _d in _dias_agg:
+                _dk = _d.get("data")
+                if _dk:
+                    _fin_por_dia[_dk] = _d.get("financeiro", {}) or {}
+            _dias_fin = sorted(_fin_por_dia.keys())
+            _x_fin = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_fin]
+
+            def _media_fin(_sd):
+                # Mesma fórmula do agregar(): ValorParcela ponderada pelo prazo, demais
+                # total/n. Payload cru já traz 'media'; o merge por Origem traz só
+                # total/n/weighted_sum, então recalcula.
+                if not isinstance(_sd, dict):
+                    return None
+                if _sd.get("media") is not None:
+                    return _sd["media"]
+                if _sd.get("weight_sum"):
+                    return _sd["weighted_sum"] / _sd["weight_sum"]
+                _n = _sd.get("n", 0)
+                return (_sd.get("total", 0.0) / _n) if _n else None
+
+            def _serie_fin(_campo):
+                _y, _cnt = [], []
+                for _dk in _dias_fin:
+                    _sd = _fin_por_dia.get(_dk, {}).get(_campo, {})
+                    _m  = _media_fin(_sd)
+                    _y.append(round(_m, 4) if _m is not None else None)
+                    _cnt.append(_sd.get("n", 0) if isinstance(_sd, dict) else 0)
+                return _y, _cnt
+
+            # Série de Valor liberado por data de desembolso (liberado/contratos).
+            _dias_lib = sorted(_desemb_agg.keys())
+            _x_lib = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_lib]
+            _y_lib, _cnt_lib = [], []
+            for _dk in _dias_lib:
+                _a  = _desemb_agg[_dk]
+                _cc = _a.get("count", 0)
+                _y_lib.append(round(_a.get("liberado", 0.0) / _cc, 2) if _cc else None)
+                _cnt_lib.append(_cc)
+
+            _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
+                ["Taxa média", "Prazo médio", "Valor liberado médio", "Valor da Parcela médio"])
+            with _tab_tx:
+                _y, _c = _serie_fin("Taxa")
+                if any(_c):
+                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Taxa média", "Taxa (% a.m.)",
+                                    ".2f", _ticksuf="%", _hval="%{y:.2f}%"),
+                                    use_container_width=True, config=_CONF)
+                else:
+                    st.info("Sem contratos aprovados com taxa no período.")
+            with _tab_pz:
+                _y, _c = _serie_fin("Prazo")
+                if any(_c):
+                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Prazo médio", "Prazo (meses)",
+                                    ".1f", _ticksuf=" m", _hval="%{y:.1f} meses"),
+                                    use_container_width=True, config=_CONF)
+                else:
+                    st.info("Sem contratos aprovados com prazo no período.")
+            with _tab_lb:
+                if any(_cnt_lib):
+                    st.plotly_chart(_fig_media(_x_lib, _y_lib, _cnt_lib, "Valor liberado médio",
+                                    "Valor (R$)", ",.0f", _xtitle="Data de Desembolso",
+                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
+                                    use_container_width=True, config=_CONF)
+                else:
+                    _msg_ori15 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                    st.info(f"Sem contratos desembolsados no período{_msg_ori15}.")
+            with _tab_pc:
+                _y, _c = _serie_fin("ValorParcela")
+                if any(_c):
+                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Valor da Parcela médio",
+                                    "Valor (R$)", ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
+                                    use_container_width=True, config=_CONF)
+                else:
+                    st.info("Sem contratos aprovados com parcela no período.")
+            st.caption(
+                "Média por dia com a mesma lógica das KPIs do topo · Taxa, Prazo e Valor da "
+                "Parcela: contratos aprovados de cada dia (parcela ponderada pelo prazo) · "
+                "Valor liberado: liberado por contrato dos desembolsados (por data de desembolso) · "
+                "respeita o filtro de Origem."
+            )
+
+            # ── 5. Alertas ────────────────────────────────────────────────────────────────
+
+            st.markdown('<div class="sec">5. Alertas</div>', unsafe_allow_html=True)
 
             if _dup:
                 _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -3429,9 +3545,9 @@ try:
 </table></div>"""
                     st.markdown(_av_html, unsafe_allow_html=True)
 
-            # ── 5. Distribuição por Status ────────────────────────────────────────────────
+            # ── 6. Distribuição por Status ────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">5. Distribuição por Status</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">6. Distribuição por Status</div>', unsafe_allow_html=True)
             
             col_d, col_f = st.columns(2)
             with col_d:
@@ -3443,9 +3559,9 @@ try:
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 6. Status Novo — CTPS ─────────────────────────────────────────────────────
+            # ── 7. Status Novo — CTPS ─────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">6. Status Novo — CTPS</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Status Novo — CTPS</div>', unsafe_allow_html=True)
             _ncs = agg.get("novo_ctps_status", {})
             if _ncs:
                 _ctps_total     = _ncs.get("ctps_total", 0)
@@ -3478,17 +3594,17 @@ try:
 </div>
 """, unsafe_allow_html=True)
 
-            # ── 7. Evolução Temporal ──────────────────────────────────────────────────────
+            # ── 8. Evolução Temporal ──────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">7. Evolução Temporal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">8. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 8. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            # ── 9. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-            st.markdown('<div class="sec">8. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">9. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -3520,9 +3636,9 @@ try:
                     if fig_taxa:
                         st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
 
-            # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
+            # ── 10. Etapa de Reprovação ────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">9. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">10. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -3584,9 +3700,9 @@ try:
             else:
                 st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
-            # ── 10. Motivos de Reprovação ──────────────────────────────────────────────────
+            # ── 11. Motivos de Reprovação ──────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">10. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">11. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -3609,9 +3725,9 @@ try:
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
-            # ── 11. Bloqueios ─────────────────────────────────────────────────────────────
+            # ── 12. Bloqueios ─────────────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">11. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">12. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
             if fig:
@@ -3621,9 +3737,9 @@ try:
             else:
                 st.info("Sem dados de bloqueios.")
             
-            # ── 12. Segmentação — Reprovados ─────────────────────────────────────────────
+            # ── 13. Segmentação — Reprovados ─────────────────────────────────────────────
 
-            st.markdown('<div class="sec">12. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">13. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -3683,9 +3799,9 @@ try:
                 else:
                     st.info("Sem dados de CBO dos reprovados.")
             
-            # ── 13. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+            # ── 14. Aprovados — Empregadores e CBOs ──────────────────────────────────────
 
-            st.markdown('<div class="sec">13. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">14. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
@@ -3710,9 +3826,9 @@ try:
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
 
-            # ── 14. Desembolsados no Período — Segmentação ──────────────────────────────
+            # ── 15. Desembolsados no Período — Segmentação ──────────────────────────────
 
-            st.markdown('<div class="sec">14. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">15. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
 
             if not _desemb_det:
                 _msg_ori14 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
