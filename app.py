@@ -3187,117 +3187,87 @@ try:
 
             st.markdown('<div class="sec">4. Evolução Temporal — Médias por Dia</div>', unsafe_allow_html=True)
 
-            # Mesma lógica das KPIs do topo:
-            #  · Taxa / Prazo / Valor da Parcela  -> média de `financeiro` de cada dia
-            #    (ValorParcela é média ponderada pelo prazo, igual à KPI "Ticket médio da
-            #    parcela"). Fonte: _dias_agg (payloads do período, já com filtro de Origem).
-            #  · Valor liberado médio -> liberado/contratos dos desembolsados (KPI "Ticket
-            #    Médio Liberado"), por data de desembolso. Fonte: _desemb_agg (respeita Origem).
-            def _fig_media(_x, _y, _cnt, _titulo, _ytitle, _tickfmt,
-                           _xtitle="Data", _tickpref="", _ticksuf="", _hval=""):
-                _figm = go.Figure()
-                _figm.add_trace(go.Scatter(
-                    x=_x, y=_y, name=_titulo, mode="lines+markers",
-                    line=dict(color="#10b981", width=2),
-                    marker=dict(size=6, color="#10b981"),
-                    fill="tozeroy", fillcolor="rgba(16,185,129,0.08)",
-                    connectgaps=True, customdata=_cnt,
-                    hovertemplate=(f"<b>%{{x}}</b><br>{_titulo}: <b>{_hval}</b><br>"
-                                   "Contratos: <b>%{customdata}</b><extra></extra>"),
-                ))
-                _figm.update_layout(
-                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                    title=dict(text=_titulo, font=_TF),
-                    xaxis=dict(title=_xtitle, tickfont=_AF, showgrid=True, gridcolor=_GRID),
-                    yaxis=dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
-                               tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf),
-                    showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
-                    height=360, hovermode="x unified",
-                )
-                return _figm
+            # Médias por DATA DE DESEMBOLSO, sobre os contratos DESEMBOLSADOS do período
+            # (o mesmo _desemb_det já filtrado por período + Origem). Um ponto por dia.
+            if not _desemb_det:
+                _msg_ori4 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori4}.")
+            else:
+                _ev_dia: dict = {}
+                for _r in _desemb_det:
+                    _pdk = _r.get("pd")
+                    if not _pdk:
+                        continue
+                    _slot = _ev_dia.setdefault(_pdk, {"taxa": [0.0, 0], "prazo": [0.0, 0],
+                                                      "liberado": [0.0, 0], "parcela": [0.0, 0]})
+                    for _k in ("taxa", "prazo", "liberado", "parcela"):
+                        _v = _r.get(_k)
+                        if _v:
+                            _slot[_k][0] += _v
+                            _slot[_k][1] += 1
 
-            # Série de `financeiro` por dia (Taxa/Prazo/ValorParcela).
-            _fin_por_dia = {}
-            for _d in _dias_agg:
-                _dk = _d.get("data")
-                if _dk:
-                    _fin_por_dia[_dk] = _d.get("financeiro", {}) or {}
-            _dias_fin = sorted(_fin_por_dia.keys())
-            _x_fin = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_fin]
+                _dias_ev = sorted(_ev_dia.keys())
+                _x_ev = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_ev]
 
-            def _media_fin(_sd):
-                # Mesma fórmula do agregar(): ValorParcela ponderada pelo prazo, demais
-                # total/n. Payload cru já traz 'media'; o merge por Origem traz só
-                # total/n/weighted_sum, então recalcula.
-                if not isinstance(_sd, dict):
-                    return None
-                if _sd.get("media") is not None:
-                    return _sd["media"]
-                if _sd.get("weight_sum"):
-                    return _sd["weighted_sum"] / _sd["weight_sum"]
-                _n = _sd.get("n", 0)
-                return (_sd.get("total", 0.0) / _n) if _n else None
+                def _serie_ev(_campo):
+                    _y, _cnt = [], []
+                    for _dk in _dias_ev:
+                        _s, _c = _ev_dia[_dk][_campo]
+                        _y.append(round(_s / _c, 4) if _c else None)
+                        _cnt.append(_c)
+                    return _y, _cnt
 
-            def _serie_fin(_campo):
-                _y, _cnt = [], []
-                for _dk in _dias_fin:
-                    _sd = _fin_por_dia.get(_dk, {}).get(_campo, {})
-                    _m  = _media_fin(_sd)
-                    _y.append(round(_m, 4) if _m is not None else None)
-                    _cnt.append(_sd.get("n", 0) if isinstance(_sd, dict) else 0)
-                return _y, _cnt
+                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval=""):
+                    _y, _cnt = _serie_ev(_campo)
+                    _figm = go.Figure()
+                    _figm.add_trace(go.Scatter(
+                        x=_x_ev, y=_y, name=_titulo, mode="lines+markers",
+                        line=dict(color="#10b981", width=2),
+                        marker=dict(size=6, color="#10b981"),
+                        fill="tozeroy", fillcolor="rgba(16,185,129,0.08)",
+                        connectgaps=True, customdata=_cnt,
+                        hovertemplate=(f"<b>%{{x}}</b><br>{_titulo}: <b>{_hval}</b><br>"
+                                       "Contratos: <b>%{customdata}</b><extra></extra>"),
+                    ))
+                    _figm.update_layout(
+                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                        title=dict(text=_titulo, font=_TF),
+                        xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                        yaxis=dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
+                                   tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf),
+                        showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
+                        height=360, hovermode="x unified",
+                    )
+                    return _figm
 
-            # Série de Valor liberado por data de desembolso (liberado/contratos).
-            _dias_lib = sorted(_desemb_agg.keys())
-            _x_lib = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_lib]
-            _y_lib, _cnt_lib = [], []
-            for _dk in _dias_lib:
-                _a  = _desemb_agg[_dk]
-                _cc = _a.get("count", 0)
-                _y_lib.append(round(_a.get("liberado", 0.0) / _cc, 2) if _cc else None)
-                _cnt_lib.append(_cc)
-
-            _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
-                ["Taxa média", "Prazo médio", "Valor liberado médio", "Valor da Parcela médio"])
-            with _tab_tx:
-                _y, _c = _serie_fin("Taxa")
-                if any(_c):
-                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Taxa média", "Taxa (% a.m.)",
-                                    ".2f", _ticksuf="%", _hval="%{y:.2f}%"),
+                _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
+                    ["Taxa média", "Prazo médio", "Valor liberado médio", "Valor da Parcela médio"])
+                with _tab_tx:
+                    st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
+                                    _ticksuf="%", _hval="%{y:.2f}%"),
                                     use_container_width=True, config=_CONF)
-                else:
-                    st.info("Sem contratos aprovados com taxa no período.")
-            with _tab_pz:
-                _y, _c = _serie_fin("Prazo")
-                if any(_c):
-                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Prazo médio", "Prazo (meses)",
-                                    ".1f", _ticksuf=" m", _hval="%{y:.1f} meses"),
+                with _tab_pz:
+                    st.plotly_chart(_fig_media("prazo", "Prazo médio", "Prazo (meses)", ".1f",
+                                    _ticksuf=" m", _hval="%{y:.1f} meses"),
                                     use_container_width=True, config=_CONF)
-                else:
-                    st.info("Sem contratos aprovados com prazo no período.")
-            with _tab_lb:
-                if any(_cnt_lib):
-                    st.plotly_chart(_fig_media(_x_lib, _y_lib, _cnt_lib, "Valor liberado médio",
-                                    "Valor (R$)", ",.0f", _xtitle="Data de Desembolso",
+                with _tab_lb:
+                    st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.0f",
                                     _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
                                     use_container_width=True, config=_CONF)
-                else:
-                    _msg_ori15 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
-                    st.info(f"Sem contratos desembolsados no período{_msg_ori15}.")
-            with _tab_pc:
-                _y, _c = _serie_fin("ValorParcela")
-                if any(_c):
-                    st.plotly_chart(_fig_media(_x_fin, _y, _c, "Valor da Parcela médio",
-                                    "Valor (R$)", ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
-                                    use_container_width=True, config=_CONF)
-                else:
-                    st.info("Sem contratos aprovados com parcela no período.")
-            st.caption(
-                "Média por dia com a mesma lógica das KPIs do topo · Taxa, Prazo e Valor da "
-                "Parcela: contratos aprovados de cada dia (parcela ponderada pelo prazo) · "
-                "Valor liberado: liberado por contrato dos desembolsados (por data de desembolso) · "
-                "respeita o filtro de Origem."
-            )
+                with _tab_pc:
+                    _yp, _cp = _serie_ev("parcela")
+                    if any(_cp):
+                        st.plotly_chart(_fig_media("parcela", "Valor da Parcela médio", "Valor (R$)",
+                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
+                                        use_container_width=True, config=_CONF)
+                    else:
+                        st.info("Sem valor de parcela nos desembolsos do período "
+                                "(ValorParcelaContrato disponível a partir de 26/06/2026).")
+                st.caption(
+                    "Média por data de desembolso entre os contratos desembolsados no período "
+                    "(respeita o filtro de Origem). Taxa, Prazo e Valor liberado cobrem todo o "
+                    "histórico; Valor da Parcela a partir de 26/06/2026."
+                )
 
             # ── 5. Alertas ────────────────────────────────────────────────────────────────
 
