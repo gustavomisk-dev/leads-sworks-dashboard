@@ -3261,12 +3261,9 @@ try:
                                         ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
                                         use_container_width=True, config=_CONF)
                     else:
-                        st.info("Sem valor de parcela nos desembolsos do período "
-                                "(ValorParcelaContrato disponível a partir de 26/06/2026).")
+                        st.info("Sem valor de parcela nos desembolsos do período.")
                 st.caption(
-                    "Média por data de desembolso entre os contratos desembolsados no período "
-                    "(respeita o filtro de Origem). Taxa, Prazo e Valor liberado cobrem todo o "
-                    "histórico; Valor da Parcela a partir de 26/06/2026."
+                    "Média por data de desembolso entre os contratos desembolsados no período."
                 )
 
             # ── 5. Alertas ────────────────────────────────────────────────────────────────
