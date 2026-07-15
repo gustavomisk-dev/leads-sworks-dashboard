@@ -3217,7 +3217,7 @@ try:
                         _cnt.append(_c)
                     return _y, _cnt
 
-                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval="", _ymin=None):
+                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval="", _ymin=None, _dtick=None):
                     _y, _cnt = _serie_ev(_campo)
                     _yax = dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
                                 tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf)
@@ -3226,6 +3226,11 @@ try:
                         if _vals and max(_vals) > _ymin:
                             _top = max(_vals)
                             _yax["range"] = [_ymin, _top + (_top - _ymin) * 0.08]
+                            # 1º tick (base) = exatamente o mínimo (tickmode linear a partir de _ymin)
+                            if _dtick:
+                                _yax["tickmode"] = "linear"
+                                _yax["tick0"] = _ymin
+                                _yax["dtick"] = _dtick
                     _figm = go.Figure()
                     _figm.add_trace(go.Scatter(
                         x=_x_ev, y=_y, name=_titulo, mode="lines+markers",
@@ -3238,6 +3243,7 @@ try:
                     ))
                     _figm.update_layout(
                         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                        separators=",.",   # vírgula decimal, ponto milhar (pt-BR)
                         title=dict(text=_titulo, font=_TF),
                         xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
                         yaxis=_yax,
@@ -3250,21 +3256,21 @@ try:
                     ["Taxa média", "Número de Parcelas Médio", "Valor liberado médio", "Valor da Parcela médio"])
                 with _tab_tx:
                     st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
-                                    _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98),
+                                    _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98, _dtick=0.5),
                                     use_container_width=True, config=_CONF)
                 with _tab_pz:
                     st.plotly_chart(_fig_media("prazo", "Número de Parcelas Médio", "Número de Parcelas", ".1f",
-                                    _hval="%{y:.1f} parcelas", _ymin=12.0),
+                                    _hval="%{y:.1f} parcelas", _ymin=12.0, _dtick=6),
                                     use_container_width=True, config=_CONF)
                 with _tab_lb:
                     st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.0f",
-                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600),
+                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600, _dtick=1000),
                                     use_container_width=True, config=_CONF)
                 with _tab_pc:
                     _yp, _cp = _serie_ev("parcela")
                     if any(_cp):
                         st.plotly_chart(_fig_media("parcela", "Valor da Parcela médio", "Valor (R$)",
-                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50),
+                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50, _dtick=50),
                                         use_container_width=True, config=_CONF)
                     else:
                         st.info("Sem valor de parcela nos desembolsos do período.")
