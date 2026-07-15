@@ -1452,7 +1452,7 @@ def _html_emp_ap_expandable(emp_ap: dict, emp_stats: dict, n_ap: int, n: int = 1
             + _row("Tempo de Emprego", f"{st['media_tempo']:.1f} meses" if st.get("media_tempo") else "—")
             + _row("Renda Líquida",    _brl(st.get("media_renda")))
             + _row("Valor Contratado", _brl(st.get("media_valor")))
-            + _row("Prazo",            f"{st['media_prazo']:.0f} meses" if st.get("media_prazo") else "—")
+            + _row("Número de Parcelas", f"{st['media_prazo']:.0f}" if st.get("media_prazo") else "—")
             + _row("Taxa Mensal",      f"{st['media_taxa']:.2f}%" if st.get("media_taxa") else "—")
         )
         pj_rows = (
@@ -1751,7 +1751,7 @@ def _html_tabela_financeira(fin: dict) -> str:
     campos = [
         ("ValorContratacao",  "Valor Contratado",    _brl),
         ("RendaLiquida",      "Renda Líquida",       _brl),
-        ("Prazo",             "Prazo (meses)",        lambda x: f"{x:.0f}"),
+        ("Prazo",             "Número de Parcelas",   lambda x: f"{x:.0f}"),
         ("Taxa",              "Taxa Mensal (%)",      lambda x: f"{x:.2f}"),
         ("TempoEmpregoMeses", "Tempo de Emprego (meses)", lambda x: f"{x:.2f}"),
     ]
@@ -1793,7 +1793,7 @@ def _html_tabela_pipeline(fin: dict) -> str:
     campos = [
         ("ValorContratacao",  "Valor Contratado",         _brl),
         ("RendaLiquida",      "Renda Líquida",            _brl),
-        ("Prazo",             "Prazo (meses)",             lambda x: f"{x:.0f}"),
+        ("Prazo",             "Número de Parcelas",        lambda x: f"{x:.0f}"),
         ("Taxa",              "Taxa Mensal (%)",           lambda x: f"{x:.2f}"),
         ("TempoEmpregoMeses", "Tempo de Emprego (meses)", lambda x: f"{x:.2f}"),
     ]
@@ -1933,7 +1933,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     _prazo_d   = fin.get("Prazo", {})
     _taxa_d    = fin.get("Taxa", {})
     _parcela_d = fin.get("ValorParcela", {})
-    prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+    prazo_s   = f"{_prazo_d['media']:.0f} parcelas"  if _prazo_d.get("media") else "—"
     ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
     parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
     taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
@@ -1966,7 +1966,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
       <div class="kpi-card"><div class="kpi-label">Taxa média</div>
         <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Prazo médio</div>
+      <div class="kpi-card"><div class="kpi-label">Número de Parcelas Médio</div>
         <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
     </div>
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -2808,7 +2808,7 @@ try:
             _prazo_d   = fin.get("Prazo", {})
             _taxa_d    = fin.get("Taxa", {})
             _parcela_d = fin.get("ValorParcela", {})
-            prazo_s   = f"{_prazo_d['media']:.0f} meses"  if _prazo_d.get("media") else "—"
+            prazo_s   = f"{_prazo_d['media']:.0f} parcelas"  if _prazo_d.get("media") else "—"
             ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
             parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
             taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
@@ -2846,7 +2846,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Volume aprovado</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
               <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Prazo médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Número de Parcelas Médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor desembolsado por contrato</div></div>
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s}</div></div>
@@ -3217,8 +3217,15 @@ try:
                         _cnt.append(_c)
                     return _y, _cnt
 
-                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval=""):
+                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval="", _ymin=None):
                     _y, _cnt = _serie_ev(_campo)
+                    _yax = dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
+                                tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf)
+                    if _ymin is not None:
+                        _vals = [v for v in _y if v is not None]
+                        if _vals and max(_vals) > _ymin:
+                            _top = max(_vals)
+                            _yax["range"] = [_ymin, _top + (_top - _ymin) * 0.08]
                     _figm = go.Figure()
                     _figm.add_trace(go.Scatter(
                         x=_x_ev, y=_y, name=_titulo, mode="lines+markers",
@@ -3233,32 +3240,31 @@ try:
                         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
                         title=dict(text=_titulo, font=_TF),
                         xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
-                        yaxis=dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
-                                   tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf),
+                        yaxis=_yax,
                         showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
                         height=360, hovermode="x unified",
                     )
                     return _figm
 
                 _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
-                    ["Taxa média", "Prazo médio", "Valor liberado médio", "Valor da Parcela médio"])
+                    ["Taxa média", "Número de Parcelas Médio", "Valor liberado médio", "Valor da Parcela médio"])
                 with _tab_tx:
                     st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
-                                    _ticksuf="%", _hval="%{y:.2f}%"),
+                                    _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98),
                                     use_container_width=True, config=_CONF)
                 with _tab_pz:
-                    st.plotly_chart(_fig_media("prazo", "Prazo médio", "Prazo (meses)", ".1f",
-                                    _ticksuf=" m", _hval="%{y:.1f} meses"),
+                    st.plotly_chart(_fig_media("prazo", "Número de Parcelas Médio", "Número de Parcelas", ".1f",
+                                    _hval="%{y:.1f} parcelas", _ymin=12.0),
                                     use_container_width=True, config=_CONF)
                 with _tab_lb:
                     st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.0f",
-                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
+                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600),
                                     use_container_width=True, config=_CONF)
                 with _tab_pc:
                     _yp, _cp = _serie_ev("parcela")
                     if any(_cp):
                         st.plotly_chart(_fig_media("parcela", "Valor da Parcela médio", "Valor (R$)",
-                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}"),
+                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50),
                                         use_container_width=True, config=_CONF)
                     else:
                         st.info("Sem valor de parcela nos desembolsos do período.")
@@ -3844,7 +3850,7 @@ try:
                   <div class="kpi-card"><div class="kpi-label">Total Liberado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_lib)}</div><div class="kpi-sub">valor líquido ao cliente</div></div>
                   <div class="kpi-card"><div class="kpi-label">IOF Total</div><div class="kpi-value">{_brl2(_iof_tot)}</div><div class="kpi-sub">soma do período</div></div>
                   <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">{_brl2(_ticket)}</div><div class="kpi-sub">contratado por contrato</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Prazo · Taxa Médios</div><div class="kpi-value">{f'{_prz_med:.0f}m' if _prz_med else '—'} · {(f'{_tx_med:.2f}'.replace('.', ',') + '%') if _tx_med else '—'}</div><div class="kpi-sub">meses · a.m.</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Nº Parcelas · Taxa Médios</div><div class="kpi-value">{f'{_prz_med:.0f}' if _prz_med else '—'} · {(f'{_tx_med:.2f}'.replace('.', ',') + '%') if _tx_med else '—'}</div><div class="kpi-sub">parcelas · a.m.</div></div>
                 </div>
                 """, unsafe_allow_html=True)
 
