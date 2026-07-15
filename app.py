@@ -3259,11 +3259,11 @@ try:
                                     _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98, _dtick=0.5),
                                     use_container_width=True, config=_CONF)
                 with _tab_pz:
-                    st.plotly_chart(_fig_media("prazo", "Número de parcelas médio", "Número de parcelas", ".1f",
+                    st.plotly_chart(_fig_media("prazo", "Número de parcelas médio", "Número de parcelas", ".0f",
                                     _hval="%{y:.1f} parcelas", _ymin=12.0, _dtick=6),
                                     use_container_width=True, config=_CONF)
                 with _tab_lb:
-                    st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.0f",
+                    st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.2f",
                                     _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600, _dtick=1000),
                                     use_container_width=True, config=_CONF)
                 with _tab_pc:
