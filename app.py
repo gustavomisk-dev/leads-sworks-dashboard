@@ -3,6 +3,7 @@ Dashboard de leads SWorks — Streamlit Community Cloud.
 Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
+import base64
 import hashlib
 import hmac
 import json
@@ -3194,10 +3195,11 @@ try:
                             _dt = datetime.fromisoformat(str(_tsraw)[:19])
                         except (ValueError, TypeError):
                             continue
-                        _bi = _faixa_idx(max(0.0, (_now_brt_nm - _dt).total_seconds() / 3600.0))
+                        _idade_h = max(0.0, (_now_brt_nm - _dt).total_seconds() / 3600.0)
+                        _bi = _faixa_idx(_idade_h)
                         _row[_bi] += 1
                         if _cod and _cod not in _seen:
-                            _seen[_cod] = _bi
+                            _seen[_cod] = (_bi, str(_tsraw)[:19], round(_idade_h / 24.0, 2), _entry)
                     if sum(_row):
                         _hm_mat[_tsh] = _row
                 if _hm_mat:
@@ -3230,7 +3232,8 @@ try:
                         if not _seen:
                             return ""
                         _grp = {0: [], 1: [], 2: []}   # 0=verde(faixas 0-1) 1=amarelo(2-4) 2=vermelho(5+)
-                        for _c, _bi in _seen.items():
+                        for _c, _v in _seen.items():
+                            _bi = _v[0] if isinstance(_v, (list, tuple)) else _v
                             _grp[0 if _bi <= 1 else 1 if _bi <= 4 else 2].append((_bi, _c))
                         for _gk in _grp:
                             _grp[_gk].sort(key=lambda x: -x[0])   # mais parado primeiro
@@ -3251,15 +3254,82 @@ try:
                         _resto = len(_seen) - len(_picked)
                         _mais  = f"<div class='hm-lk-mais'>+{_resto} lead(s) nesta etapa</div>" if _resto > 0 else ""
                         return f"<div class='hm-lks'>{_lines}{_mais}</div>"
+                    # ── Download por etapa (template Operações + Faixa + Dias na etapa) ──
+                    _HM_DL_HEADER = ("Lead;Link S-Works;Data do Lead;Origem;CPF;Nome;E-mail;"
+                                     "Telefone;Data de Nascimento;Valor do Emprestimo Solicitado;"
+                                     "Numero de Parcelas Solicitado;Faixa;Dias na etapa")
+                    def _hm_fmt_data(_s):
+                        _s = str(_s or "").strip()
+                        if not _s:
+                            return ""
+                        _m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", _s)          # ISO
+                        if _m:
+                            return f"{_m.group(3)}/{_m.group(2)}/{_m.group(1)}"
+                        _m = re.match(r"^(\d{2})/(\d{2})/(\d{4})", _s)          # já BR
+                        if _m:
+                            return _m.group(0)
+                        _m = re.match(r"^(\d{2})(\d{2})(\d{4})", _s)            # DDMMYYYY
+                        if _m:
+                            return f"{_m.group(1)}/{_m.group(2)}/{_m.group(3)}"
+                        return _s[:10]
+                    def _hm_dl_uri(_seen):
+                        def _f(_e, _i):
+                            return str(_e[_i]).strip() if isinstance(_e, (list, tuple)) and len(_e) > _i and _e[_i] else ""
+                        def _clean(_x):
+                            return str(_x).replace(";", ",").replace("\n", " ").replace("\r", " ")
+                        def _dias_of(_v):
+                            return (_v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else 0) or 0
+                        _linhas = [_HM_DL_HEADER]
+                        for _c, _v in sorted(_seen.items(), key=lambda kv: -_dias_of(kv[1])):
+                            _bi   = _v[0] if isinstance(_v, (list, tuple)) else _v
+                            _dias = _v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else ""
+                            _e    = _v[3] if isinstance(_v, (list, tuple)) and len(_v) > 3 else None
+                            _row = [
+                                _c, f"https://sworks.zilicorp.net/Processo?codigo={_c}",
+                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3), _f(_e, 4), _f(_e, 5),
+                                _f(_e, 6), _f(_e, 7), _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
+                                _f(_e, 10), _FAIXAS[_bi][0], str(_dias).replace(".", ","),
+                            ]
+                            _linhas.append(";".join(_clean(x) for x in _row))
+                        _b64 = base64.b64encode(("﻿" + "\r\n".join(_linhas)).encode("utf-8")).decode()
+                        return "data:text/csv;base64," + _b64
+                    # senha (st.secrets) habilita os downloads da coluna ↓
+                    _hm_auth = False
+                    with st.expander("🔒 Baixar listas de leads por etapa (equipe de operações)"):
+                        try:
+                            _hm_sec = st.secrets["senha_download_heatmap"]
+                        except Exception:
+                            _hm_sec = None
+                        if not _hm_sec:
+                            st.caption("Defina o secret `senha_download_heatmap` no Streamlit para liberar os downloads.")
+                        else:
+                            _hm_pw = st.text_input("Senha", type="password", key="hm_dl_pw")
+                            if not _hm_pw:
+                                st.caption("Digite a senha para habilitar a setinha ↓ de download de cada etapa.")
+                            elif _hm_pw == _hm_sec:
+                                _hm_auth = True
+                                st.caption("✓ Senha correta — use a setinha ↓ à direita da coluna Total.")
+                            else:
+                                st.caption("Senha incorreta.")
                     _hrows = ""
                     for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
-                        _lblt = _TIPO_LABEL_MAP.get(_t, _t)
-                        _lks  = _hm_links(_hm_leads.get(_t, {}))
-                        _cell = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
-                                 if _lks else _lblt)
+                        _lblt    = _TIPO_LABEL_MAP.get(_t, _t)
+                        _leads_t = _hm_leads.get(_t, {})
+                        _lks     = _hm_links(_leads_t)
+                        _cell    = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
+                                    if _lks else _lblt)
+                        if _hm_auth and _leads_t:
+                            _dlcell = (f"<td class='hm-dl'><a class='hm-dlbtn' download='leads_{_t}.csv' "
+                                       f"href=\"{_hm_dl_uri(_leads_t)}\" "
+                                       f"title='Baixar {len(_leads_t)} lead(s) — template Operações'>&#8595;</a></td>")
+                        else:
+                            _dttl = ('Sem leads com dados ainda (aguardando próxima exportação)'
+                                     if not _leads_t else 'Requer senha — abra o cadeado acima')
+                            _dlcell = f"<td class='hm-dl'><span class='hm-dlbtn hm-dlbtn-off' title='{_dttl}'>&#8595;</span></td>"
                         _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
                                    + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
-                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td></tr>')
+                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td>'
+                                   + _dlcell + '</tr>')
                     _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
                     _hm_css = """
             <style>
@@ -3280,6 +3350,11 @@ try:
             .hm-lk:hover{text-decoration:underline}
             .hm-lk-fx{color:#64748b;font-size:.82em}
             .hm-lk-mais{color:#64748b;font-size:.8em;padding:4px 0 0 2px}
+            .hm-dl-h{border-left:1px solid #272420}
+            .hm-dl{text-align:center;padding:4px 8px;border-bottom:1px solid #1c1a17;border-left:1px solid #1c1a17}
+            .hm-dlbtn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:20px;border:1px solid #333;border-radius:5px;color:#94a3b8;text-decoration:none;font-size:.85em;background:#17150f;line-height:1}
+            .hm-dlbtn:hover{border-color:#FEC52E;color:#FEC52E}
+            .hm-dlbtn-off{opacity:.3;cursor:not-allowed}
             </style>
             """
                     st.markdown(
@@ -3287,7 +3362,7 @@ try:
                         + '<div class="sec" style="font-size:.95em">Tempo desde a última atualização (por etapa)</div>'
                         + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção.</p>"
                         + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
-                        + _hhead + '<th class="hm-c">Total</th></tr></thead><tbody>'
+                        + _hhead + '<th class="hm-c">Total</th><th class="hm-c hm-dl-h"></th></tr></thead><tbody>'
                         + _hrows + "</tbody></table></div>",
                         unsafe_allow_html=True,
                     )
