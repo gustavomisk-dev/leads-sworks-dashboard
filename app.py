@@ -41,6 +41,8 @@ st.markdown("""
 .kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 .kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
+.kpi-grp   { color: #FEC52E; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 4px; border-bottom: 1px solid #272420; padding-bottom: 3px; }
+.kpi-grp span { color: #64748b; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; margin-left: 6px; }
 
 .sec { color: #FEC52E; font-size: 15px; font-weight: 600; margin: 28px 0 8px;
        border-bottom: 1px solid #272420; padding-bottom: 6px; }
@@ -2794,16 +2796,8 @@ try:
             _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("iof", 0.0)
             if _proj_val:
                 _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                _proj_lib_fmt = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                _proj_iof_fmt = ("R$ " + f"{_proj_iof:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-                _proj_kpi_sub = (
-                    f"<span style='color:#64748b;font-size:0.82em'>"
-                    f"Lib. {_proj_lib_fmt} · IOF {_proj_iof_fmt}"
-                    "</span>"
-                )
             else:
                 _proj_val_fmt = "—"
-                _proj_kpi_sub = ""
             
             _prazo_d   = fin.get("Prazo", {})
             _taxa_d    = fin.get("Taxa", {})
@@ -2837,25 +2831,69 @@ try:
             _desemb_ticket_lib_s = ("R$ " + f"{_desemb_tot_lib/_desemb_tot_count:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _desemb_tot_count else "—"
             _desemb_cnt_s        = _nbr(_desemb_tot_count) if _desemb_tot_count else "—"
 
-            # Grid 4x4 (col1=tickets medios | col2=taxas/contratos | col3=funil | col4=desembolso $)
+            # ── KPIs em 4 grupos: 1) funil · 2) aprovados · 3) desembolsados · 4) projeção ──
+            # A separação aprovados × desembolsados é proposital: data de aprovação ≠ data
+            # de desembolso, então as mesmas métricas (ticket, taxa, prazo, liberado) são
+            # calculadas em bases distintas e nunca misturadas no mesmo bloco.
+            _brl = lambda x: ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if x else "—"
+            # Grupo 2 — liberado ao cliente dos APROVADOS (fin['ValorLiquido']; fica "—" nos
+            # dias exportados antes de o produtor passar a emitir esse campo).
+            _ap_lib_d     = fin.get("ValorLiquido", {})
+            _ap_lib_tot_s = _brl(_ap_lib_d.get("total"))
+            _ap_lib_tk_s  = _brl(_ap_lib_d.get("media"))
+            # Grupo 3 — taxa / nº de parcelas / valor da parcela médios dos DESEMBOLSADOS
+            # (de _desemb_det; ignora registros sem o campo). Parcela = média ponderada pelo
+            # prazo (mesmo critério dos aprovados).
+            _dz_taxas   = [d["taxa"]  for d in _desemb_det if d.get("taxa")]
+            _dz_prazos  = [d["prazo"] for d in _desemb_det if d.get("prazo")]
+            _dz_parc_pz = [(d["parcela"], d["prazo"]) for d in _desemb_det if d.get("parcela") and d.get("prazo")]
+            _dz_taxa_m  = (sum(_dz_taxas) / len(_dz_taxas)) if _dz_taxas else None
+            _dz_prazo_m = (sum(_dz_prazos) / len(_dz_prazos)) if _dz_prazos else None
+            _dz_parc_m  = (sum(p * z for p, z in _dz_parc_pz) / sum(z for _, z in _dz_parc_pz)) if _dz_parc_pz else None
+            _dz_taxa_s  = (f"{_dz_taxa_m:.2f}".replace(".", ",") + "% a.m.") if _dz_taxa_m else "—"
+            _dz_prazo_s = f"{_dz_prazo_m:.0f} parcelas" if _dz_prazo_m else "—"
+            _dz_parc_s  = _brl(_dz_parc_m)
+            # Grupo 4 — projeção com e sem IOF (verificado: valor = liberado + iof, logo
+            # com IOF = valor e sem IOF = valor − iof).
+            _proj_comiof_fmt = _proj_val_fmt
+            _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
+            _pix_ref_sub     = f"Pix {_ref_short_kpi}{_proj_global_tag}"
+
             st.markdown(f"""
+            <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor do empréstimo por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label} · {n_dias} dia(s)</div></div>
-              <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s} do total</div></div>
+              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
+              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
+            </div>
+            <div class="kpi-grp">2 · Aprovados <span>base: leads aprovados no período</span></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Volume aprovado</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado ao cliente</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Ticket médio liberado</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Número de Parcelas Médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-              <div class="kpi-card"><div class="kpi-label">Liberado ao Cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket Médio Desembolsado</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">valor desembolsado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total Desembolsado</div><div class="kpi-value" style="color:#FEC52E">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado · data desembolso</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket Médio Liberado</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">valor liberado por contrato</div></div>
-              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div><div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt}</div><div class="kpi-sub">Pix {_ref_short_kpi}{_proj_global_tag} · {_proj_kpi_sub}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+            </div>
+            <div class="kpi-grp">3 · Desembolsados <span>base: leads desembolsados no período (data do Pix)</span></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total desembolsado</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado ao cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Ticket médio liberado</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+            </div>
+            <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Projeção de leads a desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">{_pix_ref_sub}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
             """, unsafe_allow_html=True)
 
