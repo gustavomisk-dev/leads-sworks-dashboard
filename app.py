@@ -3172,16 +3172,28 @@ try:
                         _hm_mat[_tsh] = _row
                 if _hm_mat:
                     _hm_max = max(max(r) for r in _hm_mat.values()) or 1
-                    def _hm_cell(v):
+                    _N_FAIXAS = len(_FAIXAS)
+                    def _hm_base(_i):
+                        # verde (2 primeiras) → amarelo (3 seguintes) → vermelho (restantes)
+                        # → cinza escuro na última faixa (>5d). Tonalidade varia pela contagem.
+                        if _i >= _N_FAIXAS - 1:
+                            return (82, 82, 91)      # >5d: cinza escuro
+                        if _i <= 1:
+                            return (34, 197, 94)     # verde
+                        if _i <= 4:
+                            return (254, 197, 46)    # amarelo
+                        return (239, 68, 68)         # vermelho
+                    def _hm_cell(v, _i):
                         if not v:
                             return '<td class="hm-c hm-0">·</td>'
+                        _r, _g, _b = _hm_base(_i)
                         _a = 0.12 + 0.88 * (v / _hm_max)
-                        return '<td class="hm-c" style="background:rgba(254,197,46,%.2f)">%d</td>' % (_a, v)
+                        return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
                     _hrows = ""
                     for _t in sorted(_hm_mat, key=lambda t: -sum(_hm_mat[t])):
                         _lblt = _TIPO_LABEL_MAP.get(_t, _t)
                         _hrows += ('<tr><td class="hm-lbl">' + _lblt + '</td>'
-                                   + "".join(_hm_cell(v) for v in _hm_mat[_t])
+                                   + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
                                    + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td></tr>')
                     _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
                     _hm_css = """
