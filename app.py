@@ -2859,7 +2859,7 @@ try:
             # "Aguardando próxima janela de pagamento PIX").
             _proj_comiof_fmt = _proj_val_fmt
             _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
-            _pix_ref_sub     = f"Pix {_ref_short_kpi}{_proj_global_tag}"
+            _pix_ref_sub     = f"(via PIX em {_ref_short_kpi}){_proj_global_tag}"
             _proj_pess_cnt   = (_non_bt_live_nm.get("PAGAMENTO") or {}).get("count", 0)
             _proj_pess_fmt   = _nbr(_proj_pess_cnt)
 
@@ -2871,7 +2871,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
             </div>
-            <div class="kpi-grp">2 · Aprovados <span>base: leads aprovados no período</span></div>
+            <div class="kpi-grp">2 · Aprovados <span>(leads aprovados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
@@ -2882,7 +2882,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
             </div>
-            <div class="kpi-grp">3 · Desembolsados <span>base: leads desembolsados no período (data do Pix)</span></div>
+            <div class="kpi-grp">3 · Desembolsados <span>(leads desembolsados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
@@ -2895,8 +2895,8 @@ try:
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">só aguardando Pix (CCB assinada)</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">todo o funil a desembolsar</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">só aguardando Pix</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
