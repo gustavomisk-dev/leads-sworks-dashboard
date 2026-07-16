@@ -2854,10 +2854,14 @@ try:
             _dz_prazo_s = f"{_dz_prazo_m:.0f} parcelas" if _dz_prazo_m else "—"
             _dz_parc_s  = _brl(_dz_parc_m)
             # Grupo 4 — projeção com e sem IOF (verificado: valor = liberado + iof, logo
-            # com IOF = valor e sem IOF = valor − iof).
+            # com IOF = valor e sem IOF = valor − iof). Otimista = todo o funil (_proj_cnt);
+            # pessimista = só quem já assinou a CCB e aguarda o Pix (tipo PAGAMENTO =
+            # "Aguardando próxima janela de pagamento PIX").
             _proj_comiof_fmt = _proj_val_fmt
             _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
             _pix_ref_sub     = f"Pix {_ref_short_kpi}{_proj_global_tag}"
+            _proj_pess_cnt   = (_non_bt_live_nm.get("PAGAMENTO") or {}).get("count", 0)
+            _proj_pess_fmt   = _nbr(_proj_pess_cnt)
 
             st.markdown(f"""
             <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
@@ -2870,28 +2874,29 @@ try:
             <div class="kpi-grp">2 · Aprovados <span>base: leads aprovados no período</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
-              <div class="kpi-card"><div class="kpi-label">Volume aprovado</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total liberado ao cliente</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio liberado</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
             </div>
             <div class="kpi-grp">3 · Desembolsados <span>base: leads desembolsados no período (data do Pix)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total desembolsado</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total liberado ao cliente</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio liberado</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Taxa média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
-            <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção de leads a desembolsar</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">{_pix_ref_sub}</div></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">todo o funil a desembolsar</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">só aguardando Pix (CCB assinada)</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
