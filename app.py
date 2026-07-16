@@ -3,6 +3,7 @@ Dashboard de leads SWorks — Streamlit Community Cloud.
 Dados lidos do repositorio privado leads-sworks-data via GitHub API.
 """
 
+import base64
 import hashlib
 import hmac
 import json
@@ -3292,15 +3293,46 @@ try:
                             ]
                             _linhas.append(";".join(_clean(x) for x in _row))
                         return "﻿" + "\r\n".join(_linhas)   # BOM p/ Excel abrir acentos
+                    # ── Autorização de download: senha 1x na sessão via 🔒 discreto ──
+                    try:
+                        _hm_sec = st.secrets["senha_download_heatmap"]
+                    except Exception:
+                        _hm_sec = None
+                    _hm_auth = bool(st.session_state.get("hm_dl_ok"))
+                    _ct, _cq = st.columns([10, 1])
+                    with _ct:
+                        st.markdown('<div class="sec" style="font-size:.95em;margin-top:6px">Tempo desde a última atualização (por etapa)</div>', unsafe_allow_html=True)
+                    with _cq:
+                        with st.popover("🔒", help="Liberar download dos leads (senha)"):
+                            if not _hm_sec:
+                                st.caption("Configure o secret `senha_download_heatmap`.")
+                            elif _hm_auth:
+                                st.caption("✓ Downloads liberados nesta sessão.")
+                            else:
+                                _pw = st.text_input("Senha p/ baixar leads", type="password", key="hm_dl_pw")
+                                if _pw and _pw == _hm_sec:
+                                    st.session_state["hm_dl_ok"] = True
+                                    _hm_auth = True
+                                elif _pw:
+                                    st.caption("Senha incorreta.")
                     _hrows = ""
                     for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
-                        _lblt = _TIPO_LABEL_MAP.get(_t, _t)
-                        _lks  = _hm_links(_hm_leads.get(_t, {}))
-                        _cell = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
-                                 if _lks else _lblt)
+                        _lblt    = _TIPO_LABEL_MAP.get(_t, _t)
+                        _leads_t = _hm_leads.get(_t, {})
+                        _lks     = _hm_links(_leads_t)
+                        _cell    = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
+                                    if _lks else _lblt)
+                        if _hm_auth and _leads_t:
+                            _dl = "data:text/csv;base64," + base64.b64encode(_hm_csv(_leads_t).encode("utf-8")).decode()
+                            _dlcell = (f'<td class="hm-dl"><a class="hm-dlbtn" download="leads_{_t}.csv" '
+                                       f'href="{_dl}" title="Baixar {len(_leads_t)} lead(s) — template Operações">&#8595;</a></td>')
+                        else:
+                            _dttl = "Sem dados ainda (aguardando exportação)" if not _leads_t else "Libere no cadeado acima"
+                            _dlcell = f'<td class="hm-dl"><span class="hm-dlbtn hm-dlbtn-off" title="{_dttl}">&#8595;</span></td>'
                         _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
                                    + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
-                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td></tr>')
+                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td>'
+                                   + _dlcell + '</tr>')
                     _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
                     _hm_css = """
             <style>
@@ -3321,59 +3353,21 @@ try:
             .hm-lk:hover{text-decoration:underline}
             .hm-lk-fx{color:#64748b;font-size:.82em}
             .hm-lk-mais{color:#64748b;font-size:.8em;padding:4px 0 0 2px}
+            .hm-dl-h{border-left:1px solid #272420;min-width:30px}
+            .hm-dl{text-align:center;padding:4px 8px;border-bottom:1px solid #1c1a17;border-left:1px solid #272420}
+            .hm-dlbtn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:18px;border:1px solid #333;border-radius:4px;color:#94a3b8;text-decoration:none;font-size:.8em;background:#17150f;line-height:1}
+            .hm-dlbtn:hover{border-color:#FEC52E;color:#FEC52E}
+            .hm-dlbtn-off{opacity:.28;cursor:not-allowed}
             </style>
             """
                     st.markdown(
                         _hm_css
-                        + '<div class="sec" style="font-size:.95em">Tempo desde a última atualização (por etapa)</div>'
-                        + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção.</p>"
+                        + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção. ↓ = baixar os leads da etapa (libere no 🔒 ao lado do título).</p>"
                         + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
-                        + _hhead + '<th class="hm-c">Total</th></tr></thead><tbody>'
+                        + _hhead + '<th class="hm-c">Total</th><th class="hm-c hm-dl-h">&#8595;</th></tr></thead><tbody>'
                         + _hrows + "</tbody></table></div>",
                         unsafe_allow_html=True,
                     )
-                    # ── Download por etapa: setinha ↓ discreta -> caixinha pede a senha ──
-                    try:
-                        _hm_sec = st.secrets["senha_download_heatmap"]
-                    except Exception:
-                        _hm_sec = None
-                    _etapas_dl = [_t for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t])))
-                                  if _hm_leads.get(_t)]
-                    if _etapas_dl:
-                        st.markdown(
-                            "<p style='color:#475569;font-size:.75em;margin:10px 0 0'>Baixar leads por etapa "
-                            "(clique no ↓ — a caixinha pede a senha; template de Operações + faixa e tempo na etapa):</p>",
-                            unsafe_allow_html=True,
-                        )
-                        for _t in _etapas_dl:
-                            _leads_t = _hm_leads.get(_t, {})
-                            _lbl_t   = _TIPO_LABEL_MAP.get(_t, _t)
-                            _cl, _cr = st.columns([11, 1])
-                            with _cl:
-                                st.markdown(
-                                    f"<div style='color:#94a3b8;font-size:.8em;padding-top:8px'>{_lbl_t}"
-                                    f"<span style='color:#475569'> · {len(_leads_t)}</span></div>",
-                                    unsafe_allow_html=True,
-                                )
-                            with _cr:
-                                with st.popover("↓"):
-                                    st.caption(f"{_lbl_t} · {len(_leads_t)} lead(s)")
-                                    if not _hm_sec:
-                                        st.caption("Configure o secret `senha_download_heatmap`.")
-                                    else:
-                                        _authed = bool(st.session_state.get("hm_dl_ok"))
-                                        if not _authed:
-                                            _pw = st.text_input("Senha", type="password", key=f"hm_pw_{_t}")
-                                            if _pw and _pw == _hm_sec:
-                                                st.session_state["hm_dl_ok"] = True
-                                                _authed = True
-                                            elif _pw:
-                                                st.caption("Senha incorreta.")
-                                        st.download_button(
-                                            "Baixar", key=f"hm_dlb_{_t}", disabled=not _authed,
-                                            data=(_hm_csv(_leads_t).encode("utf-8") if _authed else b""),
-                                            file_name=f"leads_{_t}.csv", mime="text/csv",
-                                        )
                 else:
                     st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
             else:
