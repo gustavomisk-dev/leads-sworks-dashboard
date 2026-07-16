@@ -2895,8 +2895,8 @@ try:
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">todo o funil a desembolsar</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">só aguardando Pix (CCB assinada)</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">todo o funil a desembolsar</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
