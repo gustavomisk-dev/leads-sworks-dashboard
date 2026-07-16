@@ -2875,22 +2875,22 @@ try:
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
               <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
             </div>
             <div class="kpi-grp">3 · Desembolsados <span>(leads desembolsados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
               <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
