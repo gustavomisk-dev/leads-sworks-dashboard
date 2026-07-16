@@ -3028,6 +3028,19 @@ try:
                 "AVERBACAO_PENDENTE_MANUAL": "Falha na etapa de averbação (Pendente Manual)",
             }
             
+            # Ordem fixa das etapas na esteira (tabela de projeção + heatmap).
+            # BLOQUEIO_TEMPORARIO vem em 1º na tabela (no heatmap ele é excluído);
+            # qualquer outra etapa fora da lista vai para o fim.
+            _ETAPA_ORDER = [
+                "PRE_APROVADO", "SIMULACAO", "FORMALIZACAO", "ASSINATURA", "ASSINADO",
+                "AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO",
+            ]
+            _ORD = {t: i for i, t in enumerate(_ETAPA_ORDER)}
+            def _etapa_key(ts):
+                if ts == "BLOQUEIO_TEMPORARIO":
+                    return -1                      # 1ª na tabela de projeção
+                return _ORD.get(ts, len(_ETAPA_ORDER))
+
             # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
             _pt_sec_base = dict(_non_bt_sec_nm)
             if _bt_live_nm.get("count", 0) > 0:
@@ -3046,7 +3059,7 @@ try:
                     return f"<span class='pj-i' title=\"{_tx}\">i</span>"
                 _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
             
-                _sorted = sorted(_pt_sec.items(), key=lambda x: (x[0] in _HIDE_VALOR_TIPOS, -x[1]["valor"]))
+                _sorted = sorted(_pt_sec.items(), key=lambda x: (_etapa_key(x[0]), -x[1]["valor"]))
                 _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
                 _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
                 _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
@@ -3190,7 +3203,7 @@ try:
                         _a = 0.12 + 0.88 * (v / _hm_max)
                         return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
                     _hrows = ""
-                    for _t in sorted(_hm_mat, key=lambda t: -sum(_hm_mat[t])):
+                    for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
                         _lblt = _TIPO_LABEL_MAP.get(_t, _t)
                         _hrows += ('<tr><td class="hm-lbl">' + _lblt + '</td>'
                                    + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
