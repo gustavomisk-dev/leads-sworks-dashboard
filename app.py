@@ -2791,9 +2791,18 @@ try:
                         _non_bt_live_nm[_ts5nm]["iof"]      += _v5nm.get("iof", 0.0)
             _proj_cnt   = sum(d["count"]    for d in _non_bt_live_nm.values()) + _bt_live_kpi_nm.get("count", 0)
             _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-            _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("valor", 0.0)
-            _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("liberado", 0.0)
-            _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_kpi_nm.get("iof", 0.0)
+            # Projeção PESSIMISTA = 4 últimas etapas da esteira (mais próximas do desembolso).
+            _PROJ_PESS = {"AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO"}
+            _proj_pess_cnt = sum((_non_bt_live_nm.get(_t) or {}).get("count", 0) for _t in _PROJ_PESS)
+            # Projeção OTIMISTA = demais etapas com valor liberado preenchido (liberado>0),
+            # + BLOQUEIO_TEMPORARIO; PRE_APROVADO/SIMULACAO ficam de fora (liberado zerado).
+            _proj_otim_cnt = sum(d["count"] for ts, d in _non_bt_live_nm.items()
+                                 if ts not in _PROJ_PESS and (d.get("liberado") or 0) > 0)
+            if (_bt_live_kpi_nm.get("liberado") or 0) > 0:
+                _proj_otim_cnt += _bt_live_kpi_nm.get("count", 0)
+            _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("valor", 0.0)
+            _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("liberado", 0.0)
+            _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("iof", 0.0)
             if _proj_val:
                 _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
             else:
@@ -2853,15 +2862,13 @@ try:
             _dz_taxa_s  = (f"{_dz_taxa_m:.2f}".replace(".", ",") + "% a.m.") if _dz_taxa_m else "—"
             _dz_prazo_s = f"{_dz_prazo_m:.0f} parcelas" if _dz_prazo_m else "—"
             _dz_parc_s  = _brl(_dz_parc_m)
-            # Grupo 4 — projeção com e sem IOF (verificado: valor = liberado + iof, logo
-            # com IOF = valor e sem IOF = valor − iof). Otimista = todo o funil (_proj_cnt);
-            # pessimista = só quem já assinou a CCB e aguarda o Pix (tipo PAGAMENTO =
-            # "Aguardando próxima janela de pagamento PIX").
+            # Grupo 4 — projeção com e sem IOF (valor = liberado + iof). Pessimista = 4
+            # últimas etapas; otimista = demais etapas com valor liberado (ver _PROJ_PESS acima).
             _proj_comiof_fmt = _proj_val_fmt
             _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
             _pix_ref_sub     = f"(via PIX em {_ref_short_kpi}){_proj_global_tag}"
-            _proj_pess_cnt   = (_non_bt_live_nm.get("PAGAMENTO") or {}).get("count", 0)
             _proj_pess_fmt   = _nbr(_proj_pess_cnt)
+            _proj_otim_fmt   = _nbr(_proj_otim_cnt)
 
             st.markdown(f"""
             <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
@@ -2895,8 +2902,8 @@ try:
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">só aguardando Pix</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_f_ag_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">4 etapas finais da esteira</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">demais etapas c/ liberado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
@@ -3057,7 +3064,7 @@ try:
                     _tx = (_tx.replace("&", "&amp;").replace('"', "&quot;")
                               .replace("<", "&lt;").replace(">", "&gt;"))
                     return f"<span class='pj-i' title=\"{_tx}\">i</span>"
-                _HIDE_VALOR_TIPOS = {"PRE_APROVADO", "ASSINATURA"}
+                _HIDE_VALOR_TIPOS = {"PRE_APROVADO"}  # ASSINATURA voltou a exibir valor/liberado
             
                 _sorted = sorted(_pt_sec.items(), key=lambda x: (_etapa_key(x[0]), -x[1]["valor"]))
                 _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
