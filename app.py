@@ -3177,17 +3177,27 @@ try:
                             return _i
                     return len(_FAIXAS) - 1
                 _hm_mat = {}
+                _hm_leads: dict = {}   # etapa -> {cod: faixa_idx} (dedup por cod, snapshot mais recente 1o)
                 for _tsh, _lst in _hm_ts.items():
                     if _tsh == "BLOQUEIO_TEMPORARIO":
                         continue  # BT = countdown de 24h (nao staleness); contagem diverge da tabela
                     _row = [0] * len(_FAIXAS)
-                    for _tsraw in _lst:
+                    _seen = _hm_leads.setdefault(_tsh, {})
+                    for _entry in _lst:
+                        # Compat: formato novo = [ts, codigo]; antigo = string ts.
+                        if isinstance(_entry, (list, tuple)):
+                            _tsraw = _entry[0] if _entry else ""
+                            _cod   = str(_entry[1]).strip() if len(_entry) > 1 else ""
+                        else:
+                            _tsraw, _cod = _entry, ""
                         try:
                             _dt = datetime.fromisoformat(str(_tsraw)[:19])
                         except (ValueError, TypeError):
                             continue
-                        _idade_h = (_now_brt_nm - _dt).total_seconds() / 3600.0
-                        _row[_faixa_idx(max(0.0, _idade_h))] += 1
+                        _bi = _faixa_idx(max(0.0, (_now_brt_nm - _dt).total_seconds() / 3600.0))
+                        _row[_bi] += 1
+                        if _cod and _cod not in _seen:
+                            _seen[_cod] = _bi
                     if sum(_row):
                         _hm_mat[_tsh] = _row
                 if _hm_mat:
@@ -3209,10 +3219,45 @@ try:
                         _r, _g, _b = _hm_base(_i)
                         _a = 0.12 + 0.88 * (v / _hm_max)
                         return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
+                    def _hm_lk_color(_i):
+                        # cor da faixa; >5d (cinza escuro) clareia p/ legibilidade do link
+                        if _i >= _N_FAIXAS - 1:
+                            return "#94a3b8"
+                        _r, _g, _b = _hm_base(_i)
+                        return "rgb(%d,%d,%d)" % (_r, _g, _b)
+                    def _hm_links(_seen):
+                        # até 15 links, distribuídos ~igualmente entre verde/amarelo/vermelho
+                        if not _seen:
+                            return ""
+                        _grp = {0: [], 1: [], 2: []}   # 0=verde(faixas 0-1) 1=amarelo(2-4) 2=vermelho(5+)
+                        for _c, _bi in _seen.items():
+                            _grp[0 if _bi <= 1 else 1 if _bi <= 4 else 2].append((_bi, _c))
+                        for _gk in _grp:
+                            _grp[_gk].sort(key=lambda x: -x[0])   # mais parado primeiro
+                        _sel   = {_gk: _grp[_gk][:5] for _gk in _grp}
+                        _extra = {_gk: _grp[_gk][5:] for _gk in _grp}
+                        _tot = sum(len(v) for v in _sel.values()); _gk = 0
+                        while _tot < 15 and any(_extra.values()):
+                            if _extra[_gk]:
+                                _sel[_gk].append(_extra[_gk].pop(0)); _tot += 1
+                            _gk = (_gk + 1) % 3
+                        _picked = sorted(_sel[0] + _sel[1] + _sel[2], key=lambda x: x[0])
+                        _lines = "".join(
+                            f"<a class='hm-lk' style='color:{_hm_lk_color(_bi)}' target='_blank' "
+                            f"href='https://sworks.zilicorp.net/Processo?codigo={_c}'>#{_c}"
+                            f"<span class='hm-lk-fx'>{_FAIXAS[_bi][0]}</span></a>"
+                            for _bi, _c in _picked
+                        )
+                        _resto = len(_seen) - len(_picked)
+                        _mais  = f"<div class='hm-lk-mais'>+{_resto} lead(s) nesta etapa</div>" if _resto > 0 else ""
+                        return f"<div class='hm-lks'>{_lines}{_mais}</div>"
                     _hrows = ""
                     for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
                         _lblt = _TIPO_LABEL_MAP.get(_t, _t)
-                        _hrows += ('<tr><td class="hm-lbl">' + _lblt + '</td>'
+                        _lks  = _hm_links(_hm_leads.get(_t, {}))
+                        _cell = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
+                                 if _lks else _lblt)
+                        _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
                                    + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
                                    + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td></tr>')
                     _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
@@ -3226,6 +3271,15 @@ try:
             .hm-c{text-align:center;padding:5px 9px;border-bottom:1px solid #1c1a17;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:46px}
             .hm-0{color:#3f3b35}
             .hm-tot{text-align:center;padding:5px 11px;color:#FEC52E;font-weight:700;border-bottom:1px solid #1c1a17;border-left:2px solid #272420}
+            .hm-det summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px}
+            .hm-det summary::-webkit-details-marker{display:none}
+            .hm-det summary::before{content:'\\25B6';font-size:.6em;color:#64748b;transition:transform .15s;flex-shrink:0}
+            .hm-det[open] summary::before{transform:rotate(90deg)}
+            .hm-lks{padding:4px 0 4px 16px;white-space:normal}
+            .hm-lk{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:.92em;text-decoration:none;font-variant-numeric:tabular-nums}
+            .hm-lk:hover{text-decoration:underline}
+            .hm-lk-fx{color:#64748b;font-size:.82em}
+            .hm-lk-mais{color:#64748b;font-size:.8em;padding:4px 0 0 2px}
             </style>
             """
                     st.markdown(
