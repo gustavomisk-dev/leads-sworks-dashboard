@@ -84,6 +84,8 @@ iframe{height:0!important;min-height:0!important;overflow:hidden!important}
 [data-baseweb="calendar"] [role="gridcell"]:first-child button,
 [data-baseweb="calendar"] [role="gridcell"]:last-child button{
     opacity:.25!important;pointer-events:none!important;cursor:not-allowed!important}
+/* esconde o "Press Enter to apply" abaixo dos text_input (login + 🔒 do heatmap) */
+[data-testid="InputInstructions"]{display:none!important}
 </style>
 """, unsafe_allow_html=True)
 
