@@ -3332,7 +3332,7 @@ try:
                         + _hrows + "</tbody></table></div>",
                         unsafe_allow_html=True,
                     )
-                    # ── Download por etapa: o balãozinho (popover) pede a senha ao abrir ──
+                    # ── Download por etapa: setinha ↓ discreta -> caixinha pede a senha ──
                     try:
                         _hm_sec = st.secrets["senha_download_heatmap"]
                     except Exception:
@@ -3341,33 +3341,39 @@ try:
                                   if _hm_leads.get(_t)]
                     if _etapas_dl:
                         st.markdown(
-                            "<p style='color:#475569;font-size:.78em;margin:10px 0 4px'>↓ Baixar leads por etapa "
-                            "— template de Operações + faixa/tempo na etapa (o balãozinho pede a senha):</p>",
+                            "<p style='color:#475569;font-size:.75em;margin:10px 0 0'>Baixar leads por etapa "
+                            "(clique no ↓ — a caixinha pede a senha; template de Operações + faixa e tempo na etapa):</p>",
                             unsafe_allow_html=True,
                         )
-                        _dlcols = st.columns(2)
-                        for _i, _t in enumerate(_etapas_dl):
+                        for _t in _etapas_dl:
                             _leads_t = _hm_leads.get(_t, {})
                             _lbl_t   = _TIPO_LABEL_MAP.get(_t, _t)
-                            with _dlcols[_i % 2]:
-                                with st.popover(f"↓  {_lbl_t}", use_container_width=True):
+                            _cl, _cr = st.columns([11, 1])
+                            with _cl:
+                                st.markdown(
+                                    f"<div style='color:#94a3b8;font-size:.8em;padding-top:8px'>{_lbl_t}"
+                                    f"<span style='color:#475569'> · {len(_leads_t)}</span></div>",
+                                    unsafe_allow_html=True,
+                                )
+                            with _cr:
+                                with st.popover("↓"):
                                     st.caption(f"{_lbl_t} · {len(_leads_t)} lead(s)")
                                     if not _hm_sec:
-                                        st.caption("Configure o secret `senha_download_heatmap` no Streamlit.")
+                                        st.caption("Configure o secret `senha_download_heatmap`.")
                                     else:
-                                        if not st.session_state.get("hm_dl_ok"):
+                                        _authed = bool(st.session_state.get("hm_dl_ok"))
+                                        if not _authed:
                                             _pw = st.text_input("Senha", type="password", key=f"hm_pw_{_t}")
                                             if _pw and _pw == _hm_sec:
                                                 st.session_state["hm_dl_ok"] = True
+                                                _authed = True
                                             elif _pw:
                                                 st.caption("Senha incorreta.")
-                                        if st.session_state.get("hm_dl_ok"):
-                                            st.download_button(
-                                                "Baixar CSV (template Operações)",
-                                                data=_hm_csv(_leads_t).encode("utf-8"),
-                                                file_name=f"leads_{_t}.csv", mime="text/csv",
-                                                key=f"hm_dlb_{_t}",
-                                            )
+                                        st.download_button(
+                                            "Baixar", key=f"hm_dlb_{_t}", disabled=not _authed,
+                                            data=(_hm_csv(_leads_t).encode("utf-8") if _authed else b""),
+                                            file_name=f"leads_{_t}.csv", mime="text/csv",
+                                        )
                 else:
                     st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
             else:
