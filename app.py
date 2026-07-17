@@ -17,6 +17,8 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from collections import defaultdict
+from io import BytesIO
+from openpyxl import Workbook
 from streamlit_cookies_controller import CookieController
 
 # ── Pagina ───────────────────────────────────────────────────────────────────
@@ -3274,30 +3276,30 @@ try:
                         if _m:
                             return f"{_m.group(1)}/{_m.group(2)}/{_m.group(3)}"
                         return _s[:10]
-                    def _hm_csv(_seen):
-                        # CSV no template de Operações + Faixa + Dias na etapa (+ parado -> - parado)
+                    def _hm_xlsx_b64(_seen):
+                        # .xlsx no template de Operações + Faixa + Dias na etapa. Todas as
+                        # células saem como TEXTO (openpyxl grava str como célula de texto),
+                        # então CPF/Telefone preservam os dígitos e o Excel não converte em
+                        # número/notação científica — sem precisar de apóstrofo.
                         def _f(_e, _i):
                             return str(_e[_i]).strip() if isinstance(_e, (list, tuple)) and len(_e) > _i and _e[_i] else ""
-                        def _clean(_x):
-                            return str(_x).replace(";", ",").replace("\n", " ").replace("\r", " ")
                         def _dias_of(_v):
                             return (_v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else 0) or 0
-                        _linhas = [_HM_DL_HEADER]
+                        _wb = Workbook(write_only=True)
+                        _ws = _wb.create_sheet("Leads")
+                        _ws.append(_HM_DL_HEADER.split(";"))
                         for _c, _v in sorted(_seen.items(), key=lambda kv: -_dias_of(kv[1])):
                             _bi   = _v[0] if isinstance(_v, (list, tuple)) else _v
                             _dias = _v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else ""
                             _e    = _v[3] if isinstance(_v, (list, tuple)) and len(_v) > 3 else None
-                            _cpf = _f(_e, 4); _tel = _f(_e, 7)
-                            _row = [
-                                _c, f"https://sworks.zilicorp.net/Processo?codigo={_c}",
-                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3),
-                                ("'" + _cpf) if _cpf else "", _f(_e, 5),   # CPF com ' -> Excel trata como texto
-                                _f(_e, 6), ("'" + _tel) if _tel else "",   # Telefone idem
-                                _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
+                            _ws.append([
+                                str(_c), f"https://sworks.zilicorp.net/Processo?codigo={_c}",
+                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3), _f(_e, 4), _f(_e, 5),
+                                _f(_e, 6), _f(_e, 7), _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
                                 _f(_e, 10), _FAIXAS[_bi][0], str(_dias).replace(".", ","),
-                            ]
-                            _linhas.append(";".join(_clean(x) for x in _row))
-                        return "﻿" + "\r\n".join(_linhas)   # BOM p/ Excel abrir acentos
+                            ])
+                        _buf = BytesIO(); _wb.save(_buf)
+                        return base64.b64encode(_buf.getvalue()).decode()
                     # ── Autorização de download: senha 1x na sessão via 🔒 discreto ──
                     try:
                         _hm_sec = st.secrets["senha_download_heatmap"]
@@ -3328,8 +3330,9 @@ try:
                         _cell    = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
                                     if _lks else _lblt)
                         if _hm_auth and _leads_t:
-                            _dl = "data:text/csv;base64," + base64.b64encode(_hm_csv(_leads_t).encode("utf-8")).decode()
-                            _dlcell = (f'<td class="hm-dl"><a class="hm-dlbtn" download="leads_{_t}.csv" '
+                            _dl = ("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,"
+                                   + _hm_xlsx_b64(_leads_t))
+                            _dlcell = (f'<td class="hm-dl"><a class="hm-dlbtn" download="leads_{_t}.xlsx" '
                                        f'href="{_dl}" title="Baixar {len(_leads_t)} lead(s) — template Operações">&#8595;</a></td>')
                         else:
                             _dttl = "Sem dados ainda (aguardando exportação)" if not _leads_t else "Libere no cadeado acima"
