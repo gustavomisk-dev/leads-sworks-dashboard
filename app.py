@@ -3287,10 +3287,13 @@ try:
                             _bi   = _v[0] if isinstance(_v, (list, tuple)) else _v
                             _dias = _v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else ""
                             _e    = _v[3] if isinstance(_v, (list, tuple)) and len(_v) > 3 else None
+                            _cpf = _f(_e, 4); _tel = _f(_e, 7)
                             _row = [
                                 _c, f"https://sworks.zilicorp.net/Processo?codigo={_c}",
-                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3), _f(_e, 4), _f(_e, 5),
-                                _f(_e, 6), _f(_e, 7), _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
+                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3),
+                                ("'" + _cpf) if _cpf else "", _f(_e, 5),   # CPF com ' -> Excel trata como texto
+                                _f(_e, 6), ("'" + _tel) if _tel else "",   # Telefone idem
+                                _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
                                 _f(_e, 10), _FAIXAS[_bi][0], str(_dias).replace(".", ","),
                             ]
                             _linhas.append(";".join(_clean(x) for x in _row))
