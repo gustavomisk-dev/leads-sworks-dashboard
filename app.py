@@ -2561,10 +2561,10 @@ try:
                 _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
                 with _c_tit:
                     st.markdown(
-                        '<div style="display:flex;align-items:flex-end;gap:4px;margin:4px 0 6px">'
+                        '<div style="display:flex;align-items:flex-end;gap:10px;margin:4px 0 6px">'
                         '<svg viewBox="0 0 483 462" xmlns="http://www.w3.org/2000/svg" '
-                        'style="height:44px;width:auto;flex-shrink:0;display:block;'
-                        'margin-bottom:4px">'
+                        'style="height:52px;width:auto;flex-shrink:0;display:block;'
+                        'margin-bottom:5px">'
                         '<path d="M400.738 373.763C392.772 365.797 377.074 359.276 365.814 '
                         '359.276H214.153C202.893 359.276 198.725 351.579 204.876 342.134L'
                         '224.641 311.882C230.792 302.471 229.313 288.252 221.38 280.286L'
@@ -2580,7 +2580,7 @@ try:
                         '86.4856C84.547 94.4518 100.244 100.972 111.504 100.972H219.065V'
                         '100.939Z" fill="#FEC52E"/>'
                         '</svg>'
-                        '<span style="font-size:28px;font-weight:700;line-height:1;'
+                        '<span style="font-size:32px;font-weight:700;line-height:1;'
                         'color:#e2e8f0;letter-spacing:-0.5px">ileads</span>'
                         '</div>',
                         unsafe_allow_html=True,
