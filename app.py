@@ -42,6 +42,8 @@ st.markdown("""
     padding: 11px 14px; border: 1px solid #272420; text-align: center;
 }
 .kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.kpi-i { cursor: help; color: #64748b; font-size: 10px; font-weight: 700; vertical-align: super; }
+.kpi-i:hover { color: #FEC52E; }
 .kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
 .kpi-grp   { color: #FEC52E; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 4px; border-bottom: 1px solid #272420; padding-bottom: 3px; }
@@ -2802,15 +2804,44 @@ try:
                         _non_bt_live_nm[_ts5nm]["iof"]      += _v5nm.get("iof", 0.0)
             _proj_cnt   = sum(d["count"]    for d in _non_bt_live_nm.values()) + _bt_live_kpi_nm.get("count", 0)
             _proj_cnt_s = f"{_proj_cnt:,}".replace(",", ".")
-            # Projeção PESSIMISTA = 4 últimas etapas da esteira (mais próximas do desembolso).
+            # Labels e ordem das etapas — fonte única (reusadas na tabela de projeção e no heatmap).
+            _TIPO_LABEL_MAP = {
+                "PAGAMENTO":                 "Aguardando próxima janela de pagamento PIX (Suspenso)",
+                "ASSINADO":                  "Falha em etapa pós-assinatura de CCB (Pendente Falha)",
+                "ASSINATURA":                "Aguardando assinatura do cliente na CCB enviada (Suspenso)",
+                "ENTREVISTA":                "Aguardando realização de entrevista anti-fraude da Nuvidio (Suspenso)",
+                "FORMALIZACAO":              "Aguardando aceite do cliente na etapa de formalização (Suspenso)",
+                "PRE_APROVADO":              "Aguardando aceite do cliente quanto à proposta inicial (Suspenso)",
+                "SIMULACAO":                 "Aguardando aceite do cliente quanto a uma nova proposta simulada (Suspenso)",
+                "PENDENTE_DADOS_PAGAMENTO":  "Falha em dados de pagamento do cliente (Suspenso)",
+                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h para envio de nova proposta (Em andamento)",
+                "AVERBACAO_PENDENTE_MANUAL": "Falha na etapa de averbação (Pendente Manual)",
+            }
+            # Ordem fixa das etapas (fonte única) — projeção, tabela e heatmap reusam abaixo.
+            # BLOQUEIO_TEMPORARIO: 1º na tabela; fora do heatmap; demais fora da lista vão ao fim.
+            _ETAPA_ORDER = [
+                "PRE_APROVADO", "SIMULACAO", "FORMALIZACAO", "ASSINATURA", "ASSINADO",
+                "AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO",
+            ]
+            _ORD = {t: i for i, t in enumerate(_ETAPA_ORDER)}
+            def _etapa_key(ts):
+                if ts == "BLOQUEIO_TEMPORARIO":
+                    return -1                      # 1ª na tabela de projeção
+                return _ORD.get(ts, len(_ETAPA_ORDER))
+
+            # Ambas as projeções contam SÓ etapas com valor liberado preenchido (liberado>0).
+            # PESSIMISTA = as 4 etapas finais da esteira; OTIMISTA = TODAS as etapas com liberado
+            # (superconjunto da pessimista → otimista >= pessimista sempre) + BLOQUEIO_TEMPORARIO.
             _PROJ_PESS = {"AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO"}
-            _proj_pess_cnt = sum((_non_bt_live_nm.get(_t) or {}).get("count", 0) for _t in _PROJ_PESS)
-            # Projeção OTIMISTA = demais etapas com valor liberado preenchido (liberado>0),
-            # + BLOQUEIO_TEMPORARIO; PRE_APROVADO/SIMULACAO ficam de fora (liberado zerado).
-            _proj_otim_cnt = sum(d["count"] for ts, d in _non_bt_live_nm.items()
-                                 if ts not in _PROJ_PESS and (d.get("liberado") or 0) > 0)
+            def _lib_pos(ts):
+                return ((_non_bt_live_nm.get(ts) or {}).get("liberado") or 0) > 0
+            _pess_etapas = [ts for ts in _ETAPA_ORDER if ts in _PROJ_PESS and _lib_pos(ts)]
+            _otim_etapas = sorted((ts for ts in _non_bt_live_nm if _lib_pos(ts)), key=_etapa_key)
+            _proj_pess_cnt = sum((_non_bt_live_nm.get(ts) or {}).get("count", 0) for ts in _pess_etapas)
+            _proj_otim_cnt = sum((_non_bt_live_nm.get(ts) or {}).get("count", 0) for ts in _otim_etapas)
             if (_bt_live_kpi_nm.get("liberado") or 0) > 0:
                 _proj_otim_cnt += _bt_live_kpi_nm.get("count", 0)
+                _otim_etapas = ["BLOQUEIO_TEMPORARIO"] + _otim_etapas
             _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("valor", 0.0)
             _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("liberado", 0.0)
             _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("iof", 0.0)
@@ -2873,13 +2904,20 @@ try:
             _dz_taxa_s  = (f"{_dz_taxa_m:.2f}".replace(".", ",") + "% a.m.") if _dz_taxa_m else "—"
             _dz_prazo_s = f"{_dz_prazo_m:.0f} parcelas" if _dz_prazo_m else "—"
             _dz_parc_s  = _brl(_dz_parc_m)
-            # Grupo 4 — projeção com e sem IOF (valor = liberado + iof). Pessimista = 4
-            # últimas etapas; otimista = demais etapas com valor liberado (ver _PROJ_PESS acima).
+            # Grupo 4 — projeção com e sem IOF (valor = liberado + iof). Contagens: pessimista =
+            # 4 etapas finais com liberado; otimista = TODAS as etapas com liberado (ver acima).
             _proj_comiof_fmt = _proj_val_fmt
             _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
             _pix_ref_sub     = f"(via PIX em {_ref_short_kpi}){_proj_global_tag}"
             _proj_pess_fmt   = _nbr(_proj_pess_cnt)
             _proj_otim_fmt   = _nbr(_proj_otim_cnt)
+            def _proj_tip(_codes):
+                _nm = [_TIPO_LABEL_MAP.get(_c, _c) for _c in _codes]
+                if not _nm:
+                    return "Nenhuma etapa com valor liberado no período."
+                return "Etapas consideradas:&#10;" + "&#10;".join("• " + _lbl for _lbl in _nm)
+            _pess_tip = _proj_tip(_pess_etapas)
+            _otim_tip = _proj_tip(_otim_etapas)
 
             st.markdown(f"""
             <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
@@ -2913,8 +2951,8 @@ try:
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">4 etapas finais da esteira</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">demais etapas c/ liberado</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="kpi-i" title="{_pess_tip}">&#9432;</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="kpi-i" title="{_otim_tip}">&#9432;</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
@@ -3033,31 +3071,7 @@ try:
                 _tn3 = _non_bt_sec_nm[_ts3].get("taxa_n", 0)
                 _non_bt_sec_nm[_ts3]["taxa_media"] = (_non_bt_sec_nm[_ts3]["taxa_sum"] / _tn3) if _tn3 > 0 else None
 
-            _TIPO_LABEL_MAP = {
-                "PAGAMENTO":                 "Aguardando próxima janela de pagamento PIX (Suspenso)",
-                "ASSINADO":                  "Falha em etapa pós-assinatura de CCB (Pendente Falha)",
-                "ASSINATURA":                "Aguardando assinatura do cliente na CCB enviada (Suspenso)",
-                "ENTREVISTA":                "Aguardando realização de entrevista anti-fraude da Nuvidio (Suspenso)",
-                "FORMALIZACAO":              "Aguardando aceite do cliente na etapa de formalização (Suspenso)",
-                "PRE_APROVADO":              "Aguardando aceite do cliente quanto à proposta inicial (Suspenso)",
-                "SIMULACAO":                 "Aguardando aceite do cliente quanto a uma nova proposta simulada (Suspenso)",
-                "PENDENTE_DADOS_PAGAMENTO":  "Falha em dados de pagamento do cliente (Suspenso)",
-                "BLOQUEIO_TEMPORARIO":       "Aguardando 24h para envio de nova proposta (Em andamento)",
-                "AVERBACAO_PENDENTE_MANUAL": "Falha na etapa de averbação (Pendente Manual)",
-            }
-            
-            # Ordem fixa das etapas na esteira (tabela de projeção + heatmap).
-            # BLOQUEIO_TEMPORARIO vem em 1º na tabela (no heatmap ele é excluído);
-            # qualquer outra etapa fora da lista vai para o fim.
-            _ETAPA_ORDER = [
-                "PRE_APROVADO", "SIMULACAO", "FORMALIZACAO", "ASSINATURA", "ASSINADO",
-                "AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO",
-            ]
-            _ORD = {t: i for i, t in enumerate(_ETAPA_ORDER)}
-            def _etapa_key(ts):
-                if ts == "BLOQUEIO_TEMPORARIO":
-                    return -1                      # 1ª na tabela de projeção
-                return _ORD.get(ts, len(_ETAPA_ORDER))
+            # _TIPO_LABEL_MAP / _ETAPA_ORDER / _ORD / _etapa_key definidos acima (grupo 4 de KPIs) — fonte única.
 
             # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
             _pt_sec_base = dict(_non_bt_sec_nm)
