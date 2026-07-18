@@ -88,6 +88,12 @@ iframe{height:0!important;min-height:0!important;overflow:hidden!important}
     opacity:.25!important;pointer-events:none!important;cursor:not-allowed!important}
 /* esconde o "Press Enter to apply" abaixo dos text_input (login + 🔒 do heatmap) */
 [data-testid="InputInstructions"]{display:none!important}
+/* esconde a toolbar do Streamlit no canto superior direito (Share/GitHub/menu ⋮) */
+[data-testid="stToolbar"]{display:none!important}
+[data-testid="stToolbarActions"]{display:none!important}
+[data-testid="stDecoration"]{display:none!important}
+[data-testid="stStatusWidget"]{display:none!important}
+#MainMenu{display:none!important}
 </style>
 """, unsafe_allow_html=True)
 
