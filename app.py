@@ -187,7 +187,7 @@ def _login_page(cookies: CookieController) -> None:
 
     _, col, _ = st.columns([1, 1.1, 1])
     with col:
-        _svg_inline = _SVG_Z.replace("margin:0 auto 4px", "margin:0 0 6px")
+        _svg_inline = _SVG_Z.replace("margin:0 auto 4px", "margin:0 0 4px")
         st.markdown(
             f'<div style="text-align:center;margin:56px 0 28px">'
             f'<div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-bottom:4px">'
