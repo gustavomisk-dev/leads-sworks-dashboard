@@ -42,7 +42,7 @@ st.markdown("""
     padding: 11px 14px; border: 1px solid #272420; text-align: center;
 }
 .kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
-.pj-i { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; margin-left:5px; border-radius:50%; background:#334155; color:#cbd5e1; font:italic 700 8px Georgia,serif; vertical-align:super; line-height:1; cursor:help; flex-shrink:0; }
+.pj-i { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; margin-left:5px; border-radius:50%; background:#334155; color:#cbd5e1; font:italic 700 8px Georgia,serif; vertical-align:super; line-height:1; cursor:help; flex-shrink:0; text-transform:none; letter-spacing:normal; }
 .pj-i:hover { background:#FEC52E; color:#1c1a17; }
 .kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
