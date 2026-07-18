@@ -383,12 +383,14 @@ def _merge_segmentos(segs: list) -> dict:
     out["evolucao_diaria"] = {}
     out["evolucao_horaria"] = {}
     out["valores_contratacao"] = []
+    out["bloqueados_total"] = 0
     _fin: dict = {}
     for seg in segs:
         for f in _flat:
             for k, v in seg.get(f, {}).items():
                 out[f][k] = out[f].get(k, 0) + v
         out["valores_contratacao"].extend(seg.get("valores_contratacao", []))
+        out["bloqueados_total"] += seg.get("bloqueados_total", 0)
         for etapa, mots in seg.get("etapa_motivos", {}).items():
             dst = out["etapa_motivos"].setdefault(etapa, {})
             for lbl, cnt in mots.items():
@@ -500,6 +502,7 @@ def agregar(dias_raw: list) -> dict:
     assinado_liberado   = 0.0
     assinado_iof        = 0.0
     projecao_tipos_agg  = defaultdict(lambda: {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
+    bloqueados_total_ag = 0
     for d in dias_raw:
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
             d_status[int(k)] += v
@@ -611,6 +614,7 @@ def agregar(dias_raw: list) -> dict:
         assinado_valor      += d.get("assinado_valor", 0.0)
         assinado_liberado   += d.get("assinado_liberado", 0.0)
         assinado_iof        += d.get("assinado_iof", 0.0)
+        bloqueados_total_ag += d.get("bloqueados_total", 0)
         for _ts, _v in d.get("projecao_tipos", {}).items():
             projecao_tipos_agg[_ts]["count"]    += _v.get("count", 0)
             projecao_tipos_agg[_ts]["valor"]    += _v.get("valor", 0.0)
@@ -684,6 +688,7 @@ def agregar(dias_raw: list) -> dict:
         "top_cbos_rep":      _top(cbos_rep,     20),
         "top_ufs":           _top(ufs,          27),
         "bloqueios":         dict(bloqueios),
+        "bloqueados_total":  bloqueados_total_ag,
         "etapas":            dict(etapas),
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
@@ -1234,7 +1239,7 @@ def _fig_funil_etapa(etapas: dict, n_rep: int):
     return fig, rows  # retorna rows para a tabela resumo
 
 
-def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
+def _fig_bloqueios(bloqueios: dict, n_bloq: int = 0):
     if not any(bloqueios.values()):
         return None
     nomes = {"cpf": "CPF Bloqueado", "cnpj": "CNPJ Bloqueado",
@@ -1242,7 +1247,11 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
     cores = {"cpf": "#f87171", "cnpj": "#fb923c", "cnae": "#a78bfa", "cbo": "#60a5fa"}
     labels = [nomes.get(k, k) for k, v in bloqueios.items() if v > 0]
     values = [v for v in bloqueios.values() if v > 0]
-    pcts   = [100*v/n_rep if n_rep else 0 for v in values]
+    # % sobre os leads DISTINTOS com >=1 bloqueio (n_bloq). Fallback p/ JSONs antigos sem
+    # o campo: soma dos valores (% somam 100%). Com n_bloq, os % somam >100% quando há
+    # leads com mais de um tipo de bloqueio.
+    _denom = n_bloq if n_bloq else sum(values)
+    pcts   = [100*v/_denom if _denom else 0 for v in values]
     colors = [cores.get(k, "#666") for k, v in bloqueios.items() if v > 0]
     fig = go.Figure(go.Bar(
         x=labels, y=values,
@@ -1254,7 +1263,7 @@ def _fig_bloqueios(bloqueios: dict, n_rep: int = 0):
     ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-        title=dict(text="Leads com Bloqueio por Tipo", font=_TF),
+        title=dict(text="Leads com Bloqueio por Tipo<br><sup>% sobre leads com ≥1 bloqueio</sup>", font=_TF),
         xaxis=dict(tickfont=dict(size=12, color="#cbd5e1")),
         yaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID),
         margin=dict(t=50, b=20, l=10, r=10), height=300,
@@ -2158,7 +2167,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
 
     elif slide == 9:
         _tv_h("Leads com Bloqueio por Tipo", periodo)
-        fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
+        fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
         if fig:
             fig.update_traces(textfont=dict(size=28, color="#e2e8f0"))
             fig.update_layout(
@@ -3948,7 +3957,7 @@ try:
 
             st.markdown('<div class="sec">12. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
-            fig = _fig_bloqueios(agg.get("bloqueios", {}), n_rep=n_rep)
+            fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
             if fig:
                 col_bl, _ = st.columns([1, 1])
                 with col_bl:
