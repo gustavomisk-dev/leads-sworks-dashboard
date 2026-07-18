@@ -187,12 +187,12 @@ def _login_page(cookies: CookieController) -> None:
 
     _, col, _ = st.columns([1, 1.1, 1])
     with col:
-        _svg_inline = _SVG_Z.replace("margin:0 auto 4px", "margin:0")
+        _svg_inline = _SVG_Z.replace("margin:0 auto 4px", "margin:0 0 6px")
         st.markdown(
             f'<div style="text-align:center;margin:56px 0 28px">'
-            f'<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px">'
+            f'<div style="display:flex;align-items:flex-end;justify-content:center;gap:10px;margin-bottom:4px">'
             f'{_svg_inline}'
-            f'<div style="font-size:32px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px">ileads</div>'
+            f'<div style="font-size:32px;font-weight:700;line-height:1;color:#e2e8f0;letter-spacing:-0.5px">ileads</div>'
             f'</div>'
             f'<div style="font-size:13px;color:#475569">Dashboard de Leads</div>'
             f'</div>',
