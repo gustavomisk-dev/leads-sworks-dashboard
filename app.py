@@ -2842,13 +2842,7 @@ try:
             if (_bt_live_kpi_nm.get("liberado") or 0) > 0:
                 _proj_otim_cnt += _bt_live_kpi_nm.get("count", 0)
                 _otim_etapas = ["BLOQUEIO_TEMPORARIO"] + _otim_etapas
-            _proj_val   = sum(d["valor"]    for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("valor", 0.0)
-            _proj_lib   = sum(d["liberado"] for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("liberado", 0.0)
-            _proj_iof   = sum(d["iof"]      for ts, d in _non_bt_live_nm.items() if ts not in {"PRE_APROVADO"}) + _bt_live_kpi_nm.get("iof", 0.0)
-            if _proj_val:
-                _proj_val_fmt = ("R$ " + f"{_proj_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-            else:
-                _proj_val_fmt = "—"
+            # (o valor da projeção é somado POR CENÁRIO — pessimista/otimista — no grupo 4 abaixo)
             
             _prazo_d   = fin.get("Prazo", {})
             _taxa_d    = fin.get("Taxa", {})
@@ -2904,10 +2898,21 @@ try:
             _dz_taxa_s  = (f"{_dz_taxa_m:.2f}".replace(".", ",") + "% a.m.") if _dz_taxa_m else "—"
             _dz_prazo_s = f"{_dz_prazo_m:.0f} parcelas" if _dz_prazo_m else "—"
             _dz_parc_s  = _brl(_dz_parc_m)
-            # Grupo 4 — projeção com e sem IOF (valor = liberado + iof). Contagens: pessimista =
-            # 4 etapas finais com liberado; otimista = TODAS as etapas com liberado (ver acima).
-            _proj_comiof_fmt = _proj_val_fmt
-            _proj_semiof_fmt = _brl(_proj_val - _proj_iof) if _proj_val else "—"
+            # Grupo 4 — projeção POR CENÁRIO (2 linhas × 3 col): nº de leads + valor liberado
+            # (sem IOF) + valor contratado (com IOF). O valor é somado sobre as etapas de cada
+            # cenário (pessimista = _pess_etapas; otimista = _otim_etapas). valor = liberado + iof.
+            def _proj_sum(_etapas, _field):
+                _t = 0.0
+                for _ts in _etapas:
+                    _src = _bt_live_kpi_nm if _ts == "BLOQUEIO_TEMPORARIO" else (_non_bt_live_nm.get(_ts) or {})
+                    _t += _src.get(_field, 0.0)
+                return _t
+            _pess_val = _proj_sum(_pess_etapas, "valor"); _pess_iof = _proj_sum(_pess_etapas, "iof")
+            _otim_val = _proj_sum(_otim_etapas, "valor"); _otim_iof = _proj_sum(_otim_etapas, "iof")
+            _pess_comiof_fmt = _brl(_pess_val)
+            _pess_semiof_fmt = _brl(_pess_val - _pess_iof)
+            _otim_comiof_fmt = _brl(_otim_val)
+            _otim_semiof_fmt = _brl(_otim_val - _otim_iof)
             _pix_ref_sub     = f"(via PIX em {_ref_short_kpi}){_proj_global_tag}"
             _proj_pess_fmt   = _nbr(_proj_pess_cnt)
             _proj_otim_fmt   = _nbr(_proj_otim_cnt)
@@ -2953,11 +2958,13 @@ try:
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
-            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+            <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
               <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_pess_semiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_pess_comiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="pj-i" title="{_otim_tip}">i</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_otim_semiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_otim_comiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
             </div>
             """, unsafe_allow_html=True)
 
