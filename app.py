@@ -42,8 +42,8 @@ st.markdown("""
     padding: 11px 14px; border: 1px solid #272420; text-align: center;
 }
 .kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
-.kpi-i { cursor: help; color: #64748b; font-size: 10px; font-weight: 700; vertical-align: super; }
-.kpi-i:hover { color: #FEC52E; }
+.pj-i { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; margin-left:5px; border-radius:50%; background:#334155; color:#cbd5e1; font:italic 700 8px Georgia,serif; vertical-align:super; line-height:1; cursor:help; flex-shrink:0; }
+.pj-i:hover { background:#FEC52E; color:#1c1a17; }
 .kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
 .kpi-grp   { color: #FEC52E; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 4px; border-bottom: 1px solid #272420; padding-bottom: 3px; }
@@ -2912,7 +2912,10 @@ try:
             _proj_pess_fmt   = _nbr(_proj_pess_cnt)
             _proj_otim_fmt   = _nbr(_proj_otim_cnt)
             def _proj_tip(_codes):
-                _nm = [_TIPO_LABEL_MAP.get(_c, _c) for _c in _codes]
+                def _esc(_s):
+                    return (_s.replace("&", "&amp;").replace('"', "&quot;")
+                              .replace("<", "&lt;").replace(">", "&gt;"))
+                _nm = [_esc(_TIPO_LABEL_MAP.get(_c, _c)) for _c in _codes]
                 if not _nm:
                     return "Nenhuma etapa com valor liberado no período."
                 return "Etapas consideradas:&#10;" + "&#10;".join("• " + _lbl for _lbl in _nm)
@@ -2951,8 +2954,8 @@ try:
             </div>
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="kpi-i" title="{_pess_tip}">&#9432;</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="kpi-i" title="{_otim_tip}">&#9432;</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="pj-i" title="{_otim_tip}">i</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (com IOF)</div><div class="kpi-value">{_proj_comiof_fmt}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção de desembolso (sem IOF)</div><div class="kpi-value">{_proj_semiof_fmt}</div><div class="kpi-sub">valor − IOF</div></div>
             </div>
@@ -3158,11 +3161,7 @@ try:
             .pj-det-n{{min-width:80px}}
             .pj-det-v{{font-variant-numeric:tabular-nums}}
             .pj-det-x{{color:#64748b;font-variant-numeric:tabular-nums}}
-            .pj-i{{display:inline-flex;align-items:center;justify-content:center;
-                   width:13px;height:13px;margin-left:5px;border-radius:50%;
-                   background:#334155;color:#cbd5e1;font:italic 700 8px Georgia,serif;
-                   vertical-align:super;line-height:1;cursor:help;flex-shrink:0}}
-            .pj-i:hover{{background:#FEC52E;color:#1c1a17}}
+            /* .pj-i definido no bloco de estilo global (topo do app) — fonte unica */
             </style>
             <div class="pj-wrap">
             <table class="pj-tbl">
