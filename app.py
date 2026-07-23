@@ -3028,14 +3028,19 @@ try:
 
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
 
-            _next_ref_nm = _default_ref_nm + timedelta(days=1)
+            # Spillover = próximo dia útil de Pix após o ÚLTIMO dia útil. O corte é
+            # 18h30 do último dia útil (fim de semana -> sexta), computado no produtor.
+            _ldu_nm = _now_brt_nm.date()
+            while _ldu_nm.weekday() >= 5:
+                _ldu_nm -= timedelta(days=1)
+            _next_ref_nm = _ldu_nm + timedelta(days=1)
             while _next_ref_nm.weekday() >= 5:
                 _next_ref_nm += timedelta(days=1)
             _c2ttl, _c2tog = st.columns([7, 2])
             with _c2tog:
                 _ver_prox_nm = st.toggle(
                     "dia útil seguinte", key="proj_prox_dia_nm", value=False,
-                    help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir de hoje 18h30.",
+                    help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir das 18h30 do último dia útil.",
                 )
             _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
             with _c2ttl:
@@ -3109,7 +3114,7 @@ try:
                 _bt_prox_nm = _ultimo_nm.get("bt_proximo_dia_util", {})
                 _pt_sec = {"BLOQUEIO_TEMPORARIO": _bt_prox_nm} if _bt_prox_nm.get("count", 0) > 0 else {}
                 if not _pt_sec:
-                    st.caption("Sem leads em bloqueio temporário com validade a partir de hoje 18h30 (ou aguardando a próxima exportação dos dados).")
+                    st.caption("Sem leads em bloqueio temporário com validade a partir das 18h30 do último dia útil (ou aguardando a próxima exportação dos dados).")
             else:
                 _pt_sec_base = dict(_non_bt_sec_nm)
                 if _bt_live_nm.get("count", 0) > 0:
