@@ -3036,10 +3036,11 @@ try:
             _next_ref_nm = _ldu_nm + timedelta(days=1)
             while _next_ref_nm.weekday() >= 5:
                 _next_ref_nm += timedelta(days=1)
-            _c2ttl, _c2tog = st.columns([7, 2])
+            st.session_state.setdefault("proj_prox_dia_nm", False)   # default: DESLIGADO
+            _c2ttl, _c2tog = st.columns([2, 3], gap="small")
             with _c2tog:
                 _ver_prox_nm = st.toggle(
-                    "dia útil seguinte", key="proj_prox_dia_nm", value=False,
+                    "dia útil seguinte", key="proj_prox_dia_nm",
                     help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir das 18h30 do último dia útil.",
                 )
             _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
