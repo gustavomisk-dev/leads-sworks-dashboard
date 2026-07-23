@@ -3037,7 +3037,7 @@ try:
             while _next_ref_nm.weekday() >= 5:
                 _next_ref_nm += timedelta(days=1)
             st.session_state.setdefault("proj_prox_dia_nm", False)   # default: DESLIGADO
-            _c2ttl, _c2tog = st.columns([2, 3], gap="small")
+            _c2ttl, _c2tog = st.columns([2, 3], gap="small", vertical_alignment="bottom")
             with _c2tog:
                 _ver_prox_nm = st.toggle(
                     "dia útil seguinte", key="proj_prox_dia_nm",
