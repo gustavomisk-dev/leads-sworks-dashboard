@@ -3028,7 +3028,18 @@ try:
 
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
 
-            st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_default_ref_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
+            _next_ref_nm = _default_ref_nm + timedelta(days=1)
+            while _next_ref_nm.weekday() >= 5:
+                _next_ref_nm += timedelta(days=1)
+            _c2ttl, _c2tog = st.columns([7, 2])
+            with _c2tog:
+                _ver_prox_nm = st.toggle(
+                    "dia útil seguinte", key="proj_prox_dia_nm", value=False,
+                    help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir de hoje 18h30.",
+                )
+            _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
+            with _c2ttl:
+                st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_proj_ref_show_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
 
             # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
             _data_ref_nm = _default_ref_nm
@@ -3092,11 +3103,18 @@ try:
 
             # _TIPO_LABEL_MAP / _ETAPA_ORDER / _ORD / _etapa_key definidos acima (grupo 4 de KPIs) — fonte única.
 
-            # Tabela: non-BT live (5 dias de hoje) + BT live — ambos independentes do período
-            _pt_sec_base = dict(_non_bt_sec_nm)
-            if _bt_live_nm.get("count", 0) > 0:
-                _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
-            _pt_sec = _pt_sec_base
+            # Tabela: non-BT live (5 dias) + BT live. Toggle "dia útil seguinte" mostra
+            # APENAS os leads BT com validade >= hoje 18:30 (spillover p/ o próximo dia útil).
+            if _ver_prox_nm:
+                _bt_prox_nm = _ultimo_nm.get("bt_proximo_dia_util", {})
+                _pt_sec = {"BLOQUEIO_TEMPORARIO": _bt_prox_nm} if _bt_prox_nm.get("count", 0) > 0 else {}
+                if not _pt_sec:
+                    st.caption("Sem leads em bloqueio temporário com validade a partir de hoje 18h30 (ou aguardando a próxima exportação dos dados).")
+            else:
+                _pt_sec_base = dict(_non_bt_sec_nm)
+                if _bt_live_nm.get("count", 0) > 0:
+                    _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
+                _pt_sec = _pt_sec_base
             if _pt_sec:
                 def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
                 def _n(v): return f"{v:,}".replace(",", ".")
