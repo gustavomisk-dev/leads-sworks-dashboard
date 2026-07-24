@@ -3027,422 +3027,426 @@ try:
                 st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
 
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
+            @st.fragment
+            def _sec2_frag():
 
-            # Spillover = próximo dia útil de Pix após o ÚLTIMO dia útil. O corte é
-            # 18h30 do último dia útil (fim de semana -> sexta), computado no produtor.
-            _ldu_nm = _now_brt_nm.date()
-            while _ldu_nm.weekday() >= 5:
-                _ldu_nm -= timedelta(days=1)
-            _next_ref_nm = _ldu_nm + timedelta(days=1)
-            while _next_ref_nm.weekday() >= 5:
-                _next_ref_nm += timedelta(days=1)
-            st.session_state.setdefault("proj_prox_dia_nm", False)   # default: DESLIGADO
-            _c2ttl, _c2tog = st.columns([3, 7], gap="small", vertical_alignment="bottom")
-            with _c2tog:
-                _ver_prox_nm = st.toggle(
-                    "dia útil seguinte", key="proj_prox_dia_nm",
-                    help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir das 18h30 do último dia útil.",
-                )
-            _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
-            with _c2ttl:
-                st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_proj_ref_show_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
-
-            # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
-            _data_ref_nm = _default_ref_nm
-            _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
-            _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
-            _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
-            _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
-            # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
-            _non_bt_sec_nm: dict = {}
-            _pt_por_dia: dict = {}
-            # Heatmap: ultima_atualizacao por etapa. Janela de 15 dias p/ capturar
-            # leads antigos ainda nao-terminais e preencher as faixas mais longas
-            # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
-            # ficam em cache permanente, entao so pesa no 1o load da sessao.
-            _hm_ts: dict = {}
-            for _dhm in range(15):
-                _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
-                if _shm not in datas:
-                    continue
-                _djhm = carregar_dia(_shm)
-                if not _djhm:
-                    continue
-                for _tsh, _lst in (_djhm.get("heatmap_ts", {}) or {}).items():
-                    _hm_ts.setdefault(_tsh, []).extend(_lst)
-            # 5 dias — projecao / breakdown da secao 1 (separado do heatmap)
-            for _d5pd in range(5):
-                _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
-                if _s5pd not in datas:
-                    continue
-                _dj2 = carregar_dia(_s5pd)
-                if not _dj2:
-                    continue
-                for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
-                    if _ts2 == "BLOQUEIO_TEMPORARIO":
-                        continue
-                    if _v2.get("count", 0) > 0:
-                        if _ts2 not in _non_bt_sec_nm:
-                            _non_bt_sec_nm[_ts2] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0, "taxa_sum": 0.0, "taxa_n": 0}
-                        _non_bt_sec_nm[_ts2]["count"]    += _v2.get("count", 0)
-                        _non_bt_sec_nm[_ts2]["valor"]    += _v2.get("valor", 0.0)
-                        _non_bt_sec_nm[_ts2]["liberado"] += _v2.get("liberado", 0.0)
-                        _non_bt_sec_nm[_ts2]["iof"]      += _v2.get("iof", 0.0)
-                        _non_bt_sec_nm[_ts2]["taxa_sum"] += (_v2.get("taxa_media") or 0.0) * _v2.get("taxa_n", 0)
-                        _non_bt_sec_nm[_ts2]["taxa_n"]   += _v2.get("taxa_n", 0)
-                        if _ts2 not in _pt_por_dia:
-                            _pt_por_dia[_ts2] = {}
-                        _pt_por_dia[_ts2][_s5pd] = {
-                            "count":      _v2.get("count", 0),
-                            "valor":      _v2.get("valor", 0.0),
-                            "liberado":   _v2.get("liberado", 0.0),
-                            "iof":        _v2.get("iof", 0.0),
-                            "taxa_media": _v2.get("taxa_media"),
-                            "taxa_n":     _v2.get("taxa_n", 0),
-                        }
-            # BT: breakdown já está keyed por dia Pix no JSON mais recente
-            _pt_por_dia["BLOQUEIO_TEMPORARIO"] = _ultimo_nm.get("bt_pix_days", {})
-            # Derivar taxa_media por etapa (média ponderada sobre os 5 dias acumulados)
-            for _ts3 in _non_bt_sec_nm:
-                _tn3 = _non_bt_sec_nm[_ts3].get("taxa_n", 0)
-                _non_bt_sec_nm[_ts3]["taxa_media"] = (_non_bt_sec_nm[_ts3]["taxa_sum"] / _tn3) if _tn3 > 0 else None
-
-            # _TIPO_LABEL_MAP / _ETAPA_ORDER / _ORD / _etapa_key definidos acima (grupo 4 de KPIs) — fonte única.
-
-            # Tabela: non-BT live (5 dias) + BT live. Toggle "dia útil seguinte" mostra
-            # APENAS os leads BT com validade >= hoje 18:30 (spillover p/ o próximo dia útil).
-            if _ver_prox_nm:
-                _bt_prox_nm = _ultimo_nm.get("bt_proximo_dia_util", {})
-                _pt_sec = {"BLOQUEIO_TEMPORARIO": _bt_prox_nm} if _bt_prox_nm.get("count", 0) > 0 else {}
-                if not _pt_sec:
-                    st.caption("Sem leads em bloqueio temporário com validade a partir das 18h30 do último dia útil (ou aguardando a próxima exportação dos dados).")
-            else:
-                _pt_sec_base = dict(_non_bt_sec_nm)
-                if _bt_live_nm.get("count", 0) > 0:
-                    _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
-                _pt_sec = _pt_sec_base
-            if _pt_sec:
-                def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
-                def _n(v): return f"{v:,}".replace(",", ".")
-                def _pct(v): return (f"{v:.2f}".replace(".", ",") + "% a.m.") if v else "—"
-                def _tip(ts):
-                    _tx = _ETAPA_TOOLTIPS.get(ts, "")
-                    if not _tx:
-                        return ""
-                    _tx = (_tx.replace("&", "&amp;").replace('"', "&quot;")
-                              .replace("<", "&lt;").replace(">", "&gt;"))
-                    return f"<span class='pj-i' title=\"{_tx}\">i</span>"
-                _HIDE_VALOR_TIPOS = {"PRE_APROVADO"}  # ASSINATURA voltou a exibir valor/liberado
-            
-                _sorted = sorted(_pt_sec.items(), key=lambda x: (_etapa_key(x[0]), -x[1]["valor"]))
-                _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
-                _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
-                _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
-                _t_iof  = sum(d["iof"]      for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
-                _t_taxa_n   = sum((d.get("taxa_n") or 0) for d in _pt_sec.values())
-                _t_taxa_sum = sum((d.get("taxa_media") or 0) * (d.get("taxa_n") or 0) for d in _pt_sec.values())
-                _t_taxa     = _t_taxa_sum / _t_taxa_n if _t_taxa_n > 0 else None
-            
-                _rows = ""
-                for ts, d in _sorted:
-                    _label   = _TIPO_LABEL_MAP.get(ts, ts)
-                    _dias_ts = _pt_por_dia.get(ts, {})
-                    if _dias_ts:
-                        _is_bt      = ts == "BLOQUEIO_TEMPORARIO"
-                        _det_inner  = "".join(
-                            f"<div class='pj-det-row'>"
-                            f"<span class='pj-det-dt'>{'Pix ' if _is_bt else ''}"
-                            f"{datetime.strptime(_ds3, '%Y%m%d').strftime('%d/%m/%Y')}</span>"
-                            f"<span class='pj-det-n'>{_n(_dv3['count'])} lead{'s' if _dv3['count'] != 1 else ''}</span>"
-                            f"<span class='pj-det-v'>{_r(_dv3['valor'])}</span>"
-                            f"<span class='pj-det-x'>{_pct(_dv3.get('taxa_media'))}</span>"
-                            f"</div>"
-                            for _ds3, _dv3 in sorted(_dias_ts.items())
-                        )
-                        _cell_lbl = f"<details class='pj-det'><summary>{_label}{_tip(ts)}</summary>{_det_inner}</details>"
-                    else:
-                        _cell_lbl = f"{_label}{_tip(ts)}"
-                    _hv = ts in _HIDE_VALOR_TIPOS
-                    _rows += (
-                        f"<tr>"
-                        f"<td class='pj-lbl'>{_cell_lbl}</td>"
-                        f"<td class='pj-n'>{_n(d['count'])}</td>"
-                        f"<td class='pj-n'>{_pct(d.get('taxa_media'))}</td>"
-                        f"<td class='pj-n'>{'—' if _hv else _r(d['valor'])}</td>"
-                        f"<td class='pj-n'>{'—' if _hv else _r(d['liberado'])}</td>"
-                        f"<td class='pj-n'>{'—' if _hv else _r(d['iof'])}</td>"
-                        f"</tr>"
+                # Spillover = próximo dia útil de Pix após o ÚLTIMO dia útil. O corte é
+                # 18h30 do último dia útil (fim de semana -> sexta), computado no produtor.
+                _ldu_nm = _now_brt_nm.date()
+                while _ldu_nm.weekday() >= 5:
+                    _ldu_nm -= timedelta(days=1)
+                _next_ref_nm = _ldu_nm + timedelta(days=1)
+                while _next_ref_nm.weekday() >= 5:
+                    _next_ref_nm += timedelta(days=1)
+                st.session_state.setdefault("proj_prox_dia_nm", False)   # default: DESLIGADO
+                _c2ttl, _c2tog = st.columns([3, 7], gap="small", vertical_alignment="bottom")
+                with _c2tog:
+                    _ver_prox_nm = st.toggle(
+                        "dia útil seguinte", key="proj_prox_dia_nm",
+                        help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir das 18h30 do último dia útil.",
                     )
-            
-                st.markdown(f"""
-            <style>
-            .pj-wrap{{overflow-x:auto;margin:6px 0 18px}}
-            .pj-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
-            .pj-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
-                        text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
-            .pj-tbl th.pj-n{{text-align:right}}
-            .pj-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
-            .pj-lbl{{color:#cbd5e1;white-space:nowrap}}
-            .pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
-            .pj-tbl tr:hover td{{background:#1a1815}}
-            .pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
-                        font-weight:700;border-top:2px solid #272420}}
-            .pj-tot .pj-lbl{{color:#FEC52E}}
-            .pj-det{{cursor:pointer}}
-            .pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
-                             cursor:pointer;color:#cbd5e1;white-space:nowrap}}
-            .pj-det summary::-webkit-details-marker{{display:none}}
-            .pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
-                                     transition:transform .15s;flex-shrink:0}}
-            .pj-det[open] summary::before{{transform:rotate(90deg)}}
-            .pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
-                         color:#94a3b8;border-top:1px solid #272420}}
-            .pj-det-dt{{min-width:110px;color:#64748b}}
-            .pj-det-n{{min-width:80px}}
-            .pj-det-v{{font-variant-numeric:tabular-nums}}
-            .pj-det-x{{color:#64748b;font-variant-numeric:tabular-nums}}
-            /* .pj-i definido no bloco de estilo global (topo do app) — fonte unica */
-            </style>
-            <div class="pj-wrap">
-            <table class="pj-tbl">
-              <thead><tr>
-                <th>Etapa</th>
-                <th class="pj-n">Leads</th>
-                <th class="pj-n">Taxa Média</th>
-                <th class="pj-n">Valor Total</th>
-                <th class="pj-n">Liberado</th>
-                <th class="pj-n">IOF</th>
-              </tr></thead>
-              <tbody>
-                {_rows}
-                <tr class="pj-tot">
-                  <td class="pj-lbl">Total</td>
-                  <td class="pj-n">{_n(_t_cnt)}</td>
-                  <td class="pj-n">{_pct(_t_taxa)}</td>
-                  <td class="pj-n">{_r(_t_val)}</td>
-                  <td class="pj-n">{_r(_t_lib)}</td>
-                  <td class="pj-n">{_r(_t_iof)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p style='color:#475569;font-size:.8em;margin:6px 0 0'>* Etapas consideram leads dos últimos 5 dias a partir de hoje, independente do período selecionado.</p>
-            </div>
-            """, unsafe_allow_html=True)
+                _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
+                with _c2ttl:
+                    st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_proj_ref_show_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
 
-                # ── Heatmap: tempo desde a ultima_atualizacao, por etapa ──────────
-                _FAIXAS = [
-                    ("<1h", 0, 1), ("1–3h", 1, 3), ("3–6h", 3, 6), ("6–12h", 6, 12),
-                    ("12–24h", 12, 24), ("1–2d", 24, 48), ("2–3d", 48, 72),
-                    ("3–4d", 72, 96), ("4–5d", 96, 120), (">5d", 120, None),
-                ]
-                def _faixa_idx(h):
-                    for _i, (_fl, _lo, _hi) in enumerate(_FAIXAS):
-                        if h >= _lo and (_hi is None or h < _hi):
-                            return _i
-                    return len(_FAIXAS) - 1
-                _hm_mat = {}
-                _hm_leads: dict = {}   # etapa -> {cod: faixa_idx} (dedup por cod, snapshot mais recente 1o)
-                for _tsh, _lst in _hm_ts.items():
-                    if _tsh == "BLOQUEIO_TEMPORARIO":
-                        continue  # BT = countdown de 24h (nao staleness); contagem diverge da tabela
-                    _row = [0] * len(_FAIXAS)
-                    _seen = _hm_leads.setdefault(_tsh, {})
-                    for _entry in _lst:
-                        # Compat: formato novo = [ts, codigo]; antigo = string ts.
-                        if isinstance(_entry, (list, tuple)):
-                            _tsraw = _entry[0] if _entry else ""
-                            _cod   = str(_entry[1]).strip() if len(_entry) > 1 else ""
-                        else:
-                            _tsraw, _cod = _entry, ""
-                        try:
-                            _dt = datetime.fromisoformat(str(_tsraw)[:19])
-                        except (ValueError, TypeError):
+                # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
+                _data_ref_nm = _default_ref_nm
+                _ref_str_nm    = _data_ref_nm.strftime("%Y%m%d")
+                _ref_label_nm  = _data_ref_nm.strftime("%d/%m/%Y")
+                _ref_short_nm  = _data_ref_nm.strftime("%d/%m")
+                _bt_live_nm    = _ultimo_nm.get("bt_pix_days", {}).get(_ref_str_nm, {})
+                # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
+                _non_bt_sec_nm: dict = {}
+                _pt_por_dia: dict = {}
+                # Heatmap: ultima_atualizacao por etapa. Janela de 15 dias p/ capturar
+                # leads antigos ainda nao-terminais e preencher as faixas mais longas
+                # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
+                # ficam em cache permanente, entao so pesa no 1o load da sessao.
+                _hm_ts: dict = {}
+                for _dhm in range(15):
+                    _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
+                    if _shm not in datas:
+                        continue
+                    _djhm = carregar_dia(_shm)
+                    if not _djhm:
+                        continue
+                    for _tsh, _lst in (_djhm.get("heatmap_ts", {}) or {}).items():
+                        _hm_ts.setdefault(_tsh, []).extend(_lst)
+                # 5 dias — projecao / breakdown da secao 1 (separado do heatmap)
+                for _d5pd in range(5):
+                    _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
+                    if _s5pd not in datas:
+                        continue
+                    _dj2 = carregar_dia(_s5pd)
+                    if not _dj2:
+                        continue
+                    for _ts2, _v2 in _dj2.get("projecao_tipos", {}).items():
+                        if _ts2 == "BLOQUEIO_TEMPORARIO":
                             continue
-                        _idade_h = max(0.0, (_now_brt_nm - _dt).total_seconds() / 3600.0)
-                        _bi = _faixa_idx(_idade_h)
-                        _row[_bi] += 1
-                        if _cod and _cod not in _seen:
-                            _seen[_cod] = (_bi, str(_tsraw)[:19], round(_idade_h / 24.0, 2), _entry)
-                    if sum(_row):
-                        _hm_mat[_tsh] = _row
-                if _hm_mat:
-                    _hm_max = max(max(r) for r in _hm_mat.values()) or 1
-                    _N_FAIXAS = len(_FAIXAS)
-                    def _hm_base(_i):
-                        # verde (2 primeiras) → amarelo (3 seguintes) → vermelho (restantes)
-                        # → cinza escuro na última faixa (>5d). Tonalidade varia pela contagem.
-                        if _i >= _N_FAIXAS - 1:
-                            return (82, 82, 91)      # >5d: cinza escuro
-                        if _i <= 1:
-                            return (34, 197, 94)     # verde
-                        if _i <= 4:
-                            return (254, 197, 46)    # amarelo
-                        return (239, 68, 68)         # vermelho
-                    def _hm_cell(v, _i):
-                        if not v:
-                            return '<td class="hm-c hm-0">·</td>'
-                        _r, _g, _b = _hm_base(_i)
-                        _a = 0.12 + 0.88 * (v / _hm_max)
-                        return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
-                    def _hm_lk_color(_i):
-                        # cor da faixa; >5d (cinza escuro) clareia p/ legibilidade do link
-                        if _i >= _N_FAIXAS - 1:
-                            return "#94a3b8"
-                        _r, _g, _b = _hm_base(_i)
-                        return "rgb(%d,%d,%d)" % (_r, _g, _b)
-                    def _hm_links(_seen):
-                        # até 15 links, distribuídos ~igualmente entre verde/amarelo/vermelho
-                        if not _seen:
+                        if _v2.get("count", 0) > 0:
+                            if _ts2 not in _non_bt_sec_nm:
+                                _non_bt_sec_nm[_ts2] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0, "taxa_sum": 0.0, "taxa_n": 0}
+                            _non_bt_sec_nm[_ts2]["count"]    += _v2.get("count", 0)
+                            _non_bt_sec_nm[_ts2]["valor"]    += _v2.get("valor", 0.0)
+                            _non_bt_sec_nm[_ts2]["liberado"] += _v2.get("liberado", 0.0)
+                            _non_bt_sec_nm[_ts2]["iof"]      += _v2.get("iof", 0.0)
+                            _non_bt_sec_nm[_ts2]["taxa_sum"] += (_v2.get("taxa_media") or 0.0) * _v2.get("taxa_n", 0)
+                            _non_bt_sec_nm[_ts2]["taxa_n"]   += _v2.get("taxa_n", 0)
+                            if _ts2 not in _pt_por_dia:
+                                _pt_por_dia[_ts2] = {}
+                            _pt_por_dia[_ts2][_s5pd] = {
+                                "count":      _v2.get("count", 0),
+                                "valor":      _v2.get("valor", 0.0),
+                                "liberado":   _v2.get("liberado", 0.0),
+                                "iof":        _v2.get("iof", 0.0),
+                                "taxa_media": _v2.get("taxa_media"),
+                                "taxa_n":     _v2.get("taxa_n", 0),
+                            }
+                # BT: breakdown já está keyed por dia Pix no JSON mais recente
+                _pt_por_dia["BLOQUEIO_TEMPORARIO"] = _ultimo_nm.get("bt_pix_days", {})
+                # Derivar taxa_media por etapa (média ponderada sobre os 5 dias acumulados)
+                for _ts3 in _non_bt_sec_nm:
+                    _tn3 = _non_bt_sec_nm[_ts3].get("taxa_n", 0)
+                    _non_bt_sec_nm[_ts3]["taxa_media"] = (_non_bt_sec_nm[_ts3]["taxa_sum"] / _tn3) if _tn3 > 0 else None
+
+                # _TIPO_LABEL_MAP / _ETAPA_ORDER / _ORD / _etapa_key definidos acima (grupo 4 de KPIs) — fonte única.
+
+                # Tabela: non-BT live (5 dias) + BT live. Toggle "dia útil seguinte" mostra
+                # APENAS os leads BT com validade >= hoje 18:30 (spillover p/ o próximo dia útil).
+                if _ver_prox_nm:
+                    _bt_prox_nm = _ultimo_nm.get("bt_proximo_dia_util", {})
+                    _pt_sec = {"BLOQUEIO_TEMPORARIO": _bt_prox_nm} if _bt_prox_nm.get("count", 0) > 0 else {}
+                    if not _pt_sec:
+                        st.caption("Sem leads em bloqueio temporário com validade a partir das 18h30 do último dia útil (ou aguardando a próxima exportação dos dados).")
+                else:
+                    _pt_sec_base = dict(_non_bt_sec_nm)
+                    if _bt_live_nm.get("count", 0) > 0:
+                        _pt_sec_base["BLOQUEIO_TEMPORARIO"] = _bt_live_nm
+                    _pt_sec = _pt_sec_base
+                if _pt_sec:
+                    def _r(v): return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+                    def _n(v): return f"{v:,}".replace(",", ".")
+                    def _pct(v): return (f"{v:.2f}".replace(".", ",") + "% a.m.") if v else "—"
+                    def _tip(ts):
+                        _tx = _ETAPA_TOOLTIPS.get(ts, "")
+                        if not _tx:
                             return ""
-                        _grp = {0: [], 1: [], 2: []}   # 0=verde(faixas 0-1) 1=amarelo(2-4) 2=vermelho(5+)
-                        for _c, _v in _seen.items():
-                            _bi = _v[0] if isinstance(_v, (list, tuple)) else _v
-                            _grp[0 if _bi <= 1 else 1 if _bi <= 4 else 2].append((_bi, _c))
-                        for _gk in _grp:
-                            _grp[_gk].sort(key=lambda x: -x[0])   # mais parado primeiro
-                        _sel   = {_gk: _grp[_gk][:5] for _gk in _grp}
-                        _extra = {_gk: _grp[_gk][5:] for _gk in _grp}
-                        _tot = sum(len(v) for v in _sel.values()); _gk = 0
-                        while _tot < 15 and any(_extra.values()):
-                            if _extra[_gk]:
-                                _sel[_gk].append(_extra[_gk].pop(0)); _tot += 1
-                            _gk = (_gk + 1) % 3
-                        _picked = sorted(_sel[0] + _sel[1] + _sel[2], key=lambda x: x[0])
-                        _lines = "".join(
-                            f"<a class='hm-lk' style='color:{_hm_lk_color(_bi)}' target='_blank' "
-                            f"href='https://sworks.zilicorp.net/Processo?codigo={_c}'>#{_c}"
-                            f"<span class='hm-lk-fx'>{_FAIXAS[_bi][0]}</span></a>"
-                            for _bi, _c in _picked
-                        )
-                        _resto = len(_seen) - len(_picked)
-                        _mais  = f"<div class='hm-lk-mais'>+{_resto} lead(s) nesta etapa</div>" if _resto > 0 else ""
-                        return f"<div class='hm-lks'>{_lines}{_mais}</div>"
-                    # ── Download por etapa (template Operações + Faixa + Dias na etapa) ──
-                    _HM_DL_HEADER = ("Lead;Link S-Works;Data do Lead;Origem;CPF;Nome;E-mail;"
-                                     "Telefone;Data de Nascimento;Valor do Emprestimo Solicitado;"
-                                     "Numero de Parcelas Solicitado;Faixa;Dias na etapa")
-                    def _hm_fmt_data(_s):
-                        _s = str(_s or "").strip()
-                        if not _s:
-                            return ""
-                        _m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", _s)          # ISO
-                        if _m:
-                            return f"{_m.group(3)}/{_m.group(2)}/{_m.group(1)}"
-                        _m = re.match(r"^(\d{2})/(\d{2})/(\d{4})", _s)          # já BR
-                        if _m:
-                            return _m.group(0)
-                        _m = re.match(r"^(\d{2})(\d{2})(\d{4})", _s)            # DDMMYYYY
-                        if _m:
-                            return f"{_m.group(1)}/{_m.group(2)}/{_m.group(3)}"
-                        return _s[:10]
-                    def _hm_xlsx_b64(_seen):
-                        # .xlsx no template de Operações + Faixa + Dias na etapa. Todas as
-                        # células saem como TEXTO (openpyxl grava str como célula de texto),
-                        # então CPF/Telefone preservam os dígitos e o Excel não converte em
-                        # número/notação científica — sem precisar de apóstrofo.
-                        def _f(_e, _i):
-                            return str(_e[_i]).strip() if isinstance(_e, (list, tuple)) and len(_e) > _i and _e[_i] else ""
-                        def _dias_of(_v):
-                            return (_v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else 0) or 0
-                        _wb = Workbook(write_only=True)
-                        _ws = _wb.create_sheet("Leads")
-                        _ws.append(_HM_DL_HEADER.split(";"))
-                        for _c, _v in sorted(_seen.items(), key=lambda kv: -_dias_of(kv[1])):
-                            _bi   = _v[0] if isinstance(_v, (list, tuple)) else _v
-                            _dias = _v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else ""
-                            _e    = _v[3] if isinstance(_v, (list, tuple)) and len(_v) > 3 else None
-                            _ws.append([
-                                str(_c), f"https://sworks.zilicorp.net/Processo?codigo={_c}",
-                                _hm_fmt_data(_f(_e, 2)), _f(_e, 3), _f(_e, 4), _f(_e, 5),
-                                _f(_e, 6), _f(_e, 7), _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
-                                _f(_e, 10), _FAIXAS[_bi][0], str(_dias).replace(".", ","),
-                            ])
-                        _buf = BytesIO(); _wb.save(_buf)
-                        return base64.b64encode(_buf.getvalue()).decode()
-                    # ── Autorização de download: senha 1x na sessão via 🔒 discreto ──
-                    try:
-                        _hm_sec = st.secrets["senha_download_heatmap"]
-                    except Exception:
-                        _hm_sec = None
-                    _hm_auth = bool(st.session_state.get("hm_dl_ok"))
-                    _ct, _cq = st.columns([10, 1])
-                    with _ct:
-                        st.markdown('<div class="sec" style="font-size:.95em;margin-top:6px">Tempo desde a última atualização (por etapa)</div>', unsafe_allow_html=True)
-                    with _cq:
-                        with st.popover("🔒", help="Liberar download dos leads (senha)"):
-                            if not _hm_sec:
-                                st.caption("Configure o secret `senha_download_heatmap`.")
-                            elif _hm_auth:
-                                st.caption("✓ Downloads liberados nesta sessão.")
-                            else:
-                                _pw = st.text_input("Senha p/ baixar leads", type="password", key="hm_dl_pw")
-                                if _pw and _pw == _hm_sec:
-                                    st.session_state["hm_dl_ok"] = True
-                                    _hm_auth = True
-                                elif _pw:
-                                    st.caption("Senha incorreta.")
-                    _hrows = ""
-                    for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
-                        _lblt    = _TIPO_LABEL_MAP.get(_t, _t)
-                        _leads_t = _hm_leads.get(_t, {})
-                        _lks     = _hm_links(_leads_t)
-                        _cell    = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
-                                    if _lks else _lblt)
-                        if _hm_auth and _leads_t:
-                            _dl = ("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,"
-                                   + _hm_xlsx_b64(_leads_t))
-                            _dlcell = (f'<td class="hm-dl"><a class="hm-dlbtn" download="leads_{_t}.xlsx" '
-                                       f'href="{_dl}" title="Baixar {len(_leads_t)} lead(s) — template Operações">&#8595;</a></td>')
+                        _tx = (_tx.replace("&", "&amp;").replace('"', "&quot;")
+                                  .replace("<", "&lt;").replace(">", "&gt;"))
+                        return f"<span class='pj-i' title=\"{_tx}\">i</span>"
+                    _HIDE_VALOR_TIPOS = {"PRE_APROVADO"}  # ASSINATURA voltou a exibir valor/liberado
+            
+                    _sorted = sorted(_pt_sec.items(), key=lambda x: (_etapa_key(x[0]), -x[1]["valor"]))
+                    _t_cnt  = sum(d["count"]    for d in _pt_sec.values())
+                    _t_val  = sum(d["valor"]    for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                    _t_lib  = sum(d["liberado"] for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                    _t_iof  = sum(d["iof"]      for ts, d in _pt_sec.items() if ts not in _HIDE_VALOR_TIPOS)
+                    _t_taxa_n   = sum((d.get("taxa_n") or 0) for d in _pt_sec.values())
+                    _t_taxa_sum = sum((d.get("taxa_media") or 0) * (d.get("taxa_n") or 0) for d in _pt_sec.values())
+                    _t_taxa     = _t_taxa_sum / _t_taxa_n if _t_taxa_n > 0 else None
+            
+                    _rows = ""
+                    for ts, d in _sorted:
+                        _label   = _TIPO_LABEL_MAP.get(ts, ts)
+                        _dias_ts = _pt_por_dia.get(ts, {})
+                        if _dias_ts:
+                            _is_bt      = ts == "BLOQUEIO_TEMPORARIO"
+                            _det_inner  = "".join(
+                                f"<div class='pj-det-row'>"
+                                f"<span class='pj-det-dt'>{'Pix ' if _is_bt else ''}"
+                                f"{datetime.strptime(_ds3, '%Y%m%d').strftime('%d/%m/%Y')}</span>"
+                                f"<span class='pj-det-n'>{_n(_dv3['count'])} lead{'s' if _dv3['count'] != 1 else ''}</span>"
+                                f"<span class='pj-det-v'>{_r(_dv3['valor'])}</span>"
+                                f"<span class='pj-det-x'>{_pct(_dv3.get('taxa_media'))}</span>"
+                                f"</div>"
+                                for _ds3, _dv3 in sorted(_dias_ts.items())
+                            )
+                            _cell_lbl = f"<details class='pj-det'><summary>{_label}{_tip(ts)}</summary>{_det_inner}</details>"
                         else:
-                            _dttl = "Sem dados ainda (aguardando exportação)" if not _leads_t else "Libere no cadeado acima"
-                            _dlcell = f'<td class="hm-dl"><span class="hm-dlbtn hm-dlbtn-off" title="{_dttl}">&#8595;</span></td>'
-                        _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
-                                   + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
-                                   + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td>'
-                                   + _dlcell + '</tr>')
-                    _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
-                    _hm_css = """
-            <style>
-            .hm-wrap{overflow-x:auto;margin:2px 0 18px}
-            .hm-tbl{border-collapse:collapse;font-size:.85em}
-            .hm-tbl th{background:#1c1a17;color:#94a3b8;font-weight:600;padding:6px 9px;text-align:center;border-bottom:2px solid #272420;white-space:nowrap}
-            .hm-tbl th.hm-lbl-h{text-align:left}
-            .hm-lbl{color:#cbd5e1;white-space:nowrap;padding:5px 12px 5px 4px;border-bottom:1px solid #1c1a17}
-            .hm-c{text-align:center;padding:5px 9px;border-bottom:1px solid #1c1a17;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:46px}
-            .hm-0{color:#3f3b35}
-            .hm-tot{text-align:center;padding:5px 11px;color:#FEC52E;font-weight:700;border-bottom:1px solid #1c1a17;border-left:2px solid #272420}
-            .hm-det summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px}
-            .hm-det summary::-webkit-details-marker{display:none}
-            .hm-det summary::before{content:'\\25B6';font-size:.6em;color:#64748b;transition:transform .15s;flex-shrink:0}
-            .hm-det[open] summary::before{transform:rotate(90deg)}
-            .hm-lks{padding:4px 0 4px 16px;white-space:normal}
-            .hm-lk{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:.92em;text-decoration:none;font-variant-numeric:tabular-nums}
-            .hm-lk:hover{text-decoration:underline}
-            .hm-lk-fx{color:#64748b;font-size:.82em}
-            .hm-lk-mais{color:#64748b;font-size:.8em;padding:4px 0 0 2px}
-            .hm-dl-h{border-left:1px solid #272420;min-width:30px}
-            .hm-dl{text-align:center;padding:4px 8px;border-bottom:1px solid #1c1a17;border-left:1px solid #272420}
-            .hm-dlbtn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:18px;border:1px solid #333;border-radius:4px;color:#94a3b8;text-decoration:none;font-size:.8em;background:#17150f;line-height:1}
-            .hm-dlbtn:hover{border-color:#FEC52E;color:#FEC52E}
-            .hm-dlbtn-off{opacity:.28;cursor:not-allowed}
-            </style>
-            """
+                            _cell_lbl = f"{_label}{_tip(ts)}"
+                        _hv = ts in _HIDE_VALOR_TIPOS
+                        _rows += (
+                            f"<tr>"
+                            f"<td class='pj-lbl'>{_cell_lbl}</td>"
+                            f"<td class='pj-n'>{_n(d['count'])}</td>"
+                            f"<td class='pj-n'>{_pct(d.get('taxa_media'))}</td>"
+                            f"<td class='pj-n'>{'—' if _hv else _r(d['valor'])}</td>"
+                            f"<td class='pj-n'>{'—' if _hv else _r(d['liberado'])}</td>"
+                            f"<td class='pj-n'>{'—' if _hv else _r(d['iof'])}</td>"
+                            f"</tr>"
+                        )
+            
+                    st.markdown(f"""
+                <style>
+                .pj-wrap{{overflow-x:auto;margin:6px 0 18px}}
+                .pj-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
+                .pj-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
+                            text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
+                .pj-tbl th.pj-n{{text-align:right}}
+                .pj-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
+                .pj-lbl{{color:#cbd5e1;white-space:nowrap}}
+                .pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+                .pj-tbl tr:hover td{{background:#1a1815}}
+                .pj-tot td{{background:#1c1a17!important;color:#FEC52E!important;
+                            font-weight:700;border-top:2px solid #272420}}
+                .pj-tot .pj-lbl{{color:#FEC52E}}
+                .pj-det{{cursor:pointer}}
+                .pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
+                                 cursor:pointer;color:#cbd5e1;white-space:nowrap}}
+                .pj-det summary::-webkit-details-marker{{display:none}}
+                .pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
+                                         transition:transform .15s;flex-shrink:0}}
+                .pj-det[open] summary::before{{transform:rotate(90deg)}}
+                .pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
+                             color:#94a3b8;border-top:1px solid #272420}}
+                .pj-det-dt{{min-width:110px;color:#64748b}}
+                .pj-det-n{{min-width:80px}}
+                .pj-det-v{{font-variant-numeric:tabular-nums}}
+                .pj-det-x{{color:#64748b;font-variant-numeric:tabular-nums}}
+                /* .pj-i definido no bloco de estilo global (topo do app) — fonte unica */
+                </style>
+                <div class="pj-wrap">
+                <table class="pj-tbl">
+                  <thead><tr>
+                    <th>Etapa</th>
+                    <th class="pj-n">Leads</th>
+                    <th class="pj-n">Taxa Média</th>
+                    <th class="pj-n">Valor Total</th>
+                    <th class="pj-n">Liberado</th>
+                    <th class="pj-n">IOF</th>
+                  </tr></thead>
+                  <tbody>
+                    {_rows}
+                    <tr class="pj-tot">
+                      <td class="pj-lbl">Total</td>
+                      <td class="pj-n">{_n(_t_cnt)}</td>
+                      <td class="pj-n">{_pct(_t_taxa)}</td>
+                      <td class="pj-n">{_r(_t_val)}</td>
+                      <td class="pj-n">{_r(_t_lib)}</td>
+                      <td class="pj-n">{_r(_t_iof)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style='color:#475569;font-size:.8em;margin:6px 0 0'>* Etapas consideram leads dos últimos 5 dias a partir de hoje, independente do período selecionado.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                    # ── Heatmap: tempo desde a ultima_atualizacao, por etapa ──────────
+                    _FAIXAS = [
+                        ("<1h", 0, 1), ("1–3h", 1, 3), ("3–6h", 3, 6), ("6–12h", 6, 12),
+                        ("12–24h", 12, 24), ("1–2d", 24, 48), ("2–3d", 48, 72),
+                        ("3–4d", 72, 96), ("4–5d", 96, 120), (">5d", 120, None),
+                    ]
+                    def _faixa_idx(h):
+                        for _i, (_fl, _lo, _hi) in enumerate(_FAIXAS):
+                            if h >= _lo and (_hi is None or h < _hi):
+                                return _i
+                        return len(_FAIXAS) - 1
+                    _hm_mat = {}
+                    _hm_leads: dict = {}   # etapa -> {cod: faixa_idx} (dedup por cod, snapshot mais recente 1o)
+                    for _tsh, _lst in _hm_ts.items():
+                        if _tsh == "BLOQUEIO_TEMPORARIO":
+                            continue  # BT = countdown de 24h (nao staleness); contagem diverge da tabela
+                        _row = [0] * len(_FAIXAS)
+                        _seen = _hm_leads.setdefault(_tsh, {})
+                        for _entry in _lst:
+                            # Compat: formato novo = [ts, codigo]; antigo = string ts.
+                            if isinstance(_entry, (list, tuple)):
+                                _tsraw = _entry[0] if _entry else ""
+                                _cod   = str(_entry[1]).strip() if len(_entry) > 1 else ""
+                            else:
+                                _tsraw, _cod = _entry, ""
+                            try:
+                                _dt = datetime.fromisoformat(str(_tsraw)[:19])
+                            except (ValueError, TypeError):
+                                continue
+                            _idade_h = max(0.0, (_now_brt_nm - _dt).total_seconds() / 3600.0)
+                            _bi = _faixa_idx(_idade_h)
+                            _row[_bi] += 1
+                            if _cod and _cod not in _seen:
+                                _seen[_cod] = (_bi, str(_tsraw)[:19], round(_idade_h / 24.0, 2), _entry)
+                        if sum(_row):
+                            _hm_mat[_tsh] = _row
+                    if _hm_mat:
+                        _hm_max = max(max(r) for r in _hm_mat.values()) or 1
+                        _N_FAIXAS = len(_FAIXAS)
+                        def _hm_base(_i):
+                            # verde (2 primeiras) → amarelo (3 seguintes) → vermelho (restantes)
+                            # → cinza escuro na última faixa (>5d). Tonalidade varia pela contagem.
+                            if _i >= _N_FAIXAS - 1:
+                                return (82, 82, 91)      # >5d: cinza escuro
+                            if _i <= 1:
+                                return (34, 197, 94)     # verde
+                            if _i <= 4:
+                                return (254, 197, 46)    # amarelo
+                            return (239, 68, 68)         # vermelho
+                        def _hm_cell(v, _i):
+                            if not v:
+                                return '<td class="hm-c hm-0">·</td>'
+                            _r, _g, _b = _hm_base(_i)
+                            _a = 0.12 + 0.88 * (v / _hm_max)
+                            return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
+                        def _hm_lk_color(_i):
+                            # cor da faixa; >5d (cinza escuro) clareia p/ legibilidade do link
+                            if _i >= _N_FAIXAS - 1:
+                                return "#94a3b8"
+                            _r, _g, _b = _hm_base(_i)
+                            return "rgb(%d,%d,%d)" % (_r, _g, _b)
+                        def _hm_links(_seen):
+                            # até 15 links, distribuídos ~igualmente entre verde/amarelo/vermelho
+                            if not _seen:
+                                return ""
+                            _grp = {0: [], 1: [], 2: []}   # 0=verde(faixas 0-1) 1=amarelo(2-4) 2=vermelho(5+)
+                            for _c, _v in _seen.items():
+                                _bi = _v[0] if isinstance(_v, (list, tuple)) else _v
+                                _grp[0 if _bi <= 1 else 1 if _bi <= 4 else 2].append((_bi, _c))
+                            for _gk in _grp:
+                                _grp[_gk].sort(key=lambda x: -x[0])   # mais parado primeiro
+                            _sel   = {_gk: _grp[_gk][:5] for _gk in _grp}
+                            _extra = {_gk: _grp[_gk][5:] for _gk in _grp}
+                            _tot = sum(len(v) for v in _sel.values()); _gk = 0
+                            while _tot < 15 and any(_extra.values()):
+                                if _extra[_gk]:
+                                    _sel[_gk].append(_extra[_gk].pop(0)); _tot += 1
+                                _gk = (_gk + 1) % 3
+                            _picked = sorted(_sel[0] + _sel[1] + _sel[2], key=lambda x: x[0])
+                            _lines = "".join(
+                                f"<a class='hm-lk' style='color:{_hm_lk_color(_bi)}' target='_blank' "
+                                f"href='https://sworks.zilicorp.net/Processo?codigo={_c}'>#{_c}"
+                                f"<span class='hm-lk-fx'>{_FAIXAS[_bi][0]}</span></a>"
+                                for _bi, _c in _picked
+                            )
+                            _resto = len(_seen) - len(_picked)
+                            _mais  = f"<div class='hm-lk-mais'>+{_resto} lead(s) nesta etapa</div>" if _resto > 0 else ""
+                            return f"<div class='hm-lks'>{_lines}{_mais}</div>"
+                        # ── Download por etapa (template Operações + Faixa + Dias na etapa) ──
+                        _HM_DL_HEADER = ("Lead;Link S-Works;Data do Lead;Origem;CPF;Nome;E-mail;"
+                                         "Telefone;Data de Nascimento;Valor do Emprestimo Solicitado;"
+                                         "Numero de Parcelas Solicitado;Faixa;Dias na etapa")
+                        def _hm_fmt_data(_s):
+                            _s = str(_s or "").strip()
+                            if not _s:
+                                return ""
+                            _m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", _s)          # ISO
+                            if _m:
+                                return f"{_m.group(3)}/{_m.group(2)}/{_m.group(1)}"
+                            _m = re.match(r"^(\d{2})/(\d{2})/(\d{4})", _s)          # já BR
+                            if _m:
+                                return _m.group(0)
+                            _m = re.match(r"^(\d{2})(\d{2})(\d{4})", _s)            # DDMMYYYY
+                            if _m:
+                                return f"{_m.group(1)}/{_m.group(2)}/{_m.group(3)}"
+                            return _s[:10]
+                        def _hm_xlsx_b64(_seen):
+                            # .xlsx no template de Operações + Faixa + Dias na etapa. Todas as
+                            # células saem como TEXTO (openpyxl grava str como célula de texto),
+                            # então CPF/Telefone preservam os dígitos e o Excel não converte em
+                            # número/notação científica — sem precisar de apóstrofo.
+                            def _f(_e, _i):
+                                return str(_e[_i]).strip() if isinstance(_e, (list, tuple)) and len(_e) > _i and _e[_i] else ""
+                            def _dias_of(_v):
+                                return (_v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else 0) or 0
+                            _wb = Workbook(write_only=True)
+                            _ws = _wb.create_sheet("Leads")
+                            _ws.append(_HM_DL_HEADER.split(";"))
+                            for _c, _v in sorted(_seen.items(), key=lambda kv: -_dias_of(kv[1])):
+                                _bi   = _v[0] if isinstance(_v, (list, tuple)) else _v
+                                _dias = _v[2] if isinstance(_v, (list, tuple)) and len(_v) > 2 else ""
+                                _e    = _v[3] if isinstance(_v, (list, tuple)) and len(_v) > 3 else None
+                                _ws.append([
+                                    str(_c), f"https://sworks.zilicorp.net/Processo?codigo={_c}",
+                                    _hm_fmt_data(_f(_e, 2)), _f(_e, 3), _f(_e, 4), _f(_e, 5),
+                                    _f(_e, 6), _f(_e, 7), _hm_fmt_data(_f(_e, 8)), _f(_e, 9),
+                                    _f(_e, 10), _FAIXAS[_bi][0], str(_dias).replace(".", ","),
+                                ])
+                            _buf = BytesIO(); _wb.save(_buf)
+                            return base64.b64encode(_buf.getvalue()).decode()
+                        # ── Autorização de download: senha 1x na sessão via 🔒 discreto ──
+                        try:
+                            _hm_sec = st.secrets["senha_download_heatmap"]
+                        except Exception:
+                            _hm_sec = None
+                        _hm_auth = bool(st.session_state.get("hm_dl_ok"))
+                        _ct, _cq = st.columns([10, 1])
+                        with _ct:
+                            st.markdown('<div class="sec" style="font-size:.95em;margin-top:6px">Tempo desde a última atualização (por etapa)</div>', unsafe_allow_html=True)
+                        with _cq:
+                            with st.popover("🔒", help="Liberar download dos leads (senha)"):
+                                if not _hm_sec:
+                                    st.caption("Configure o secret `senha_download_heatmap`.")
+                                elif _hm_auth:
+                                    st.caption("✓ Downloads liberados nesta sessão.")
+                                else:
+                                    _pw = st.text_input("Senha p/ baixar leads", type="password", key="hm_dl_pw")
+                                    if _pw and _pw == _hm_sec:
+                                        st.session_state["hm_dl_ok"] = True
+                                        _hm_auth = True
+                                    elif _pw:
+                                        st.caption("Senha incorreta.")
+                        _hrows = ""
+                        for _t in sorted(_hm_mat, key=lambda t: (_etapa_key(t), -sum(_hm_mat[t]))):
+                            _lblt    = _TIPO_LABEL_MAP.get(_t, _t)
+                            _leads_t = _hm_leads.get(_t, {})
+                            _lks     = _hm_links(_leads_t)
+                            _cell    = (f"<details class='hm-det'><summary>{_lblt}</summary>{_lks}</details>"
+                                        if _lks else _lblt)
+                            if _hm_auth and _leads_t:
+                                _dl = ("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,"
+                                       + _hm_xlsx_b64(_leads_t))
+                                _dlcell = (f'<td class="hm-dl"><a class="hm-dlbtn" download="leads_{_t}.xlsx" '
+                                           f'href="{_dl}" title="Baixar {len(_leads_t)} lead(s) — template Operações">&#8595;</a></td>')
+                            else:
+                                _dttl = "Sem dados ainda (aguardando exportação)" if not _leads_t else "Libere no cadeado acima"
+                                _dlcell = f'<td class="hm-dl"><span class="hm-dlbtn hm-dlbtn-off" title="{_dttl}">&#8595;</span></td>'
+                            _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
+                                       + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
+                                       + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td>'
+                                       + _dlcell + '</tr>')
+                        _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
+                        _hm_css = """
+                <style>
+                .hm-wrap{overflow-x:auto;margin:2px 0 18px}
+                .hm-tbl{border-collapse:collapse;font-size:.85em}
+                .hm-tbl th{background:#1c1a17;color:#94a3b8;font-weight:600;padding:6px 9px;text-align:center;border-bottom:2px solid #272420;white-space:nowrap}
+                .hm-tbl th.hm-lbl-h{text-align:left}
+                .hm-lbl{color:#cbd5e1;white-space:nowrap;padding:5px 12px 5px 4px;border-bottom:1px solid #1c1a17}
+                .hm-c{text-align:center;padding:5px 9px;border-bottom:1px solid #1c1a17;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:46px}
+                .hm-0{color:#3f3b35}
+                .hm-tot{text-align:center;padding:5px 11px;color:#FEC52E;font-weight:700;border-bottom:1px solid #1c1a17;border-left:2px solid #272420}
+                .hm-det summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px}
+                .hm-det summary::-webkit-details-marker{display:none}
+                .hm-det summary::before{content:'\\25B6';font-size:.6em;color:#64748b;transition:transform .15s;flex-shrink:0}
+                .hm-det[open] summary::before{transform:rotate(90deg)}
+                .hm-lks{padding:4px 0 4px 16px;white-space:normal}
+                .hm-lk{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:.92em;text-decoration:none;font-variant-numeric:tabular-nums}
+                .hm-lk:hover{text-decoration:underline}
+                .hm-lk-fx{color:#64748b;font-size:.82em}
+                .hm-lk-mais{color:#64748b;font-size:.8em;padding:4px 0 0 2px}
+                .hm-dl-h{border-left:1px solid #272420;min-width:30px}
+                .hm-dl{text-align:center;padding:4px 8px;border-bottom:1px solid #1c1a17;border-left:1px solid #272420}
+                .hm-dlbtn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:18px;border:1px solid #333;border-radius:4px;color:#94a3b8;text-decoration:none;font-size:.8em;background:#17150f;line-height:1}
+                .hm-dlbtn:hover{border-color:#FEC52E;color:#FEC52E}
+                .hm-dlbtn-off{opacity:.28;cursor:not-allowed}
+                </style>
+                """
+                        st.markdown(
+                            _hm_css
+                            + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção. ↓ = baixar os leads da etapa (libere no 🔒 ao lado do título).</p>"
+                            + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
+                            + _hhead + '<th class="hm-c">Total</th><th class="hm-c hm-dl-h">&#8595;</th></tr></thead><tbody>'
+                            + _hrows + "</tbody></table></div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
+                else:
                     st.markdown(
-                        _hm_css
-                        + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção. ↓ = baixar os leads da etapa (libere no 🔒 ao lado do título).</p>"
-                        + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
-                        + _hhead + '<th class="hm-c">Total</th><th class="hm-c hm-dl-h">&#8595;</th></tr></thead><tbody>'
-                        + _hrows + "</tbody></table></div>",
+                        "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
                         unsafe_allow_html=True,
                     )
-                else:
-                    st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
-            else:
-                st.markdown(
-                    "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
-                    unsafe_allow_html=True,
-                )
             
+            _sec2_frag()
+
             # ── 3. Leads Aguardando Desembolso ───────────────────────────────────────────
 
             st.markdown('<div class="sec">3. Leads Aguardando Desembolso</div>', unsafe_allow_html=True)
