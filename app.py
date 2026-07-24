@@ -884,7 +884,6 @@ _MOTIVOS_DET_MERGE = {
     "CBO do cliente está na lista de CBOs bloqueados":                                     "CBO do cliente está na lista de CBOs bloqueados",
     "CBO do cliente está na lista de CBOs bloqueados | O semáforo do CBO é vermelho":      "CBO do cliente está na lista de CBOs bloqueados",
     "O semaforo do CBO é vermelho":                                                        "CBO do cliente está na lista de CBOs bloqueados",
-    "Reprovação Perfil Margem":                                                            "Cadastro Proposta Reprovada",
 }
 
 _RE_BLOQUEADO_DASH = re.compile(r'^Bloqueado pelo Segurado\b')
