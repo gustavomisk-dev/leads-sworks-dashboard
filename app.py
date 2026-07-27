@@ -3477,18 +3477,81 @@ try:
             
             _sec2_frag()
 
-            # ── 3. Leads Aguardando Desembolso ───────────────────────────────────────────
+            # ── 3. Desembolsos por Data de Criação ───────────────────────────────────────
 
-            st.markdown('<div class="sec">3. Leads Aguardando Desembolso</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">3. Desembolsos por Data de Criação</div>', unsafe_allow_html=True)
 
-            _pf = agg.get("pipeline_financeiro", {})
+            _pf = agg.get("pipeline_financeiro", {})   # ainda usado pela seção 5 (Alertas)
             _dup = agg.get("duplicatas_cpf", [])
 
-            html_pf = _html_tabela_pipeline(_pf)
-            if html_pf:
-                st.markdown(html_pf, unsafe_allow_html=True)
-                if n_dias > 1:
-                    st.caption("*Dados do dia mais recente selecionado")
+            # Mesmo padrão do gráfico da seção 1 (Evolução Temporal de Desembolsos), mas
+            # distribui os contratos DESEMBOLSADOS no período pela DATA DE CRIAÇÃO do lead
+            # (não pela data de desembolso). Reaproveita o mesmo `_desemb_det`, já filtrado
+            # por período (data de desembolso) e por Origem.
+            _cr_agg: dict = {}
+            _cr_sem_dc = 0
+            for _det in _desemb_det:
+                _dck = _det.get("data_criacao")
+                if not _dck:
+                    _cr_sem_dc += 1
+                    continue
+                try:
+                    datetime.strptime(str(_dck), "%Y%m%d")
+                except (ValueError, TypeError):
+                    _cr_sem_dc += 1
+                    continue
+                _slot = _cr_agg.setdefault(str(_dck), {"count": 0, "valor": 0.0, "liberado": 0.0})
+                _slot["count"]    += 1
+                _slot["valor"]    += _det.get("valor", 0.0) or 0.0
+                _slot["liberado"] += _det.get("liberado", 0.0) or 0.0
+
+            if not _cr_agg:
+                _msg_ori3 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori3}.")
+            else:
+                _cr_sorted = dict(sorted(_cr_agg.items()))
+                _c_x     = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _cr_sorted]
+                _c_y_val = [round(v["valor"], 2)    for v in _cr_sorted.values()]
+                _c_y_cnt = [v["count"]              for v in _cr_sorted.values()]
+                _c_y_lib = [round(v["liberado"], 2) for v in _cr_sorted.values()]
+                _cr_tot_cnt = sum(_c_y_cnt)
+                _cr_tot_val = sum(_c_y_val)
+                _cap_cr_s = "R$ " + f"{_cr_tot_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                _fig_cr = go.Figure()
+                _fig_cr.add_trace(go.Scatter(
+                    x=_c_x,
+                    y=_c_y_val,
+                    name="Valor Contratado",
+                    mode="lines+markers",
+                    line=dict(color="#10b981", width=2),
+                    marker=dict(size=6, color="#10b981"),
+                    fill="tozeroy",
+                    fillcolor="rgba(16,185,129,0.08)",
+                    customdata=list(zip(_c_y_cnt, _c_y_lib)),
+                    hovertemplate=(
+                        "<b>%{x}</b><br>"
+                        "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
+                        "Contratos: <b>%{customdata[0]}</b><br>"
+                        "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
+                        "<extra></extra>"
+                    ),
+                ))
+                _fig_cr.update_layout(
+                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                    title=dict(text="Evolução Temporal por Data de Criação", font=_TF),
+                    xaxis=dict(title="Data de Criação do Lead", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                    yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
+                    showlegend=False,
+                    margin=dict(t=50, b=40, l=10, r=10),
+                    height=360,
+                    hovermode="x unified",
+                )
+                st.plotly_chart(_fig_cr, use_container_width=True, config=_CONF)
+                _cap_cr = (f"Distribui os {_cr_tot_cnt} contrato(s) desembolsados no período "
+                           f"pela data de criação do lead · {_cap_cr_s}")
+                if _cr_sem_dc:
+                    _cap_cr += f" · {_cr_sem_dc} sem data de criação (ignorado(s))"
+                st.caption(_cap_cr)
 
             # ── 4. Evolução Temporal — Médias por Dia ──────────────────────────────────
 
