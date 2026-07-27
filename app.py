@@ -4002,63 +4002,57 @@ try:
 
             st.markdown('<div class="sec">12. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
-            col_s1, col_s2 = st.columns(2)
             
-            with col_s1:
-                emp_rep = agg.get("top_emp_rep", {})
-                emp_mot = agg.get("emp_motivos", {})
-                if emp_rep:
-                    fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
-                    if _tbl_html:
-                        st.markdown(_tbl_html, unsafe_allow_html=True)
-                else:
-                    st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
+            emp_rep = agg.get("top_emp_rep", {})
+            emp_mot = agg.get("emp_motivos", {})
+            if emp_rep:
+                fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
+                if _tbl_html:
+                    st.markdown(_tbl_html, unsafe_allow_html=True)
+            else:
+                st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
             
-            with col_s2:
-                ufs = agg.get("top_ufs", {})
-                if ufs:
-                    n_ufs = sum(ufs.values())
-                    fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
-                else:
-                    st.info("Sem dados de UF dos reprovados.")
+            ufs = agg.get("top_ufs", {})
+            if ufs:
+                n_ufs = sum(ufs.values())
+                fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+            else:
+                st.info("Sem dados de UF dos reprovados.")
             
-            col_s3, col_s4 = st.columns(2)
             
-            with col_s3:
-                cnaes = agg.get("top_cnaes", {})
-                if cnaes:
-                    n_cnae = sum(cnaes.values())
-                    fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
-                                        pct_base=n_cnae)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
-                else:
-                    st.info("Sem dados de CNAE bloqueado.")
+            cnaes = agg.get("top_cnaes", {})
+            if cnaes:
+                n_cnae = sum(cnaes.values())
+                fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
+                                    pct_base=n_cnae)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+            else:
+                st.info("Sem dados de CNAE bloqueado.")
             
-            with col_s4:
-                cbos_rep = agg.get("top_cbos_rep", {})
-                if cbos_rep:
-                    n_cbo_r = sum(cbos_rep.values())
-                    fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
-                                        pct_base=n_cbo_r)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
-                else:
-                    st.info("Sem dados de CBO dos reprovados.")
+            cbos_rep = agg.get("top_cbos_rep", {})
+            if cbos_rep:
+                n_cbo_r = sum(cbos_rep.values())
+                fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
+                                    pct_base=n_cbo_r)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+            else:
+                st.info("Sem dados de CBO dos reprovados.")
             
             # ── 13. Aprovados — Empregadores e CBOs ──────────────────────────────────────
 
