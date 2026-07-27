@@ -3855,17 +3855,17 @@ try:
     </div>
     """, unsafe_allow_html=True)
 
-            # ── 8. Evolução Temporal ──────────────────────────────────────────────────────
+            # ── 7. Evolução Temporal ──────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">8. Evolução Temporal</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">7. Evolução Temporal</div>', unsafe_allow_html=True)
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             
-            # ── 9. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            # ── 8. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
-            st.markdown('<div class="sec">9. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">8. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
             html_fin = _html_tabela_financeira(fin)
             if html_fin:
@@ -3897,9 +3897,9 @@ try:
                     if fig_taxa:
                         st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
 
-            # ── 10. Etapa de Reprovação ────────────────────────────────────────────────────
+            # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">10. Etapa de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">9. Etapa de Reprovação</div>', unsafe_allow_html=True)
             
             n_rep    = f.get("reprovados", 0)
             etapas_d = agg.get("etapas", {})
@@ -3961,9 +3961,9 @@ try:
             else:
                 st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
-            # ── 11. Motivos de Reprovação ──────────────────────────────────────────────────
+            # ── 10. Motivos de Reprovação ──────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">11. Motivos de Reprovação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">10. Motivos de Reprovação</div>', unsafe_allow_html=True)
             
             col_m1, col_m2 = st.columns(2)
             
@@ -3986,9 +3986,9 @@ try:
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
-            # ── 12. Bloqueios ─────────────────────────────────────────────────────────────
+            # ── 11. Bloqueios ─────────────────────────────────────────────────────────────
 
-            st.markdown('<div class="sec">12. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">11. Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
             fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
             if fig:
@@ -3998,9 +3998,9 @@ try:
             else:
                 st.info("Sem dados de bloqueios.")
             
-            # ── 13. Segmentação — Reprovados ─────────────────────────────────────────────
+            # ── 12. Segmentação — Reprovados ─────────────────────────────────────────────
 
-            st.markdown('<div class="sec">13. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">12. Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             col_s1, col_s2 = st.columns(2)
             
@@ -4060,9 +4060,9 @@ try:
                 else:
                     st.info("Sem dados de CBO dos reprovados.")
             
-            # ── 14. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+            # ── 13. Aprovados — Empregadores e CBOs ──────────────────────────────────────
 
-            st.markdown('<div class="sec">14. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">13. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
             n_ap = f.get("aprovados", 0)
             
@@ -4087,9 +4087,9 @@ try:
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
 
-            # ── 15. Desembolsados no Período — Segmentação ──────────────────────────────
+            # ── 14. Desembolsados no Período — Segmentação ──────────────────────────────
 
-            st.markdown('<div class="sec">15. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">14. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
 
             if not _desemb_det:
                 _msg_ori14 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
