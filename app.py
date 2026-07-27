@@ -379,6 +379,7 @@ def _merge_segmentos(segs: list) -> dict:
     out: dict = {f: {} for f in _flat}
     out["etapa_motivos"] = {}
     out["emp_motivos"] = {}
+    out["emp_motivos_leads"] = {}
     out["emp_ap_stats"] = {}
     out["evolucao_diaria"] = {}
     out["evolucao_horaria"] = {}
@@ -404,6 +405,10 @@ def _merge_segmentos(segs: list) -> dict:
             dst = out["emp_motivos"].setdefault(emp, {})
             for lbl, cnt in mots.items():
                 dst[lbl] = dst.get(lbl, 0) + cnt
+        for emp, mots in seg.get("emp_motivos_leads", {}).items():
+            dst = out["emp_motivos_leads"].setdefault(emp, {})
+            for lbl, cods in mots.items():
+                dst.setdefault(lbl, []).extend(cods)
         for campo, s in seg.get("financeiro", {}).items():
             n = s.get("n", 0)
             if n <= 0:
@@ -487,6 +492,7 @@ def agregar(dias_raw: list) -> dict:
     etapas       = defaultdict(int)
     etapa_motivos = defaultdict(lambda: defaultdict(int))
     emp_motivos   = defaultdict(lambda: defaultdict(int))
+    emp_motivos_leads = defaultdict(lambda: defaultdict(list))
     novo_ctps     = defaultdict(int)
     funil_orig_acc: dict = {}
     origens_all: set = set()
@@ -564,6 +570,9 @@ def agregar(dias_raw: list) -> dict:
         for emp, mots in d.get("emp_motivos", {}).items():
             for label, cnt in mots.items():
                 emp_motivos[emp][label] += cnt
+        for emp, mots in d.get("emp_motivos_leads", {}).items():
+            for label, cods in mots.items():
+                emp_motivos_leads[emp][label].extend(cods)
 
         for k, v in d.get("novo_ctps_status", {}).items():
             novo_ctps[k] += v
@@ -692,6 +701,7 @@ def agregar(dias_raw: list) -> dict:
         "etapas":            dict(etapas),
         "etapa_motivos":     {e: dict(m) for e, m in etapa_motivos.items()},
         "emp_motivos":       {emp: dict(sorted(mots.items(), key=lambda x: -x[1])[:15]) for emp, mots in emp_motivos.items()},
+        "emp_motivos_leads": {emp: dict(m) for emp, m in emp_motivos_leads.items()},
         "emp_ap_stats":      emp_ap_stats_final,
         "taxa_dist":         taxa_dist,
         "valores_contratacao": valores_cont,
@@ -1377,7 +1387,7 @@ def _html_tabela_desemb(items: list, titulo_col: str, n_total: int,
             + '<tbody>' + "".join(rows_html) + '</tbody></table></div>')
 
 
-def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 15) -> str:
+def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, emp_mot_leads: dict, n_rep: int, n: int = 15) -> str:
     """Tabela de empregadores reprovados com <details>/<summary> para motivos (sem JS, sem iframe)."""
     if not emp_rep:
         return ""
@@ -1389,14 +1399,35 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, n_rep: int, n: int = 
         rc   = "g0" if i % 2 == 0 else "g1"
         if mots:
             total_emp = sum(mots.values())
-            mrows = "".join(
-                f'<tr>'
-                f'<td style="font-size:0.78em;color:#94a3b8;padding:2px 8px 2px 0;word-break:break-word">{lbl}</td>'
-                f'<td style="font-size:0.78em;color:#e2e8f0;font-weight:600;text-align:right;white-space:nowrap;padding:2px 0">{v/total_emp*100:.1f}%</td>'
-                f'<td style="font-size:0.78em;color:#64748b;text-align:right;padding:2px 0 2px 10px">{v}</td>'
-                f'</tr>'
-                for lbl, v in sorted(mots.items(), key=lambda x: -x[1])
-            )
+            _leads_by_mot = emp_mot_leads.get(emp, {})
+            _CAP_LK = 200
+            _mrows_list = []
+            for lbl, v in sorted(mots.items(), key=lambda x: -x[1]):
+                _cods = _leads_by_mot.get(lbl, [])
+                if _cods:
+                    _links = "".join(
+                        f'<a href="https://sworks.zilicorp.net/Processo?codigo={_c}" target="_blank" '
+                        f'style="color:#60a5fa;text-decoration:none;margin-right:8px;white-space:nowrap">{_c}</a>'
+                        for _c in _cods[:_CAP_LK]
+                    )
+                    _extra = f'<span style="color:#64748b"> +{len(_cods)-_CAP_LK} mais</span>' if len(_cods) > _CAP_LK else ""
+                    _mot_cell = (
+                        f'<details style="cursor:pointer">'
+                        f'<summary style="list-style:none;display:flex;align-items:center;gap:5px">'
+                        f'<span style="font-size:8px;color:#475569">▶</span><span>{lbl}</span></summary>'
+                        f'<div style="margin:3px 0 4px 12px;line-height:1.9;font-size:0.9em">{_links}{_extra}</div>'
+                        f'</details>'
+                    )
+                else:
+                    _mot_cell = lbl
+                _mrows_list.append(
+                    f'<tr>'
+                    f'<td style="font-size:0.78em;color:#94a3b8;padding:2px 8px 2px 0;word-break:break-word;vertical-align:top">{_mot_cell}</td>'
+                    f'<td style="font-size:0.78em;color:#e2e8f0;font-weight:600;text-align:right;white-space:nowrap;padding:2px 0;vertical-align:top">{v/total_emp*100:.1f}%</td>'
+                    f'<td style="font-size:0.78em;color:#64748b;text-align:right;padding:2px 0 2px 10px;vertical-align:top">{v}</td>'
+                    f'</tr>'
+                )
+            mrows = "".join(_mrows_list)
             name_cell = (
                 f'<details style="cursor:pointer">'
                 f'<summary style="list-style:none;display:flex;align-items:center;gap:6px">'
@@ -4009,7 +4040,7 @@ try:
                 fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, n_rep)
+                _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, agg.get("emp_motivos_leads", {}), n_rep)
                 if _tbl_html:
                     st.markdown(_tbl_html, unsafe_allow_html=True)
             else:
