@@ -2085,9 +2085,9 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
           <div class="kpi-card"><div class="kpi-label">Novos</div>
             <div class="kpi-value">{_nbr(funil.get('novos', 0))}</div><div class="kpi-sub">{_pct(funil.get('novos', 0), funil.get('total', 0))} do total</div></div>
           <div class="kpi-card"><div class="kpi-label">Reprovados</div>
-            <div class="kpi-value" style="color:#ef4444">{_nbr(n_rep)}</div><div class="kpi-sub">{funil.get('taxa_reprovacao', 0):.1f}% dos finalizados</div></div>
+            <div class="kpi-value" style="color:#FEC52E">{_nbr(n_rep)}</div><div class="kpi-sub">{funil.get('taxa_reprovacao', 0):.1f}% dos finalizados</div></div>
           <div class="kpi-card"><div class="kpi-label">Aprovados</div>
-            <div class="kpi-value" style="color:#22c55e">{_nbr(n_ap)}</div><div class="kpi-sub">taxa de aprovação: {_taxa_ap}</div></div>
+            <div class="kpi-value" style="color:#FEC52E">{_nbr(n_ap)}</div><div class="kpi-sub">taxa de aprovação: {_taxa_ap}</div></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2136,7 +2136,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         st.markdown(f"""
         <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
           <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div>
-            <div class="kpi-value" style="color:#22c55e">{_nbr(n_ap)}</div><div class="kpi-sub">leads aprovados</div></div>
+            <div class="kpi-value" style="color:#FEC52E">{_nbr(n_ap)}</div><div class="kpi-sub">leads aprovados</div></div>
           <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div>
             <div class="kpi-value">{_brl(_vol.get('total'))}</div><div class="kpi-sub">valor contratado</div></div>
           <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div>
@@ -2338,26 +2338,24 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
     elif slide == 16:
         _tv_h("Projeção a Desembolsar", periodo)
         _ref_lbl, _pess, _otim = _compute_projecao_live(datas)
-
-        def _cards(nome, d):
-            _comiof = d["valor"]
-            _semiof = d["valor"] - d["iof"]
-            return f"""
-              <div class="kpi-card"><div class="kpi-label">Projeção {nome} de leads</div>
-                <div class="kpi-value">{_nbr(d['count'])}</div><div class="kpi-sub">via Pix {_ref_lbl}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div>
-                <div class="kpi-value" style="color:#FEC52E">{_brl(_comiof)}</div><div class="kpi-sub">cenário {nome}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div>
-                <div class="kpi-value">{_brl(_semiof)}</div><div class="kpi-sub">cenário {nome}</div></div>
-            """
+        _p_com = _pess["valor"]; _p_sem = _pess["valor"] - _pess["iof"]
+        _o_com = _otim["valor"]; _o_sem = _otim["valor"] - _otim["iof"]
         st.markdown(f"""
         <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
-          {_cards("pessimista", _pess)}
-          {_cards("otimista", _otim)}
+          <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads</div>
+            <div class="kpi-value">{_nbr(_pess['count'])}</div><div class="kpi-sub">via Pix {_ref_lbl}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div>
+            <div class="kpi-value" style="color:#FEC52E">{_brl(_p_com)}</div><div class="kpi-sub">cenário pessimista</div></div>
+          <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div>
+            <div class="kpi-value">{_brl(_p_sem)}</div><div class="kpi-sub">cenário pessimista</div></div>
+          <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads</div>
+            <div class="kpi-value">{_nbr(_otim['count'])}</div><div class="kpi-sub">via Pix {_ref_lbl}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div>
+            <div class="kpi-value" style="color:#FEC52E">{_brl(_o_com)}</div><div class="kpi-sub">cenário otimista</div></div>
+          <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div>
+            <div class="kpi-value">{_brl(_o_sem)}</div><div class="kpi-sub">cenário otimista</div></div>
         </div>
-        <p style="color:#64748b;font-size:20px;margin-top:10px">
-          Pessimista = 4 etapas finais da esteira · Otimista = todas as etapas com valor liberado + bloqueio temporário.
-        </p>
+        <p style="color:#64748b;font-size:20px;margin-top:10px">Pessimista = 4 etapas finais da esteira · Otimista = todas as etapas com valor liberado + bloqueio temporário.</p>
         """, unsafe_allow_html=True)
 
     # ═══════════════ D · REPROVAÇÕES ═══════════════
