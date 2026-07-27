@@ -294,7 +294,7 @@ _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=13, color="#94a3b8")
 
-_TV_N_SLIDES   = 17
+_TV_N_SLIDES   = 25
 _TV_INTERVAL_S = 20  # seconds per slide
 
 _TV_CSS = """<style>
@@ -1929,124 +1929,167 @@ def _tv_h(titulo: str, periodo: str = "") -> None:
     )
 
 
+def _build_desemb_det(datas: list, d_ini, d_fim, ori_ativas=None) -> list:
+    """Contratos desembolsados (PaymentDate `pd` no período [d_ini, d_fim]).
+
+    Lê os JSONs dos dias [d_ini-7, d_fim] (lookback de 7 dias — igual ao modo normal,
+    pois cada JSON diário é chaveado pela data de CRIAÇÃO do lead e o desembolso pode
+    ocorrer depois). Aplica o filtro de Origem quando `ori_ativas` for informado.
+    Cada item é o dict `desembolsos_detalhe` (campos: pd, data_criacao, emp, cbo, cnae,
+    uf, origem, valor, liberado, iof, prazo, taxa, parcela)."""
+    _ori_set = set(ori_ativas) if ori_ativas else None
+    _ini = d_ini - timedelta(days=7)
+    out: list = []
+    for _dd in datas:
+        try:
+            _dd_date = datetime.strptime(_dd, "%Y%m%d").date()
+        except (ValueError, TypeError):
+            continue
+        if not (_ini <= _dd_date <= d_fim):
+            continue
+        _dj = carregar_dia(_dd)
+        if not _dj:
+            continue
+        for _det in _dj.get("desembolsos_detalhe", []):
+            _pdk = _det.get("pd")
+            if not _pdk:
+                continue
+            try:
+                _pdk_date = datetime.strptime(str(_pdk), "%Y%m%d").date()
+            except (ValueError, TypeError):
+                continue
+            if not (d_ini <= _pdk_date <= d_fim):
+                continue
+            if _ori_set is not None and (_det.get("origem") or "Outros") not in _ori_set:
+                continue
+            out.append(_det)
+    return out
+
+
+def _compute_projecao_live(datas: list):
+    """(ref_label, pess, otim) para a projeção a desembolsar — mesma lógica do modo normal.
+
+    pess = 4 etapas finais da esteira com liberado>0 (sem BT); otim = todas as etapas
+    com liberado>0 + BLOQUEIO_TEMPORARIO. Cada dict traz count/valor/iof, onde
+    valor = valor contratado (com IOF). Independe do período: usa os últimos 5 dias."""
+    _PROJ_PESS_SET = {"AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO"}
+    _ETAPA_ORD = ["PRE_APROVADO", "SIMULACAO", "FORMALIZACAO", "ASSINATURA", "ASSINADO",
+                  "AVERBACAO_PENDENTE_MANUAL", "ENTREVISTA", "PAGAMENTO", "PENDENTE_DADOS_PAGAMENTO"]
+    _now = datetime.utcnow() - timedelta(hours=3)
+    _ref = _now.date()
+    if _now.weekday() >= 5 or (_now.hour, _now.minute) > (18, 30):
+        _ref += timedelta(days=1)
+        while _ref.weekday() >= 5:
+            _ref += timedelta(days=1)
+    _bt = (carregar_dia(max(datas)) if datas else {}).get("bt_pix_days", {}).get(_ref.strftime("%Y%m%d"), {})
+    _nonbt: dict = {}
+    _today = _now.date()
+    for _d in range(5):
+        _s = (_today - timedelta(days=_d)).strftime("%Y%m%d")
+        if _s not in datas:
+            continue
+        _j = carregar_dia(_s)
+        if not _j:
+            continue
+        for _ts, _v in _j.get("projecao_tipos", {}).items():
+            if _ts == "BLOQUEIO_TEMPORARIO" or _v.get("count", 0) <= 0:
+                continue
+            _a = _nonbt.setdefault(_ts, {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
+            _a["count"]    += _v.get("count", 0)
+            _a["valor"]    += _v.get("valor", 0.0)
+            _a["liberado"] += _v.get("liberado", 0.0)
+            _a["iof"]      += _v.get("iof", 0.0)
+
+    def _libpos(ts):
+        return ((_nonbt.get(ts) or {}).get("liberado") or 0) > 0
+
+    def _acc(etapas, incl_bt):
+        _r = {"count": 0, "valor": 0.0, "iof": 0.0}
+        for ts in etapas:
+            _s = _nonbt.get(ts) or {}
+            _r["count"] += _s.get("count", 0)
+            _r["valor"] += _s.get("valor", 0.0)
+            _r["iof"]   += _s.get("iof", 0.0)
+        if incl_bt and (_bt.get("liberado") or 0) > 0:
+            _r["count"] += _bt.get("count", 0)
+            _r["valor"] += _bt.get("valor", 0.0)
+            _r["iof"]   += _bt.get("iof", 0.0)
+        return _r
+
+    _pess_et = [ts for ts in _ETAPA_ORD if ts in _PROJ_PESS_SET and _libpos(ts)]
+    _otim_et = [ts for ts in _nonbt if _libpos(ts)]
+    return _ref.strftime("%d/%m"), _acc(_pess_et, False), _acc(_otim_et, True)
+
+
 def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
-                     n_dias: int, dias_raw: list, datas_sel: list, periodo: str):
-    # _TV_CSS is emitted once by the caller before invoking this function.
+                     n_dias: int, dias_raw: list, datas_sel: list, periodo: str,
+                     d_ini=None, d_fim=None):
+    # _TV_CSS é emitido uma vez pelo chamador antes de invocar esta função.
     n_rep = funil.get("reprovados", 0)
     n_ap  = funil.get("aprovados", 0)
 
-    # TV font constants — 28px so every label reads comfortably from 3 metres
+    # Fontes TV — grandes o suficiente para leitura a 3 metros
     _TV_TF   = dict(size=28, color="#FEC52E")
     _TV_AF   = dict(size=28, color="#94a3b8")
     _TV_TXT  = dict(size=28, color="rgba(255,255,255,0.92)")
     _TV_YTXT = dict(size=28, color="#cbd5e1")
 
-    taxa     = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
-    vol      = fin.get("ValorContratacao", {})
-    vol_s    = ("R$ " + f"{vol['total']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("total") else "—"
-    # BT live: independente do período — data de referência baseada no horário BRT atual
-    _now_brt_tv  = datetime.utcnow() - timedelta(hours=3)
-    _pix_ab_tv   = _now_brt_tv.weekday() < 5 and (7, 0) <= (_now_brt_tv.hour, _now_brt_tv.minute) <= (18, 30)
-    _data_ref_tv = _now_brt_tv.date()
-    if not _pix_ab_tv:
-        _data_ref_tv += timedelta(days=1)
-        while _data_ref_tv.weekday() >= 5:
-            _data_ref_tv += timedelta(days=1)
-    _ref_str_tv   = _data_ref_tv.strftime("%Y%m%d")
-    _ref_label_tv = _data_ref_tv.strftime("%d/%m")
-    _ultimo_tv    = carregar_dia(max(datas)) if datas else {}
-    _bt_live_tv   = _ultimo_tv.get("bt_pix_days", {}).get(_ref_str_tv, {})
-    # Non-BT live: últimos 5 dias a partir de hoje, independente do período
-    _non_bt_live_tv: dict = {}
-    _today_tv = _now_brt_tv.date()
-    for _d5tv in range(5):
-        _s5tv = (_today_tv - timedelta(days=_d5tv)).strftime("%Y%m%d")
-        if _s5tv not in datas:
-            continue
-        _j5tv = carregar_dia(_s5tv)
-        if not _j5tv:
-            continue
-        for _ts5tv, _v5tv in _j5tv.get("projecao_tipos", {}).items():
-            if _ts5tv == "BLOQUEIO_TEMPORARIO":
-                continue
-            if _v5tv.get("count", 0) > 0:
-                if _ts5tv not in _non_bt_live_tv:
-                    _non_bt_live_tv[_ts5tv] = {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0}
-                _non_bt_live_tv[_ts5tv]["count"]    += _v5tv.get("count", 0)
-                _non_bt_live_tv[_ts5tv]["valor"]    += _v5tv.get("valor", 0.0)
-                _non_bt_live_tv[_ts5tv]["liberado"] += _v5tv.get("liberado", 0.0)
-                _non_bt_live_tv[_ts5tv]["iof"]      += _v5tv.get("iof", 0.0)
-    _proj_count   = sum(d["count"]    for d in _non_bt_live_tv.values()) + _bt_live_tv.get("count", 0)
-    _proj_count_s = f"{_proj_count:,}".replace(",", ".")
-    _proj_valor   = sum(d["valor"]    for ts, d in _non_bt_live_tv.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_tv.get("valor", 0.0)
-    _proj_lib     = sum(d["liberado"] for ts, d in _non_bt_live_tv.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_tv.get("liberado", 0.0)
-    _proj_iof_tv  = sum(d["iof"]      for ts, d in _non_bt_live_tv.items() if ts not in {"PRE_APROVADO", "ASSINATURA"}) + _bt_live_tv.get("iof", 0.0)
-    if _proj_valor:
-        _proj_val_fmt_tv = ("R$ " + f"{_proj_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_lib_fmt_tv = ("R$ " + f"{_proj_lib:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_iof_fmt_tv = ("R$ " + f"{_proj_iof_tv:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-        _proj_sub = (
-            f"<span style='color:#64748b;font-size:0.82em'>"
-            f"Lib. {_proj_lib_fmt_tv} · IOF {_proj_iof_fmt_tv}"
-            "</span>"
-        )
-    else:
-        _proj_val_fmt_tv = "—"
-        _proj_sub = ""
-    _prazo_d   = fin.get("Prazo", {})
-    _taxa_d    = fin.get("Taxa", {})
-    _parcela_d = fin.get("ValorParcela", {})
-    prazo_s   = f"{_prazo_d['media']:.0f} parcelas"  if _prazo_d.get("media") else "—"
-    ticket_s  = ("R$ " + f"{vol['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if vol.get("media") else "—"
-    parcela_s = ("R$ " + f"{_parcela_d['media']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if _parcela_d.get("media") else "—"
-    taxa_s    = f"{_taxa_d['media']:.2f}".replace(".", ",") + "% a.m." if _taxa_d.get("media") else "—"
-    _total_fmt = _nbr(funil["total"])
-    _aprov_fmt = _nbr(funil["aprovados"])
-    _term_fmt  = _nbr(funil["terminais"])
-    _repro_fmt = _nbr(funil["reprovados"])
-    _ag_fmt    = _nbr(_proj_count)
-    _ncs_tv       = agg.get("novo_ctps_status", {})
-    _ctps_antes_tv   = _ncs_tv.get("ctps_antes", 0)
-    _ctps_apos_tv    = _ncs_tv.get("ctps_apos", 0)
-    _ctps_outros_tv  = _ncs_tv.get("ctps_outros_status", 0)
-    _ctps_bot_tv     = _ctps_apos_tv + _ctps_outros_tv
-    _kpi_html = f"""
-    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card"><div class="kpi-label">Total de leads</div>
-        <div class="kpi-value">{_total_fmt}</div><div class="kpi-sub">{periodo}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Aprovados</div>
-        <div class="kpi-value">{_aprov_fmt}</div><div class="kpi-sub">taxa: {taxa}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Reprovados</div>
-        <div class="kpi-value">{_repro_fmt}</div>
-        <div class="kpi-sub">{funil['taxa_reprovacao']:.1f}% dos finalizados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Volume aprovado</div>
-        <div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado</div></div>
-    </div>
-    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card"><div class="kpi-label">Ticket médio do empréstimo</div>
-        <div class="kpi-value">{ticket_s}</div><div class="kpi-sub">valor contratado</div></div>
-      <div class="kpi-card"><div class="kpi-label">Ticket médio da parcela</div>
-        <div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-      <div class="kpi-card"><div class="kpi-label">Taxa média</div>
-        <div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Número de Parcelas Médio</div>
-        <div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
-    </div>
-    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi-card"><div class="kpi-label">Projeção de Leads a Desembolsar</div>
-        <div class="kpi-value">{_ag_fmt}</div><div class="kpi-sub">Pix {_ref_label_tv}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Projeção de Desembolso</div>
-        <div class="kpi-value" style="color:#FEC52E">{_proj_val_fmt_tv}</div><div class="kpi-sub">Pix {_ref_label_tv} · {_proj_sub}</div></div>
-      <div class="kpi-card"><div class="kpi-label">CTPS — Aguardando clique</div>
-        <div class="kpi-value">{_nbr(_ctps_antes_tv)}</div><div class="kpi-sub">Novos sem DataHoraInicio</div></div>
-      <div class="kpi-card"><div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
-        <div class="kpi-value">{_nbr(_ctps_bot_tv)}</div><div class="kpi-sub">{_nbr(_ctps_outros_tv)} em outros status</div></div>
-    </div>
-    """
+    def _brl(x):
+        return ("R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if x else "—"
 
+    def _pct(a, b):
+        return f"{100*a/b:.1f}%" if b else "—"
+
+    def _tv_bar(fig, h=620, r=120):
+        """Aplica o layout TV a um gráfico de barras horizontais e o plota. False se vazio."""
+        if not fig:
+            return False
+        fig.update_traces(textfont=_TV_TXT)
+        fig.update_layout(
+            height=h, title=dict(text=""),
+            xaxis=dict(tickfont=_TV_AF),
+            yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+            margin=dict(t=10, b=20, l=20, r=r),
+        )
+        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        return True
+
+    def _tv_line_valor(x, yval, ycnt, ylib, xtitle):
+        fig = go.Figure(go.Scatter(
+            x=x, y=yval, mode="lines+markers",
+            line=dict(color="#10b981", width=3), marker=dict(size=9, color="#10b981"),
+            fill="tozeroy", fillcolor="rgba(16,185,129,0.10)",
+            customdata=list(zip(ycnt, ylib)),
+            hovertemplate=("<b>%{x}</b><br>Contratado: <b>R$ %{y:,.2f}</b><br>"
+                           "Contratos: <b>%{customdata[0]}</b><br>"
+                           "Liberado: <b>R$ %{customdata[1]:,.2f}</b><extra></extra>"),
+        ))
+        fig.update_layout(
+            template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG, height=640,
+            separators=",.", title=dict(text=""),
+            xaxis=dict(title=dict(text=xtitle, font=_TV_AF), tickfont=_TV_AF, showgrid=True, gridcolor=_GRID),
+            yaxis=dict(title=dict(text="Valor (R$)", font=_TV_AF), tickfont=_TV_AF, showgrid=True,
+                       gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
+            margin=dict(t=20, b=50, l=10, r=20), hovermode="x unified",
+        )
+        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    # ═══════════════ A · VISÃO GERAL ═══════════════
     if slide == 0:
-        _tv_h("KPIs", periodo)
-        st.markdown(_kpi_html, unsafe_allow_html=True)
+        _tv_h("Visão Geral — Funil de Leads", periodo)
+        _taxa_ap = f"{funil['taxa_aprovacao']:.1f}%" if funil.get("terminais") else "—"
+        st.markdown(f"""
+        <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi-card"><div class="kpi-label">Total de leads</div>
+            <div class="kpi-value">{_nbr(funil.get('total', 0))}</div><div class="kpi-sub">{periodo}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Novos</div>
+            <div class="kpi-value">{_nbr(funil.get('novos', 0))}</div><div class="kpi-sub">{_pct(funil.get('novos', 0), funil.get('total', 0))} do total</div></div>
+          <div class="kpi-card"><div class="kpi-label">Reprovados</div>
+            <div class="kpi-value" style="color:#ef4444">{_nbr(n_rep)}</div><div class="kpi-sub">{funil.get('taxa_reprovacao', 0):.1f}% dos finalizados</div></div>
+          <div class="kpi-card"><div class="kpi-label">Aprovados</div>
+            <div class="kpi-value" style="color:#22c55e">{_nbr(n_ap)}</div><div class="kpi-sub">taxa de aprovação: {_taxa_ap}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
 
     elif slide == 1:
         _tv_h("Distribuição por Status", periodo)
@@ -2054,311 +2097,347 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         if fig:
             fig.update_traces(textfont=dict(size=27))
             fig.update_annotations(font_size=30)
-            fig.update_layout(
-                height=560,
-                legend=dict(font=dict(size=30, color="#94a3b8")),
-            )
+            fig.update_layout(height=620, legend=dict(font=dict(size=30, color="#94a3b8")))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        else:
+            st.info("Sem dados de status.")
 
     elif slide == 2:
         _tv_h("Funil de Conversão", periodo)
         fig = _fig_funil_rico(funil)
         if fig:
-            fig.update_traces(
-                textfont=dict(size=32, color="#e2e8f0"),
-                texttemplate="%{value:,}  %{percentInitial:.1%}",
-            )
-            fig.update_layout(
-                height=560,
-                title=dict(text=""),
-                xaxis=dict(tickfont=_TV_AF),
-                yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                margin=dict(t=10, b=20, l=250, r=40),
-            )
+            fig.update_traces(textfont=dict(size=32, color="#e2e8f0"),
+                              texttemplate="%{value:,}  %{percentInitial:.1%}")
+            fig.update_layout(height=620, title=dict(text=""),
+                xaxis=dict(tickfont=_TV_AF), yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                margin=dict(t=10, b=20, l=250, r=40))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
     elif slide == 3:
-        _tv_h("Estatísticas Financeiras dos Aprovados", periodo)
+        _tv_h("Evolução Temporal — Leads por Status", periodo)
+        fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
+        if fig:
+            fig.update_layout(height=620, title=dict(text=""),
+                margin=dict(t=120, b=20, l=10, r=20),
+                xaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
+                yaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
+                legend=dict(orientation="h", x=0.5, y=1.07, xanchor="center", yanchor="bottom",
+                    bgcolor="rgba(15,14,11,0.88)", bordercolor="rgba(255,255,255,0.10)",
+                    borderwidth=1, font=dict(size=34, color="#94a3b8")))
+            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+    # ═══════════════ B · APROVADOS ═══════════════
+    elif slide == 4:
+        _tv_h("Aprovados — Indicadores Financeiros", periodo)
+        _vol = fin.get("ValorContratacao", {}); _lib = fin.get("ValorLiquido", {})
+        _prz = fin.get("Prazo", {}); _tx = fin.get("Taxa", {}); _pc = fin.get("ValorParcela", {})
+        _taxa_txt = (f"{_tx['media']:.2f}".replace('.', ',') + "% a.m.") if _tx.get("media") else "—"
+        _prz_txt  = f"{_prz['media']:.0f}" if _prz.get("media") else "—"
+        st.markdown(f"""
+        <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div>
+            <div class="kpi-value" style="color:#22c55e">{_nbr(n_ap)}</div><div class="kpi-sub">leads aprovados</div></div>
+          <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div>
+            <div class="kpi-value">{_brl(_vol.get('total'))}</div><div class="kpi-sub">valor contratado</div></div>
+          <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div>
+            <div class="kpi-value">{_brl(_lib.get('total'))}</div><div class="kpi-sub">recebido pelo cliente</div></div>
+          <div class="kpi-card"><div class="kpi-label">Ticket contratado</div>
+            <div class="kpi-value">{_brl(_vol.get('media'))}</div><div class="kpi-sub">por contrato</div></div>
+        </div>
+        <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi-card"><div class="kpi-label">Ticket liberado</div>
+            <div class="kpi-value">{_brl(_lib.get('media'))}</div><div class="kpi-sub">por contrato</div></div>
+          <div class="kpi-card"><div class="kpi-label">Valor da parcela</div>
+            <div class="kpi-value">{_brl(_pc.get('media'))}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+          <div class="kpi-card"><div class="kpi-label">Taxa mensal</div>
+            <div class="kpi-value">{_taxa_txt}</div><div class="kpi-sub">pond. pelo nº de parcelas</div></div>
+          <div class="kpi-card"><div class="kpi-label">Nº de parcelas</div>
+            <div class="kpi-value">{_prz_txt}</div><div class="kpi-sub">média</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    elif slide == 5:
+        _tv_h("Aprovados — Estatísticas Financeiras", periodo)
         html = _html_tabela_financeira(fin)
         if html:
             st.markdown(html, unsafe_allow_html=True)
         else:
             st.info("Sem dados financeiros.")
 
-    elif slide == 4:
-        _tv_h("Distribuição do Valor Contratado — Aprovados", periodo)
+    elif slide == 6:
+        _tv_h("Aprovados — Distribuição do Valor Contratado", periodo)
         fig = _fig_histograma(agg.get("valores_contratacao", []))
         if fig:
             fig.update_annotations(font_size=25)
-            fig.update_layout(
-                height=680,
-                title=dict(text="", font=_TV_TF),
-                xaxis=dict(title=dict(text="Valor (R$)", font=_TV_AF),
-                           tickformat=",.0f", tickfont=_TV_AF),
+            fig.update_layout(height=680, title=dict(text=""),
+                xaxis=dict(title=dict(text="Valor (R$)", font=_TV_AF), tickformat=",.0f", tickfont=_TV_AF),
                 yaxis=dict(title=dict(text="Contratos", font=_TV_AF), tickfont=_TV_AF),
-                margin=dict(t=10, b=40, l=10, r=10),
-            )
+                margin=dict(t=10, b=40, l=10, r=10))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de distribuição.")
 
-    elif slide == 5:
-        _tv_h("Etapas de Reprovação — Visão geral", periodo)
-        etapas_d = agg.get("etapas", {})
-        if etapas_d and n_rep > 0:
-            _order_idx_tv = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
-            _ordered_tv = sorted(
-                [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
-                key=lambda x: _order_idx_tv.get(x[0], 999),
-            )
-            _max_v_tv = max(v for _, v in _ordered_tv) if _ordered_tv else 1
-            _y_tv  = [e for e, _ in reversed(_ordered_tv)]
-            _x_tv  = [v for _, v in reversed(_ordered_tv)]
-            _ps_tv = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in _ordered_tv])]
-            _sh_tv = [f"rgba(96,165,250,{0.40 + 0.55*(v/_max_v_tv):.2f})" for v in _x_tv]
-            fig_d = go.Figure(go.Bar(
-                x=_x_tv, y=_y_tv, orientation="h",
-                marker=dict(color=_sh_tv, line=dict(color="#0d0c0a", width=0.5)),
-                text=[f"{_nbr(v)} ({p})" for v, p in zip(_x_tv, _ps_tv)],
-                textposition="auto",
-                insidetextanchor="end",
-                cliponaxis=False,
-                textfont=dict(size=13, color="#cbd5e1"),
-                hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
-            ))
-            fig_d.update_layout(
-                template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                title=dict(text=""),
-                xaxis=dict(title="Ocorrências", tickfont=_TV_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-                yaxis=dict(tickfont=_TV_YTXT, automargin=True, zeroline=False),
-                margin=dict(t=10, b=30, l=20, r=160), height=580,
-            )
-            st.plotly_chart(fig_d, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de etapas.")
+    elif slide == 7:
+        _tv_h("Aprovados — Top Empregadores", periodo)
+        if not _tv_bar(_fig_barras_h(agg.get("top_empregadores", {}), "", "#22c55e", pct_base=n_ap)):
+            st.info("Sem dados de empregadores.")
 
-    elif slide == 6:
-        _tv_h("Etapas de Reprovação — Visão de Funil", periodo)
+    elif slide == 8:
+        _tv_h("Aprovados — Top CBOs", periodo)
+        if not _tv_bar(_fig_barras_h(_sem_codigo(agg.get("top_cbos", {})), "", "#3b82f6", pct_base=n_ap), r=55):
+            st.info("Sem dados de CBOs.")
+
+    # ═══════════════ C · DESEMBOLSOS ═══════════════
+    elif slide == 9:
+        _tv_h("Desembolsos no Período", periodo)
+        _dd = _build_desemb_det(datas, d_ini, d_fim)
+        if not _dd:
+            st.info("Sem contratos desembolsados no período.")
+        else:
+            _n = len(_dd)
+            _tot_val = sum((r.get("valor", 0.0) or 0.0) for r in _dd)
+            _tot_lib = sum((r.get("liberado", 0.0) or 0.0) for r in _dd)
+            _tot_iof = sum((r.get("iof", 0.0) or 0.0) for r in _dd)
+            _txpz = [(r["taxa"], r["prazo"]) for r in _dd if r.get("taxa") and r.get("prazo")]
+            _pcpz = [(r["parcela"], r["prazo"]) for r in _dd if r.get("parcela") and r.get("prazo")]
+            _przs = [r["prazo"] for r in _dd if r.get("prazo")]
+            _tx_m = (sum(t * z for t, z in _txpz) / sum(z for _, z in _txpz)) if _txpz else None
+            _pc_m = (sum(p * z for p, z in _pcpz) / sum(z for _, z in _pcpz)) if _pcpz else None
+            _prz_m = (sum(_przs) / len(_przs)) if _przs else None
+            _tk = (_tot_val / _n) if _n else 0
+            _taxa_txt = (f"{_tx_m:.2f}".replace('.', ',') + "% a.m.") if _tx_m else "—"
+            _prz_txt  = f"{_prz_m:.0f}" if _prz_m else "—"
+            st.markdown(f"""
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div>
+                <div class="kpi-value" style="color:#FEC52E">{_nbr(_n)}</div><div class="kpi-sub">{periodo}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div>
+                <div class="kpi-value" style="color:#FEC52E">{_brl(_tot_val)}</div><div class="kpi-sub">valor do empréstimo</div></div>
+              <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div>
+                <div class="kpi-value" style="color:#FEC52E">{_brl(_tot_lib)}</div><div class="kpi-sub">recebido pelo cliente</div></div>
+              <div class="kpi-card"><div class="kpi-label">IOF total</div>
+                <div class="kpi-value">{_brl(_tot_iof)}</div><div class="kpi-sub">soma do período</div></div>
+            </div>
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Ticket contratado</div>
+                <div class="kpi-value">{_brl(_tk)}</div><div class="kpi-sub">por contrato</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor da parcela</div>
+                <div class="kpi-value">{_brl(_pc_m)}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa mensal</div>
+                <div class="kpi-value">{_taxa_txt}</div><div class="kpi-sub">pond. pelo nº de parcelas</div></div>
+              <div class="kpi-card"><div class="kpi-label">Nº de parcelas</div>
+                <div class="kpi-value">{_prz_txt}</div><div class="kpi-sub">média</div></div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    elif slide == 10:
+        _tv_h("Evolução Temporal de Desembolsos", periodo)
+        _dd = _build_desemb_det(datas, d_ini, d_fim)
+        _acc: dict = {}
+        for r in _dd:
+            k = r.get("pd")
+            if not k:
+                continue
+            a = _acc.setdefault(k, {"count": 0, "valor": 0.0, "lib": 0.0})
+            a["count"] += 1; a["valor"] += r.get("valor", 0.0) or 0; a["lib"] += r.get("liberado", 0.0) or 0
+        if not _acc:
+            st.info("Sem contratos desembolsados no período.")
+        else:
+            ks = sorted(_acc)
+            _tv_line_valor(
+                [datetime.strptime(k, "%Y%m%d").strftime("%d/%m") for k in ks],
+                [round(_acc[k]["valor"], 2) for k in ks],
+                [_acc[k]["count"] for k in ks],
+                [round(_acc[k]["lib"], 2) for k in ks],
+                "Data de Desembolso")
+
+    elif slide == 11:
+        _tv_h("Desembolsos por Data de Criação do Lead", periodo)
+        _dd = _build_desemb_det(datas, d_ini, d_fim)
+        _acc: dict = {}
+        for r in _dd:
+            k = r.get("data_criacao")
+            if not k:
+                continue
+            try:
+                datetime.strptime(str(k), "%Y%m%d")
+            except (ValueError, TypeError):
+                continue
+            a = _acc.setdefault(str(k), {"count": 0, "valor": 0.0, "lib": 0.0})
+            a["count"] += 1; a["valor"] += r.get("valor", 0.0) or 0; a["lib"] += r.get("liberado", 0.0) or 0
+        if not _acc:
+            st.info("Sem contratos desembolsados no período.")
+        else:
+            ks = sorted(_acc)
+            _tv_line_valor(
+                [datetime.strptime(k, "%Y%m%d").strftime("%d/%m") for k in ks],
+                [round(_acc[k]["valor"], 2) for k in ks],
+                [_acc[k]["count"] for k in ks],
+                [round(_acc[k]["lib"], 2) for k in ks],
+                "Data de Criação do Lead")
+
+    elif slide in (12, 13, 14, 15):
+        _dd = _build_desemb_det(datas, d_ini, d_fim)
+        _n = len(_dd)
+        _seg = {"emp": {}, "cbo": {}, "cnae": {}, "ori": {}, "uf": {}}
+        for r in _dd:
+            for key, field in (("emp", "emp"), ("cbo", "cbo"), ("cnae", "cnae"), ("ori", "origem"), ("uf", "uf")):
+                k = r.get(field)
+                if not k:
+                    continue
+                a = _seg[key].setdefault(k, {"n": 0, "valor": 0.0, "liberado": 0.0})
+                a["n"] += 1; a["valor"] += r.get("valor", 0.0) or 0; a["liberado"] += r.get("liberado", 0.0) or 0
+
+        def _it(m, by):
+            return [{"label": k, "n": v["n"], "valor": v["valor"], "liberado": v["liberado"]}
+                    for k, v in sorted(m.items(), key=lambda x: -x[1][by])]
+
+        def _trunc(s, m=42):
+            s = str(s)
+            return s if len(s) <= m else s[:m - 1].rstrip() + "…"
+
+        if slide == 12:
+            _tv_h("Desembolsados — Top Empregadores (R$ contratado)", periodo)
+            if not _dd:
+                st.info("Sem contratos desembolsados no período.")
+            else:
+                _chart: dict = {}
+                for it in _it(_seg["emp"], "valor")[:12]:
+                    kk = _trunc(it["label"])
+                    _chart[kk] = _chart.get(kk, 0.0) + it["valor"]
+                fig = _fig_barras_reais(_chart, "", "#FEC52E")
+                if fig:
+                    fig.update_traces(textfont=_TV_TXT)
+                    fig.update_layout(height=680, title=dict(text=""),
+                        xaxis=dict(tickfont=_TV_AF), yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                        margin=dict(t=10, b=20, l=20, r=200))
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        elif slide == 13:
+            _tv_h("Desembolsados — Top CBOs", periodo)
+            if not _tv_bar(_fig_barras_h(_sem_codigo({it["label"]: it["n"] for it in _it(_seg["cbo"], "n")}),
+                                         "", "#3b82f6", pct_base=_n, show_abs=True), r=55):
+                st.info("Sem contratos desembolsados no período.")
+        elif slide == 14:
+            _tv_h("Desembolsados — Top CNAEs", periodo)
+            if not _tv_bar(_fig_barras_h(_sem_codigo({it["label"]: it["n"] for it in _it(_seg["cnae"], "n")}),
+                                         "", "#a855f7", pct_base=_n, show_abs=True), r=55):
+                st.info("Sem contratos desembolsados no período.")
+        else:  # slide 15
+            _tv_h("Desembolsados — Por Origem e UF", periodo)
+            if not _dd:
+                st.info("Sem contratos desembolsados no período.")
+            else:
+                _c1, _c2 = st.columns(2)
+                with _c1:
+                    _tv_bar(_fig_barras_h({it["label"]: it["n"] for it in _it(_seg["ori"], "n")},
+                                          "", "#f59e0b", pct_base=_n, show_abs=True, text_auto=True), h=560, r=110)
+                with _c2:
+                    _tv_bar(_fig_barras_h({it["label"]: it["n"] for it in _it(_seg["uf"], "n")},
+                                          "", "#06b6d4", n=27, pct_base=_n, show_abs=True), h=560, r=70)
+
+    elif slide == 16:
+        _tv_h("Projeção a Desembolsar", periodo)
+        _ref_lbl, _pess, _otim = _compute_projecao_live(datas)
+
+        def _cards(nome, d):
+            _comiof = d["valor"]
+            _semiof = d["valor"] - d["iof"]
+            return f"""
+              <div class="kpi-card"><div class="kpi-label">Projeção {nome} de leads</div>
+                <div class="kpi-value">{_nbr(d['count'])}</div><div class="kpi-sub">via Pix {_ref_lbl}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div>
+                <div class="kpi-value" style="color:#FEC52E">{_brl(_comiof)}</div><div class="kpi-sub">cenário {nome}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div>
+                <div class="kpi-value">{_brl(_semiof)}</div><div class="kpi-sub">cenário {nome}</div></div>
+            """
+        st.markdown(f"""
+        <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+          {_cards("pessimista", _pess)}
+          {_cards("otimista", _otim)}
+        </div>
+        <p style="color:#64748b;font-size:20px;margin-top:10px">
+          Pessimista = 4 etapas finais da esteira · Otimista = todas as etapas com valor liberado + bloqueio temporário.
+        </p>
+        """, unsafe_allow_html=True)
+
+    # ═══════════════ D · REPROVAÇÕES ═══════════════
+    elif slide == 17:
+        _tv_h("Etapas de Reprovação — Funil", periodo)
         etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
             result_f = _fig_funil_etapa(etapas_d, n_rep)
             if result_f:
                 fig_f, _ = result_f
-                fig_f.update_traces(
-                    textfont=dict(size=40, color="rgba(255,255,255,0.92)"),
-                    selector=dict(type="bar"),
-                )
-                fig_f.update_layout(
-                    height=580,
-                    title=dict(text=""),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    legend=dict(
-                        orientation="v", x=0.82, y=0.04,
-                        xanchor="left", yanchor="bottom",
-                        bgcolor="rgba(15,14,11,0.85)",
-                        bordercolor="rgba(255,255,255,0.08)",
-                        borderwidth=1,
-                        font=dict(size=28),
-                    ),
-                    margin=dict(t=10, b=20, l=20, r=40),
-                )
+                fig_f.update_traces(textfont=dict(size=40, color="rgba(255,255,255,0.92)"),
+                                    selector=dict(type="bar"))
+                fig_f.update_layout(height=620, title=dict(text=""),
+                    xaxis=dict(tickfont=_TV_AF), yaxis=dict(tickfont=_TV_YTXT, automargin=True),
+                    legend=dict(orientation="v", x=0.82, y=0.04, xanchor="left", yanchor="bottom",
+                        bgcolor="rgba(15,14,11,0.85)", bordercolor="rgba(255,255,255,0.08)",
+                        borderwidth=1, font=dict(size=28)),
+                    margin=dict(t=10, b=20, l=20, r=40))
                 st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
-    elif slide == 7:
+    elif slide == 18:
         _tv_h("Motivos de Reprovação — Alto Nível", periodo)
-        mot = agg.get("top_motivos", {})
-        fig = _fig_barras_h(mot, "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
-        if fig:
-            fig.update_traces(textfont=_TV_TXT)
-            fig.update_layout(
-                uniformtext_minsize=25, uniformtext_mode="show",
-                height=620,
-                title=dict(text="", font=_TV_TF),
-                xaxis=dict(tickfont=_TV_AF),
-                yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                margin=dict(t=10, b=20, l=20, r=120),
-            )
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
+        if not _tv_bar(_fig_barras_h(agg.get("top_motivos", {}), "", "#ef4444", pct_base=n_rep)):
             st.info("Sem dados de motivos.")
 
-    elif slide == 8:
+    elif slide == 19:
         _tv_h("Motivos de Reprovação — Detalhado", periodo)
         mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
         if mot_det:
-            n_det = sum(mot_det.values())
-            fig = _fig_barras_h(mot_det, "Motivo Detalhado", "#f97316", pct_base=n_det)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=120),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            _tv_bar(_fig_barras_h(mot_det, "", "#f97316", pct_base=sum(mot_det.values())))
         else:
             st.info("Sem dados de motivos detalhados.")
 
-    elif slide == 9:
+    elif slide == 20:
         _tv_h("Leads com Bloqueio por Tipo", periodo)
         fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
         if fig:
             fig.update_traces(textfont=dict(size=28, color="#e2e8f0"))
-            fig.update_layout(
-                height=520,
-                title=dict(text=""),
-                xaxis=dict(tickfont=dict(size=28, color="#cbd5e1")),
-                yaxis=dict(tickfont=_TV_AF),
-                margin=dict(t=10, b=40, l=80, r=80),
-            )
+            fig.update_layout(height=560, title=dict(text=""),
+                xaxis=dict(tickfont=dict(size=28, color="#cbd5e1")), yaxis=dict(tickfont=_TV_AF),
+                margin=dict(t=10, b=40, l=80, r=80))
             st.plotly_chart(fig, use_container_width=True, config=_CONF)
         else:
             st.info("Sem dados de bloqueios.")
 
-    elif slide == 10:
+    elif slide == 21:
         _tv_h("Top Empregadores dos Reprovados", periodo)
-        emp_rep = agg.get("top_emp_rep", {})
-        if emp_rep:
-            fig = _fig_barras_h(emp_rep, "Top Empregadores (Reprovados)", "#ef4444", pct_base=n_rep, show_pct=False)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT, textangle=0)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=120),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
+        if not _tv_bar(_fig_barras_h(agg.get("top_emp_rep", {}), "", "#ef4444", pct_base=n_rep, show_pct=False)):
             st.info("Sem dados de empregadores dos reprovados.")
 
-    elif slide == 11:
+    elif slide == 22:
+        _tv_h("CNAEs Bloqueados dos Reprovados", periodo)
+        cnaes = agg.get("top_cnaes", {})
+        if cnaes:
+            _tv_bar(_fig_barras_h(_sem_codigo(cnaes), "", "#eab308", pct_base=sum(cnaes.values()), show_abs=True), r=55)
+        else:
+            st.info("Sem dados de CNAE bloqueado.")
+
+    elif slide == 23:
+        _tv_h("CBOs Bloqueados dos Reprovados", periodo)
+        cbos_rep = agg.get("top_cbos_rep", {})
+        if cbos_rep:
+            _tv_bar(_fig_barras_h(_sem_codigo(cbos_rep), "", "#a855f7", pct_base=sum(cbos_rep.values()), show_abs=True), r=55)
+        else:
+            st.info("Sem dados de CBO dos reprovados.")
+
+    elif slide == 24:
         _tv_h("UF dos Reprovados", periodo)
         ufs = agg.get("top_ufs", {})
         if ufs:
             fig = _fig_mapa_ufs(ufs)
             if fig:
-                fig.update_layout(height=750)
+                fig.update_layout(height=760)
                 st.plotly_chart(fig, use_container_width=True, config=_CONF)
             else:
-                n_ufs = sum(ufs.values())
-                fig2 = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", n=27, pct_base=n_ufs)
-                if fig2:
-                    fig2.update_traces(textfont=_TV_TXT)
-                    fig2.update_layout(
-                        height=620,
-                        title=dict(text="", font=_TV_TF),
-                        xaxis=dict(tickfont=_TV_AF),
-                        yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                        margin=dict(t=10, b=20, l=20, r=120),
-                    )
-                    st.plotly_chart(fig2, use_container_width=True, config=_CONF)
+                _tv_bar(_fig_barras_h(ufs, "", "#3b82f6", n=27, pct_base=sum(ufs.values())))
         else:
             st.info("Sem dados de UF.")
-
-    elif slide == 12:
-        _tv_h("CNAEs Bloqueados dos Reprovados", periodo)
-        cnaes = agg.get("top_cnaes", {})
-        if cnaes:
-            n_cnae = sum(cnaes.values())
-            fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados", "#eab308",
-                                pct_base=n_cnae, show_abs=True)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=55),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de CNAE bloqueado.")
-
-    elif slide == 13:
-        _tv_h("CBOs Bloqueados dos Reprovados", periodo)
-        cbos_rep = agg.get("top_cbos_rep", {})
-        if cbos_rep:
-            n_cbo_r = sum(cbos_rep.values())
-            fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados", "#a855f7",
-                                pct_base=n_cbo_r, show_abs=True)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=55),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de CBO dos reprovados.")
-
-    elif slide == 14:
-        _tv_h("Top Empregadores dos Aprovados", periodo)
-        emp_ap = agg.get("top_empregadores", {})
-        if emp_ap:
-            fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=120),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de empregadores dos aprovados.")
-
-    elif slide == 15:
-        _tv_h("Evolução Temporal", periodo)
-        fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
-        if fig:
-            fig.update_layout(
-                height=620,
-                title=dict(text=""),
-                margin=dict(t=120, b=20, l=10, r=20),
-                xaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
-                yaxis=dict(tickfont=_TV_AF, title=dict(font=_TV_AF)),
-                legend=dict(
-                    orientation="h",
-                    x=0.5, y=1.07,
-                    xanchor="center", yanchor="bottom",
-                    bgcolor="rgba(15,14,11,0.88)",
-                    bordercolor="rgba(255,255,255,0.10)",
-                    borderwidth=1,
-                    font=dict(size=34, color="#94a3b8"),
-                ),
-            )
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
-
-    elif slide == 16:
-        _tv_h("Top CBOs dos Aprovados", periodo)
-        cbos_ap = agg.get("top_cbos", {})
-        if cbos_ap:
-            fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
-            if fig:
-                fig.update_traces(textfont=_TV_TXT)
-                fig.update_layout(
-                    height=620,
-                    title=dict(text="", font=_TV_TF),
-                    xaxis=dict(tickfont=_TV_AF),
-                    yaxis=dict(tickfont=_TV_YTXT, automargin=True),
-                    margin=dict(t=10, b=20, l=20, r=55),
-                )
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
-        else:
-            st.info("Sem dados de CBO dos aprovados.")
 
     _tv_nav(slide)
 
@@ -2576,6 +2655,7 @@ try:
         _render_tv_slide(
             _tv_slide, _agg_tv, _agg_tv["funil"], _agg_tv["financeiro"],
             len(_datas_sel_tv), _dias_raw_tv, _datas_sel_tv, _periodo_tv,
+            _d_ini_tv, data_max,
         )
         _tv_now = time.time()
         if st.session_state.get("tv_slide_at_start") != _tv_slide:
