@@ -427,12 +427,15 @@ def _merge_segmentos(segs: list) -> dict:
             ed = out["emp_ap_stats"].setdefault(emp, {
                 "n": 0, "n_tempo": 0, "sum_tempo": 0.0, "n_renda": 0, "sum_renda": 0.0,
                 "n_valor": 0, "sum_valor": 0.0, "n_prazo": 0, "sum_prazo": 0.0,
-                "n_taxa": 0, "sum_taxa": 0.0, "num_funcionarios": None,
+                "n_taxa": 0, "sum_taxa": 0.0, "sum_taxa_prazo": 0.0, "weight_prazo_taxa": 0.0,
+                "num_funcionarios": None,
                 "faturamento": None, "dividas_ativas": None, "capital_social": None})
             ed["n"] += s.get("n", 0)
             for c in ("tempo", "renda", "valor", "prazo", "taxa"):
                 ed[f"n_{c}"]   += s.get(f"n_{c}", 0)
                 ed[f"sum_{c}"] += s.get(f"sum_{c}", 0.0)
+            ed["sum_taxa_prazo"]    += s.get("sum_taxa_prazo", 0.0)
+            ed["weight_prazo_taxa"] += s.get("weight_prazo_taxa", 0.0)
             for pj in ("num_funcionarios", "faturamento", "dividas_ativas", "capital_social"):
                 if ed[pj] is None and s.get(pj) is not None:
                     ed[pj] = s[pj]
@@ -592,6 +595,7 @@ def agregar(dias_raw: list) -> dict:
                     "n_valor": 0, "sum_valor": 0.0,
                     "n_prazo": 0, "sum_prazo": 0.0,
                     "n_taxa":  0, "sum_taxa":  0.0,
+                    "sum_taxa_prazo": 0.0, "weight_prazo_taxa": 0.0,
                     "num_funcionarios": None, "faturamento": None,
                     "dividas_ativas":   None, "capital_social": None,
                 }
@@ -599,6 +603,8 @@ def agregar(dias_raw: list) -> dict:
             for _c in ("tempo", "renda", "valor", "prazo", "taxa"):
                 a[f"n_{_c}"]   += s.get(f"n_{_c}", 0)
                 a[f"sum_{_c}"] += s.get(f"sum_{_c}", 0.0)
+            a["sum_taxa_prazo"]    += s.get("sum_taxa_prazo", 0.0)
+            a["weight_prazo_taxa"] += s.get("weight_prazo_taxa", 0.0)
             for _pj in ("num_funcionarios", "faturamento", "dividas_ativas", "capital_social"):
                 if a[_pj] is None and s.get(_pj) is not None:
                     a[_pj] = s[_pj]
@@ -675,7 +681,8 @@ def agregar(dias_raw: list) -> dict:
             "media_renda": _a["sum_renda"] / _a["n_renda"] if _a["n_renda"] else None,
             "media_valor": _a["sum_valor"] / _a["n_valor"] if _a["n_valor"] else None,
             "media_prazo": _a["sum_prazo"] / _a["n_prazo"] if _a["n_prazo"] else None,
-            "media_taxa":  _a["sum_taxa"]  / _a["n_taxa"]  if _a["n_taxa"]  else None,
+            "media_taxa":  (_a["sum_taxa_prazo"] / _a["weight_prazo_taxa"]) if _a.get("weight_prazo_taxa")
+                           else (_a["sum_taxa"] / _a["n_taxa"] if _a["n_taxa"] else None),
             "n_taxa":      _a["n_taxa"],
             "num_funcionarios": _a["num_funcionarios"],
             "faturamento":      _a["faturamento"],
@@ -2930,10 +2937,10 @@ try:
             # Grupo 3 — taxa / nº de parcelas / valor da parcela médios dos DESEMBOLSADOS
             # (de _desemb_det; ignora registros sem o campo). Parcela = média ponderada pelo
             # prazo (mesmo critério dos aprovados).
-            _dz_taxas   = [d["taxa"]  for d in _desemb_det if d.get("taxa")]
             _dz_prazos  = [d["prazo"] for d in _desemb_det if d.get("prazo")]
             _dz_parc_pz = [(d["parcela"], d["prazo"]) for d in _desemb_det if d.get("parcela") and d.get("prazo")]
-            _dz_taxa_m  = (sum(_dz_taxas) / len(_dz_taxas)) if _dz_taxas else None
+            _dz_taxa_pz = [(d["taxa"], d["prazo"]) for d in _desemb_det if d.get("taxa") and d.get("prazo")]
+            _dz_taxa_m  = (sum(_t * _z for _t, _z in _dz_taxa_pz) / sum(_z for _, _z in _dz_taxa_pz)) if _dz_taxa_pz else None
             _dz_prazo_m = (sum(_dz_prazos) / len(_dz_prazos)) if _dz_prazos else None
             _dz_parc_m  = (sum(p * z for p, z in _dz_parc_pz) / sum(z for _, z in _dz_parc_pz)) if _dz_parc_pz else None
             _dz_taxa_s  = (f"{_dz_taxa_m:.2f}".replace(".", ",") + "% a.m.") if _dz_taxa_m else "—"
@@ -2982,7 +2989,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{ticket_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{parcela_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">contratos aprovados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{taxa_s}</div><div class="kpi-sub">média pond. pelo nº de parcelas</div></div>
               <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_ap_lib_tot_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
@@ -2993,7 +3000,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+              <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">média pond. pelo nº de parcelas</div></div>
               <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
@@ -3565,18 +3572,25 @@ try:
                 _msg_ori4 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
                 st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori4}.")
             else:
+                # taxa = [Σ(taxa×prazo), nº contratos, Σ(prazo)] -> média ponderada pelo prazo;
+                # demais campos = [soma, count] -> média simples.
                 _ev_dia: dict = {}
                 for _r in _desemb_det:
                     _pdk = _r.get("pd")
                     if not _pdk:
                         continue
-                    _slot = _ev_dia.setdefault(_pdk, {"taxa": [0.0, 0], "prazo": [0.0, 0],
+                    _slot = _ev_dia.setdefault(_pdk, {"taxa": [0.0, 0, 0.0], "prazo": [0.0, 0],
                                                       "liberado": [0.0, 0], "parcela": [0.0, 0]})
-                    for _k in ("taxa", "prazo", "liberado", "parcela"):
+                    for _k in ("prazo", "liberado", "parcela"):
                         _v = _r.get(_k)
                         if _v:
                             _slot[_k][0] += _v
                             _slot[_k][1] += 1
+                    _tx, _pz = _r.get("taxa"), _r.get("prazo")
+                    if _tx and _pz:
+                        _slot["taxa"][0] += _tx * _pz   # Σ(taxa×prazo)
+                        _slot["taxa"][1] += 1           # nº de contratos (hover)
+                        _slot["taxa"][2] += _pz         # Σ(prazo) = peso
 
                 _dias_ev = sorted(_ev_dia.keys())
                 _x_ev = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_ev]
@@ -3584,8 +3598,13 @@ try:
                 def _serie_ev(_campo):
                     _y, _cnt = [], []
                     for _dk in _dias_ev:
-                        _s, _c = _ev_dia[_dk][_campo]
-                        _y.append(round(_s / _c, 4) if _c else None)
+                        _slotv = _ev_dia[_dk][_campo]
+                        if _campo == "taxa":
+                            _wsum, _c, _psum = _slotv
+                            _y.append(round(_wsum / _psum, 4) if _psum else None)
+                        else:
+                            _s, _c = _slotv
+                            _y.append(round(_s / _c, 4) if _c else None)
                         _cnt.append(_c)
                     return _y, _cnt
 
@@ -4185,7 +4204,8 @@ try:
                 # ── Agrega por dimensão (soma contratos, valor contratado e liberado) ──────
                 _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
                 _iof_tot = 0.0
-                _prz_vals, _tx_vals = [], []
+                _prz_vals = []
+                _tx_pz    = []   # (taxa, prazo) para média ponderada pelo nº de parcelas
 
                 def _bump(_m, _k, _rec):
                     if not _k:
@@ -4204,15 +4224,15 @@ try:
                     _iof_tot += _rec.get("iof", 0.0) or 0.0
                     if _rec.get("prazo"):
                         _prz_vals.append(_rec["prazo"])
-                    if _rec.get("taxa"):
-                        _tx_vals.append(_rec["taxa"])
+                    if _rec.get("taxa") and _rec.get("prazo"):
+                        _tx_pz.append((_rec["taxa"], _rec["prazo"]))
 
                 _n_det   = len(_desemb_det)
                 _sum_val = sum((r.get("valor", 0.0) or 0.0) for r in _desemb_det)
                 _sum_lib = sum((r.get("liberado", 0.0) or 0.0) for r in _desemb_det)
                 _ticket  = (_sum_val / _n_det) if _n_det else 0.0
                 _prz_med = (sum(_prz_vals) / len(_prz_vals)) if _prz_vals else 0.0
-                _tx_med  = (sum(_tx_vals) / len(_tx_vals)) if _tx_vals else 0.0
+                _tx_med  = (sum(_t * _z for _t, _z in _tx_pz) / sum(_z for _, _z in _tx_pz)) if _tx_pz else 0.0
 
                 def _brl2(v):
                     return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
