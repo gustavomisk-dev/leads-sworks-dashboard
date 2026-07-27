@@ -1415,7 +1415,8 @@ def _html_emp_rep_expandable(emp_rep: dict, emp_mot: dict, emp_mot_leads: dict, 
                         f'<details style="cursor:pointer">'
                         f'<summary style="list-style:none;display:flex;align-items:center;gap:5px">'
                         f'<span style="font-size:8px;color:#475569">▶</span><span>{lbl}</span></summary>'
-                        f'<div style="margin:3px 0 4px 12px;line-height:1.9;font-size:0.9em">{_links}{_extra}</div>'
+                        f'<div style="margin:3px 0 4px 12px;line-height:1.9;font-size:0.9em">'
+                        f'<span style="color:#64748b;margin-right:8px">Links S-works:</span>{_links}{_extra}</div>'
                         f'</details>'
                     )
                 else:
