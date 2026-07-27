@@ -3008,11 +3008,11 @@ try:
             <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
               <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_pess_semiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_pess_comiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_pess_semiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="pj-i" title="{_otim_tip}">i</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
-              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_otim_semiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_otim_comiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
+              <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_otim_semiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
             </div>
             """, unsafe_allow_html=True)
 
