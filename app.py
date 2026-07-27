@@ -4155,26 +4155,23 @@ try:
             
             n_ap = f.get("aprovados", 0)
             
-            col_e, col_c = st.columns(2)
-            
-            with col_e:
-                emp_ap = agg.get("top_empregadores", {})
-                emp_ap_stats = agg.get("emp_ap_stats", {})
-                fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
-            
-            with col_c:
-                cbos_ap = agg.get("top_cbos", {})
-                fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+
+            emp_ap = agg.get("top_empregadores", {})
+            emp_ap_stats = agg.get("emp_ap_stats", {})
+            fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
+            if tbl:
+                st.markdown(tbl, unsafe_allow_html=True)
+
+            cbos_ap = agg.get("top_cbos", {})
+            fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
+            if tbl:
+                st.markdown(tbl, unsafe_allow_html=True)
 
             # ── 14. Desembolsados no Período — Segmentação ──────────────────────────────
 
@@ -4254,28 +4251,25 @@ try:
                 _uf_items   = _items(_uf_d,   "n")
 
                 # ── Top Empregadores (R$) | Top CBOs (contratos) ───────────────────────────
-                col_e2, col_c2 = st.columns(2)
-                with col_e2:
-                    # soma na colisão de rótulo truncado (não sobrescreve), igual _sem_codigo
-                    _emp_chart: dict = {}
-                    for it in _emp_items[:12]:
-                        _k = _trunc(it["label"])
-                        _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
-                    fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
-                with col_c2:
-                    _cbo_chart = _sem_codigo({it["label"]: it["n"] for it in _cbo_items})
-                    fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
-                                        pct_base=_n_det, show_abs=True)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                    tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
+                # soma na colisão de rótulo truncado (não sobrescreve), igual _sem_codigo
+                _emp_chart: dict = {}
+                for it in _emp_items[:12]:
+                    _k = _trunc(it["label"])
+                    _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
+                fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
+                _cbo_chart = _sem_codigo({it["label"]: it["n"] for it in _cbo_items})
+                fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
+                                    pct_base=_n_det, show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
 
                 # ── Top CNAEs (largura total) ──────────────────────────────────────────────
                 _cnae_chart = _sem_codigo({it["label"]: it["n"] for it in _cnae_items})
@@ -4288,19 +4282,16 @@ try:
                     st.markdown(tbl, unsafe_allow_html=True)
 
                 # ── Por Origem | Por UF ────────────────────────────────────────────────────
-                col_o2, col_u2 = st.columns(2)
-                with col_o2:
-                    _ori_chart = {it["label"]: it["n"] for it in _ori_items}
-                    fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
-                                        pct_base=_n_det, show_abs=True)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
-                with col_u2:
-                    _uf_chart = {it["label"]: it["n"] for it in _uf_items}
-                    fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
-                                        pct_base=_n_det, show_abs=True)
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                _ori_chart = {it["label"]: it["n"] for it in _ori_items}
+                fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
+                                    pct_base=_n_det, show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                _uf_chart = {it["label"]: it["n"] for it in _uf_items}
+                fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
+                                    pct_base=_n_det, show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
 except Exception as _exc:
     import traceback as _tb
