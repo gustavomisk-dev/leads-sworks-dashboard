@@ -1011,7 +1011,7 @@ def _fig_mapa_ufs(ufs: dict):
 
 
 def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_base: int = 0,
-                  show_abs: bool = False, show_pct: bool = True):
+                  show_abs: bool = False, show_pct: bool = True, text_auto: bool = False):
     items = list(data_dict.items())[:n]
     if not items:
         return None
@@ -1026,7 +1026,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
             texts = [f"{_nbr(v)}  |  {100*v/pct_base:.1f}%" for v in values]
         else:
             texts  = [f"{100*v/pct_base:.1f}%" for v in values]
-        tpos   = "inside"
+        tpos   = "auto" if text_auto else "inside"
     else:
         shades = color
         texts  = [f"{_nbr(v)}" for v in values]
@@ -1036,6 +1036,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
         text=texts, textposition=tpos,
         insidetextanchor="end" if pct_base else None,
+        cliponaxis=False,   # não corta o rótulo que cai fora da barra (à direita)
         textfont=dict(size=13, color="rgba(255,255,255,0.85)" if pct_base else "#94a3b8"),
         hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
     ))
@@ -1045,7 +1046,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         title=dict(text=titulo, font=_TF),
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
         yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
-        margin=dict(t=50, b=20, l=20, r=60), height=h,
+        margin=dict(t=50, b=20, l=20, r=110 if text_auto else 60), height=h,
     )
     return fig
 
@@ -4284,7 +4285,7 @@ try:
                 # ── Por Origem | Por UF ────────────────────────────────────────────────────
                 _ori_chart = {it["label"]: it["n"] for it in _ori_items}
                 fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
-                                    pct_base=_n_det, show_abs=True)
+                                    pct_base=_n_det, show_abs=True, text_auto=True)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
                 _uf_chart = {it["label"]: it["n"] for it in _uf_items}
