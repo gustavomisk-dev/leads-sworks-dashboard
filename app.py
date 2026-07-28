@@ -4315,15 +4315,17 @@ try:
                 def _brl2(v):
                     return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
 
-                # ── Mini-KPIs específicos dos desembolsados ────────────────────────────────
+                # ── KPIs dos desembolsados (mesmos do grupo inicial "3 · Desembolsados") ────
                 st.markdown(f"""
-                <div class="kpi-row" style="grid-template-columns:repeat(6,1fr)">
-                  <div class="kpi-card"><div class="kpi-label">Contratos Desembolsados</div><div class="kpi-value" style="color:#FEC52E">{_nbr(_n_det)}</div><div class="kpi-sub">{periodo_label}</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Total Contratado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_val)}</div><div class="kpi-sub">valor do empréstimo</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Total Liberado</div><div class="kpi-value" style="color:#FEC52E">{_brl2(_sum_lib)}</div><div class="kpi-sub">valor líquido ao cliente</div></div>
-                  <div class="kpi-card"><div class="kpi-label">IOF Total</div><div class="kpi-value">{_brl2(_iof_tot)}</div><div class="kpi-sub">soma do período</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">{_brl2(_ticket)}</div><div class="kpi-sub">contratado por contrato</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Nº Parcelas · Taxa Médios</div><div class="kpi-value">{f'{_prz_med:.0f}' if _prz_med else '—'} · {(f'{_tx_med:.2f}'.replace('.', ',') + '%') if _tx_med else '—'}</div><div class="kpi-sub">parcelas · a.m.</div></div>
+                <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+                  <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">média pond. pelo nº de parcelas</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+                  <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
                 </div>
                 """, unsafe_allow_html=True)
 
