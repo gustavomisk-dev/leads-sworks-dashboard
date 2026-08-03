@@ -1772,7 +1772,6 @@ def _html_wf166_diagrama() -> str:
             '<div style="width:20px;height:20px;border-radius:50%;background:#26221a;color:#FEC52E;'
             'font-size:11px;font-weight:700;line-height:20px;text-align:center;">' + num + '</div>'
             '<div style="color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25;margin-top:6px;">' + nome + '</div>'
-            '<div style="color:#5b6470;font-size:9px;margin-top:3px;">ordem ' + ordem + '</div>'
             '</div>'
         )
 
@@ -1782,7 +1781,6 @@ def _html_wf166_diagrama() -> str:
     _sub_items = "".join(
         '<div style="display:flex;align-items:center;gap:7px;padding:3px 7px;margin:2px 0;'
         'background:#141019;border:1px solid rgba(99,102,241,0.3);border-radius:6px;">'
-        '<span style="color:#6b7280;font-size:8px;min-width:36px;">' + ordem + '</span>'
         '<span style="color:#c4b5fd;font-size:10px;">' + nome + '</span></div>'
         for nome, ordem in motor
     )
@@ -1796,7 +1794,7 @@ def _html_wf166_diagrama() -> str:
         'font-size:11px;font-weight:700;line-height:20px;text-align:center;">2</div>'
         '<span style="color:#a5b4fc;font-size:13px;">&#9662;</span></div>'
         '<div style="color:#c7d2fe;font-size:12px;font-weight:700;line-height:1.25;margin-top:6px;">Motor de Cr&#233;dito</div>'
-        '<div style="color:#7c83a3;font-size:9px;margin-top:3px;">ordem 600 &#183; clique p/ abrir/fechar</div>'
+        '<div style="color:#7c83a3;font-size:9px;margin-top:3px;">clique p/ abrir/fechar</div>'
         '</summary>'
         '<div style="width:232px;margin-top:8px;border:1px dashed rgba(99,102,241,0.45);'
         'border-radius:9px;padding:8px 9px;background:rgba(99,102,241,0.05);">'
