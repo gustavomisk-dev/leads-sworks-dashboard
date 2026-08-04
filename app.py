@@ -4172,11 +4172,69 @@ try:
             # client-side, instantâneo). Clicar na caixa 'Motor de Crédito' entra nela; a
             # setinha ◂ discreta no topo-esquerdo volta. Documento HTML completo (renderiza
             # de forma confiável no iframe, ao contrário do fragmento HTML anterior).
-            # Diagrama do Workflow 166 — drill-down por clique via link de query-param
-            # (st.markdown renderiza sempre; o iframe do components.html vinha vazio aqui).
-            _wf_lvl = st.query_params.get("wf166", "root")
-            _wf_lvl = _wf_lvl if _wf_lvl in ("root", "motor") else "root"
-            st.markdown(_html_wf166_flow(_wf_lvl), unsafe_allow_html=True)
+            # Diagrama do Workflow 166 — drill-down por clique SEM recarregar a página.
+            # As caixas são cards numa faixa com scroll horizontal; o Motor de Crédito é um
+            # botão (clicável) dentro de um @st.fragment → só a seção 9 re-renderiza (entrar
+            # E voltar). (components.html/iframe vem vazio neste deploy → sem JS.)
+            _WF166_FASES = ["Inicializa Dados", "Motor de Crédito", "Cálculo Proposta",
+                "Cadastro Proposta", "Formalização", "Atualização Dados Cliente", "Obter CCB",
+                "Envia CCB Único", "Averbação Dataprev", "Nuvidio Antifraude",
+                "Envio de Informações Dataprev", "Pagamento Pix", "Atualizar Tesouraria",
+                "Atualizar Portal de Crédito", "Contratar o Seguro", "Aprovação Processo"]
+            _WF166_MOTOR = ["Validações Iniciais", "Token", "Dataprev Vínculos",
+                "Dataprev Dados do Trabalhador", "RF PJ", "RF PF", "SCR", "BDC PJ Dados Básicos",
+                "BDC PJ Dados Unificados", "PH3A PJ", "BDC PF Dados Unificados",
+                "BDC PF Risco Financeiro", "BDC PF Dados Básicos", "PH3A PF", "Decisão Motor"]
+            _WF166_CSS = """<style>
+            .st-key-wf166flow [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;overflow-x:auto;gap:8px;padding:12px 12px 16px;border:1px solid #2a2620;border-radius:10px;background:#100e0a}
+            .st-key-wf166flow [data-testid="stColumn"]{min-width:150px!important;width:150px!important;flex:0 0 150px!important}
+            .st-key-wf166flow [data-testid="stColumn"] [data-testid="stVerticalBlock"]{gap:0!important}
+            .wfbox{background:#15130e;border:1px solid #332e25;border-radius:9px;padding:10px 11px;min-height:66px;display:flex;align-items:center;color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25}
+            .wfbox.sub{background:#141019;border-color:rgba(99,102,241,0.35);color:#c4b5fd}
+            .wfbox.dec{background:#1a1420;border-color:rgba(167,139,250,0.55);color:#d8b4fe}
+            .st-key-wf166_motor button{min-height:66px;width:100%;white-space:normal;background:rgba(99,102,241,0.12)!important;border:1.5px solid #6366f1!important;color:#c7d2fe!important;font-size:12px!important;font-weight:700!important;border-radius:9px!important;box-shadow:0 0 0 3px rgba(99,102,241,0.07)}
+            .st-key-wf166_motor button:hover{background:rgba(99,102,241,0.22)!important;border-color:#818cf8!important;color:#e0e7ff!important}
+            .st-key-wf166_back button{padding:2px 11px!important;min-height:0;color:#a5b4fc!important;background:#15130e!important;border:1px solid #332e25!important;border-radius:7px!important}
+            .st-key-wf166_back button:hover{border-color:#6366f1!important;background:#1a1726!important;color:#c7d2fe!important}
+            </style>"""
+
+            @st.fragment
+            def _wf166_frag():
+                st.session_state.setdefault("wf166_lvl", "root")
+                st.markdown(_WF166_CSS, unsafe_allow_html=True)
+                if st.session_state["wf166_lvl"] == "motor":
+                    _bk, _cr = st.columns([0.55, 9], vertical_alignment="center")
+                    with _bk:
+                        if st.button("◂", key="wf166_back", help="Voltar ao nível externo"):
+                            st.session_state["wf166_lvl"] = "root"
+                            st.rerun(scope="fragment")
+                    with _cr:
+                        st.markdown('<div style="color:#94a3b8;font-size:13px;">&#128194; Workflow 166 '
+                                    '&nbsp;&#8250;&nbsp; <b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></div>',
+                                    unsafe_allow_html=True)
+                else:
+                    st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Workflow 166 '
+                                '&#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; clique no '
+                                'Motor de Cr&#233;dito para entrar</span></div>', unsafe_allow_html=True)
+                with st.container(key="wf166flow"):
+                    if st.session_state["wf166_lvl"] == "motor":
+                        _cols = st.columns(len(_WF166_MOTOR))
+                        for _i, _n in enumerate(_WF166_MOTOR):
+                            with _cols[_i]:
+                                _cls = "wfbox dec" if _n == "Decisão Motor" else "wfbox sub"
+                                st.markdown('<div class="' + _cls + '">' + _n + '</div>', unsafe_allow_html=True)
+                    else:
+                        _cols = st.columns(len(_WF166_FASES))
+                        for _i, _n in enumerate(_WF166_FASES):
+                            with _cols[_i]:
+                                if _n == "Motor de Crédito":
+                                    if st.button("Motor de Crédito", key="wf166_motor",
+                                                 use_container_width=True):
+                                        st.session_state["wf166_lvl"] = "motor"
+                                        st.rerun(scope="fragment")
+                                else:
+                                    st.markdown('<div class="wfbox">' + _n + '</div>', unsafe_allow_html=True)
+            _wf166_frag()
             
             # 2 abas: Visão geral | Visão de Funil
             if etapas_d and n_rep > 0:
