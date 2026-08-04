@@ -247,16 +247,15 @@ def _login_page(cookies: CookieController) -> None:
 # repositório PRIVADO (leads-sworks-data, o mesmo dos JSONs diários), em acessos/YYYYMMDD.json,
 # usando o token de st.secrets["github"] — nunca ficam no repositório público.
 
-_ADMIN_EMAILS = {"gustavo.misk@zilicred.com.br"}   # admins fixos; além do campo admin=true no secrets
-_ACESSOS_DIR  = "acessos"                           # pasta no repo privado
+_ACESSOS_DIR = "acessos"   # pasta no repo privado
 
 
 def _is_admin_user(email: str) -> bool:
-    """True se o e-mail é admin — via lista fixa OU campo `admin` no bloco do usuário no secrets."""
+    """True somente se o bloco do usuário em st.secrets["auth"]["users"] tiver `admin = true`.
+    O papel de admin vive APENAS no secrets do Streamlit — nunca no repositório público,
+    então o código não revela quem é (ou não) administrador."""
     if not email:
         return False
-    if email.strip().lower() in _ADMIN_EMAILS:
-        return True
     u = _find_user(email)
     return bool(u and u.get("admin"))
 
