@@ -13,7 +13,6 @@ import time
 import bcrypt
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -209,7 +208,7 @@ def _login_page(cookies: CookieController) -> None:
         with st.form("login_form", border=False):
             email_in = st.text_input("E-mail", placeholder="seu@zilicred.com.br")
             senha_in = st.text_input("Senha", type="password")
-            entrar   = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+            entrar   = st.form_submit_button("Entrar", width='stretch', type="primary")
 
         if entrar:
             attempt = _login_attempts.get(email_in, {"count": 0, "blocked_until": None})
@@ -375,7 +374,7 @@ def _pagina_acessos() -> None:
     st.markdown("<style>[data-testid='stHeader']{display:none!important}</style>", unsafe_allow_html=True)
     _cb, _ct = st.columns([0.5, 9], vertical_alignment="center")
     with _cb:
-        if st.button("◂", key="acessos_voltar", help="Voltar ao dashboard", use_container_width=True):
+        if st.button("◂", key="acessos_voltar", help="Voltar ao dashboard", width='stretch'):
             try:
                 del st.query_params["page"]
             except Exception:
@@ -423,7 +422,7 @@ def _pagina_acessos() -> None:
         [{"Empresa": o, "Usuários": len(a["emails"]), "Acessos": a["n"]} for o, a in _org_ag.items()],
         key=lambda r: -r["Acessos"])
     st.markdown("##### Por empresa")
-    st.dataframe(_org_rows, use_container_width=True, hide_index=True)
+    st.dataframe(_org_rows, width='stretch', hide_index=True)
 
     resumo: dict = {}
     for e in eventos:
@@ -440,13 +439,13 @@ def _pagina_acessos() -> None:
         r["Último acesso"] = _fmt(r["Último acesso"])
 
     st.markdown("##### Por usuário")
-    st.dataframe(resumo_rows, use_container_width=True, hide_index=True)
+    st.dataframe(resumo_rows, width='stretch', hide_index=True)
 
     st.markdown("##### Acessos recentes")
     _det = [{"Data/hora": _fmt(e.get("ts", "")), "Usuário": e.get("nome", ""),
              "Empresa": _user_org(e.get("email", "")), "E-mail": e.get("email", ""),
              "Via": e.get("via", "")} for e in eventos[:500]]
-    st.dataframe(_det, use_container_width=True, hide_index=True)
+    st.dataframe(_det, width='stretch', hide_index=True)
     st.caption(f"Mostrando os {len(_det)} acessos mais recentes · fonte: repositório privado (acessos/).")
 
 
@@ -554,7 +553,7 @@ _DIAS_MUTAVEIS = 8
 # (novos campos em desembolsos_detalhe etc.) — muda a chave do cache e força re-fetch,
 # sem depender do processo reiniciar. Histórico ganha TTL de 12h como rede de segurança
 # (auto-heal), mantendo a performance dentro da sessão.
-_DATA_VER = "2026-08-04-desemb-demografia"
+_DATA_VER = "2026-08-04-status-fix"
 
 
 def _fetch_dia(dia_str: str) -> dict:
@@ -2423,7 +2422,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             yaxis=dict(tickfont=_TV_YTXT, automargin=True),
             margin=dict(t=10, b=20, l=20, r=r),
         )
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        st.plotly_chart(fig, width='stretch', config=_CONF)
         return True
 
     def _tv_line_valor(x, yval, ycnt, ylib, xtitle):
@@ -2444,7 +2443,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                        gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
             margin=dict(t=20, b=50, l=10, r=20), hovermode="x unified",
         )
-        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+        st.plotly_chart(fig, width='stretch', config=_CONF)
 
     # ═══════════════ A · VISÃO GERAL ═══════════════
     if slide == 0:
@@ -2470,7 +2469,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig.update_traces(textfont=dict(size=27))
             fig.update_annotations(font_size=30)
             fig.update_layout(height=620, legend=dict(font=dict(size=30, color="#94a3b8")))
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            st.plotly_chart(fig, width='stretch', config=_CONF)
         else:
             st.info("Sem dados de status.")
 
@@ -2483,7 +2482,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig.update_layout(height=620, title=dict(text=""),
                 xaxis=dict(tickfont=_TV_AF), yaxis=dict(tickfont=_TV_YTXT, automargin=True),
                 margin=dict(t=10, b=20, l=250, r=40))
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            st.plotly_chart(fig, width='stretch', config=_CONF)
 
     elif slide == 3:
         _tv_h("Evolução Temporal — Leads por Status", periodo)
@@ -2496,7 +2495,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 legend=dict(orientation="h", x=0.5, y=1.07, xanchor="center", yanchor="bottom",
                     bgcolor="rgba(15,14,11,0.88)", bordercolor="rgba(255,255,255,0.10)",
                     borderwidth=1, font=dict(size=34, color="#94a3b8")))
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            st.plotly_chart(fig, width='stretch', config=_CONF)
 
     # ═══════════════ B · APROVADOS ═══════════════
     elif slide == 4:
@@ -2545,7 +2544,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                 xaxis=dict(title=dict(text="Valor (R$)", font=_TV_AF), tickformat=",.0f", tickfont=_TV_AF),
                 yaxis=dict(title=dict(text="Contratos", font=_TV_AF), tickfont=_TV_AF),
                 margin=dict(t=10, b=40, l=10, r=10))
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            st.plotly_chart(fig, width='stretch', config=_CONF)
         else:
             st.info("Sem dados de distribuição.")
 
@@ -2683,7 +2682,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                     fig.update_layout(height=680, title=dict(text=""),
                         xaxis=dict(tickfont=_TV_AF), yaxis=dict(tickfont=_TV_YTXT, automargin=True),
                         margin=dict(t=10, b=20, l=20, r=200))
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
         elif slide == 13:
             _tv_h("Desembolsados — Top CBOs", periodo)
             if not _tv_bar(_fig_barras_h(_sem_codigo({it["label"]: it["n"] for it in _it(_seg["cbo"], "n")}),
@@ -2746,7 +2745,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
                         bgcolor="rgba(15,14,11,0.85)", bordercolor="rgba(255,255,255,0.08)",
                         borderwidth=1, font=dict(size=28)),
                     margin=dict(t=10, b=20, l=20, r=40))
-                st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig_f, width='stretch', config=_CONF)
         else:
             st.info("Sem dados de etapas.")
 
@@ -2771,7 +2770,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig.update_layout(height=560, title=dict(text=""),
                 xaxis=dict(tickfont=dict(size=28, color="#cbd5e1")), yaxis=dict(tickfont=_TV_AF),
                 margin=dict(t=10, b=40, l=80, r=80))
-            st.plotly_chart(fig, use_container_width=True, config=_CONF)
+            st.plotly_chart(fig, width='stretch', config=_CONF)
         else:
             st.info("Sem dados de bloqueios.")
 
@@ -2803,7 +2802,7 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
             fig = _fig_mapa_ufs(ufs)
             if fig:
                 fig.update_layout(height=760)
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig, width='stretch', config=_CONF)
             else:
                 _tv_bar(_fig_barras_h(ufs, "", "#3b82f6", n=27, pct_base=sum(ufs.values())))
         else:
@@ -2935,16 +2934,9 @@ try:
         _slot.empty()  # remove dashboard normal do DOM antes de renderizar o slide
         st.markdown(_TV_CSS, unsafe_allow_html=True)
     
-        # Tela cheia automática (melhor esforço — pode ser bloqueado sem gesto do usuário)
-        components.html("""
-        <script>
-        try {
-            var el = parent.document.documentElement;
-            var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-            if (fn) fn.call(el);
-        } catch(e) {}
-        </script>
-        """, height=0)
+        # Tela cheia automática removida: usava components.html (depreciado) só para injetar
+        # JS de requestFullscreen — "melhor esforço" que o sandbox do iframe costumava bloquear.
+        # O modo TV segue normal; para tela cheia, F11. (git guarda a versão anterior.)
     
         # Seletor de período + navegação de slides na mesma barra
         _default_d_ini = data_max
@@ -2967,7 +2959,7 @@ try:
         _cp_prev, _cp_lbl, _cp_date, _cp_7d, _cp_3d, _cp_1d, _cp_info, _cp_next, _cp_exit = \
             st.columns([1, 1, 2, 1.8, 1.8, 1.8, 1.5, 1, 2])
         with _cp_prev:
-            if st.button("‹", key="tv_prev", use_container_width=True):
+            if st.button("‹", key="tv_prev", width='stretch'):
                 st.session_state["tv_slide"] = _tv_prev
                 st.rerun()
         with _cp_lbl:
@@ -2982,19 +2974,19 @@ try:
                 label_visibility="collapsed",
             )
         with _cp_7d:
-            if st.button("Últimos 7 dias", key="tv_7d", use_container_width=True):
+            if st.button("Últimos 7 dias", key="tv_7d", width='stretch'):
                 st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=6))
                 st.session_state["_tv_picker_ver"] += 1
                 st.session_state["tv_slide"] = 0
                 st.rerun()
         with _cp_3d:
-            if st.button("Últimos 3 dias", key="tv_3d", use_container_width=True):
+            if st.button("Últimos 3 dias", key="tv_3d", width='stretch'):
                 st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=2))
                 st.session_state["_tv_picker_ver"] += 1
                 st.session_state["tv_slide"] = 0
                 st.rerun()
         with _cp_1d:
-            if st.button("Desde Ontem", key="tv_1d", use_container_width=True):
+            if st.button("Desde Ontem", key="tv_1d", width='stretch'):
                 st.session_state["_tv_date"] = max(data_min, data_max - timedelta(days=1))
                 st.session_state["_tv_picker_ver"] += 1
                 st.session_state["tv_slide"] = 0
@@ -3006,11 +2998,11 @@ try:
                 unsafe_allow_html=True,
             )
         with _cp_next:
-            if st.button("›", key="tv_next", use_container_width=True):
+            if st.button("›", key="tv_next", width='stretch'):
                 st.session_state["tv_slide"] = _tv_next
                 st.rerun()
         with _cp_exit:
-            if st.button("Sair do modo TV", key="tv_exit", use_container_width=True):
+            if st.button("Sair do modo TV", key="tv_exit", width='stretch'):
                 st.session_state.pop("tv_slide", None)
                 st.query_params.clear()
                 st.rerun()
@@ -3071,18 +3063,9 @@ try:
             st.session_state.pop("tv_slide_at_start", None)
             st.rerun()
     
-    # ── Saída de modo TV: sai do fullscreen via JS ────────────────────────────────
+    # ── Saída de modo TV ──────────────────────────────────────────────────────────
     else:
-        components.html("""
-        <script>
-        try {
-            var doc = parent.document;
-            var ef = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen;
-            if (ef && (doc.fullscreenElement || doc.webkitFullscreenElement)) ef.call(doc);
-        } catch(e) {}
-        </script>
-        """, height=0)
-
+        # (JS de exitFullscreen removido — usava components.html depreciado.)
         _origins_avail = ["B2B", "B2B-API", "B2C", "B2C-CT", "CTPS"]
 
         with _slot.container():
@@ -3131,19 +3114,19 @@ try:
                 if _c_adm is not None:
                     with _c_adm:
                         st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                        if st.button("🔐 Acessos", use_container_width=True,
+                        if st.button("🔐 Acessos", width='stretch',
                                      help="Histórico de acessos (admin)"):
                             st.query_params["page"] = "acessos"
                             st.rerun()
                 with _c_tv:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                    if st.button("📺 Modo TV", use_container_width=True):
+                    if st.button("📺 Modo TV", width='stretch'):
                         st.session_state["tv_slide"] = 0
                         st.query_params["tv"] = "1"
                         st.rerun()
                 with _c_out:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                    if st.button("Sair", use_container_width=True):
+                    if st.button("Sair", width='stretch'):
                         _cookies.remove(_COOKIE_NAME)
                         for _k in ["logged_in", "user_email", "display_name", "_cookie_set",
                                    "_cookie_checked", "_acesso_registrado", "_login_via"]:
@@ -3171,7 +3154,7 @@ try:
                     )
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                    if st.button("↺", use_container_width=True, help="Forçar atualização dos dados"):
+                    if st.button("↺", width='stretch', help="Forçar atualização dos dados"):
                         # Só os recentes (mutáveis) + a lista de datas. Históricos são
                         # imutáveis — re-baixá-los a cada clique só traria de volta a lentidão.
                         _carregar_dia_recente.clear()
@@ -3548,7 +3531,7 @@ try:
                     height=360,
                     hovermode="x unified",
                 )
-                st.plotly_chart(_fig_desemb, use_container_width=True, config=_CONF)
+                st.plotly_chart(_fig_desemb, width='stretch', config=_CONF)
                 st.caption(
                     f"Inclui leads criados até 7 dias antes do período filtrado · "
                     f"{_desemb_tot_count} contrato(s) · {_cap_val_s}"
@@ -4084,7 +4067,7 @@ try:
                     height=360,
                     hovermode="x unified",
                 )
-                st.plotly_chart(_fig_cr, use_container_width=True, config=_CONF)
+                st.plotly_chart(_fig_cr, width='stretch', config=_CONF)
                 _cap_cr = (f"Distribui os {_cr_tot_cnt} contrato(s) desembolsados no período "
                            f"pela data de criação do lead · {_cap_cr_s}")
                 if _cr_sem_dc:
@@ -4177,21 +4160,21 @@ try:
                 with _tab_tx:
                     st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
                                     _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98, _dtick=0.5),
-                                    use_container_width=True, config=_CONF)
+                                    width='stretch', config=_CONF)
                 with _tab_pz:
                     st.plotly_chart(_fig_media("prazo", "Número de parcelas médio", "Número de parcelas", ".0f",
                                     _hval="%{y:.1f} parcelas", _ymin=12.0, _dtick=6),
-                                    use_container_width=True, config=_CONF)
+                                    width='stretch', config=_CONF)
                 with _tab_lb:
                     st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.2f",
                                     _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600, _dtick=1000),
-                                    use_container_width=True, config=_CONF)
+                                    width='stretch', config=_CONF)
                 with _tab_pc:
                     _yp, _cp = _serie_ev("parcela")
                     if any(_cp):
                         st.plotly_chart(_fig_media("parcela", "Valor da parcela médio", "Valor (R$)",
                                         ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50, _dtick=50),
-                                        use_container_width=True, config=_CONF)
+                                        width='stretch', config=_CONF)
                     else:
                         st.info("Sem valor de parcela nos desembolsos do período.")
                 st.caption(
@@ -4452,11 +4435,11 @@ try:
             with col_d:
                 fig = _fig_donut(f.get("_d_status", {}))
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
             with col_f:
                 fig = _fig_funil_rico(f)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
             
             # ── 7. Status Novo — CTPS ─────────────────────────────────────────────────────
 
@@ -4505,7 +4488,7 @@ try:
             
             fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
             if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig, width='stretch', config=_CONF)
             
             # ── 8. Perfil Financeiro — Aprovados ─────────────────────────────────────────
 
@@ -4519,7 +4502,7 @@ try:
             
             fig = _fig_histograma(agg.get("valores_contratacao", []))
             if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig, width='stretch', config=_CONF)
 
             # Distribuição de taxa — taxa média por empregador por dia, agregada pelo dash
             _dist_taxa = agg.get("taxa_dist", {})
@@ -4539,13 +4522,13 @@ try:
                         show_abs=True,
                     )
                     if fig_taxa:
-                        st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
+                        st.plotly_chart(fig_taxa, width='stretch', config=_CONF)
 
             # Distribuição do número de parcelas — aprovados
             _fig_pz_ap = _fig_dist_prazo(
                 agg.get("prazo_dist", {}), "Distribuição de Nº de Parcelas — Aprovados")
             if _fig_pz_ap:
-                st.plotly_chart(_fig_pz_ap, use_container_width=True, config=_CONF)
+                st.plotly_chart(_fig_pz_ap, width='stretch', config=_CONF)
 
             # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
 
@@ -4616,7 +4599,7 @@ try:
                             with _cols[_i]:
                                 if _n == "Motor de Crédito":
                                     if st.button("Motor de Crédito", key="wf166_motor",
-                                                 use_container_width=True):
+                                                 width='stretch'):
                                         st.session_state["wf166_lvl"] = "motor"
                                         st.rerun(scope="fragment")
                                 else:
@@ -4656,7 +4639,7 @@ try:
                         uniformtext_minsize=9, uniformtext_mode="hide",
                         margin=dict(t=50, b=30, l=20, r=40), height=h,
                     )
-                    st.plotly_chart(fig_g, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig_g, width='stretch', config=_CONF)
 
                     tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
                     if tbl_g:
@@ -4666,7 +4649,7 @@ try:
                     result_f = _fig_funil_etapa(etapas_d, n_rep)
                     if result_f:
                         fig_f, rows_f = result_f
-                        st.plotly_chart(fig_f, use_container_width=True, config=_CONF)
+                        st.plotly_chart(fig_f, width='stretch', config=_CONF)
                         tbl_resumo = _html_tabela_resumo_funil(rows_f)
                         if tbl_resumo:
                             st.markdown(tbl_resumo, unsafe_allow_html=True)
@@ -4683,7 +4666,7 @@ try:
                 fig = _fig_barras_h(agg.get("top_motivos", {}),
                                     "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 else:
                     st.info("Sem dados de motivos.")
             
@@ -4694,7 +4677,7 @@ try:
                     fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
                                         pct_base=n_det)
                     if fig:
-                        st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
                 else:
                     st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
@@ -4706,7 +4689,7 @@ try:
             if fig:
                 col_bl, _ = st.columns([1, 1])
                 with col_bl:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
             else:
                 st.info("Sem dados de bloqueios.")
             
@@ -4720,7 +4703,7 @@ try:
             if emp_rep:
                 fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, agg.get("emp_motivos_leads", {}), n_rep)
                 if _tbl_html:
                     st.markdown(_tbl_html, unsafe_allow_html=True)
@@ -4732,7 +4715,7 @@ try:
                 n_ufs = sum(ufs.values())
                 fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4746,7 +4729,7 @@ try:
                 fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
                                     pct_base=n_cnae)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4759,7 +4742,7 @@ try:
                 fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
                                     pct_base=n_cbo_r)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4777,7 +4760,7 @@ try:
             emp_ap_stats = agg.get("emp_ap_stats", {})
             fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
             if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig, width='stretch', config=_CONF)
             tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
             if tbl:
                 st.markdown(tbl, unsafe_allow_html=True)
@@ -4785,7 +4768,7 @@ try:
             cbos_ap = agg.get("top_cbos", {})
             fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
             if fig:
-                st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                st.plotly_chart(fig, width='stretch', config=_CONF)
             tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
             if tbl:
                 st.markdown(tbl, unsafe_allow_html=True)
@@ -4873,7 +4856,7 @@ try:
                 _fig_pzn = _fig_dist_prazo(
                     _pzn_dist, "Distribuição de Nº de Parcelas — Desembolsados")
                 if _fig_pzn:
-                    st.plotly_chart(_fig_pzn, use_container_width=True, config=_CONF)
+                    st.plotly_chart(_fig_pzn, width='stretch', config=_CONF)
 
                 # ── Ordenações ─────────────────────────────────────────────────────────────
                 def _items(_m, by="valor"):
@@ -4900,7 +4883,7 @@ try:
                     _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
                 fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4908,7 +4891,7 @@ try:
                 fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
                                     pct_base=_n_det, show_abs=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4918,7 +4901,7 @@ try:
                 fig = _fig_barras_h(_cnae_chart, "Top CNAEs · Nº de Contratos", "#a855f7",
                                     pct_base=_n_det, show_abs=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_desemb(_cnae_items, "Descrição CNAE", _n_det, code_col_title="Código CNAE")
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
@@ -4928,12 +4911,12 @@ try:
                 fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
                                     pct_base=_n_det, show_abs=True, text_auto=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 _uf_chart = {it["label"]: it["n"] for it in _uf_items}
                 fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
                                     pct_base=_n_det, show_abs=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
 
                 # ── Distribuição de Idade do tomador (faixas etárias) ──────────────────────
                 # Faixas meio-abertas: o limite superior cai na faixa seguinte (25 -> "25-30").
@@ -4949,7 +4932,7 @@ try:
                 fig = _fig_barras_v([(_lbl, _id_counts[_lbl]) for _lbl, _, _ in _FAIXAS_IDADE],
                                     "Distribuição de Idade — Tomadores Desembolsados", "Faixa etária")
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
 
                 # ── Distribuição por Gênero do tomador ─────────────────────────────────────
                 _GEN_LBL = {"M": "Masculino", "F": "Feminino"}
@@ -4958,7 +4941,7 @@ try:
                 fig = _fig_barras_h(_gen_chart, "Distribuição por Gênero — Tomadores", "#ec4899",
                                     pct_base=sum(_gen_d.values()), show_abs=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
 
                 # ── Top 50 Cidades por nº de desembolsos ────────────────────────────────────
                 _cid_items = _items(_cid_d, "n")
@@ -4966,7 +4949,7 @@ try:
                 fig = _fig_barras_h(_cid_chart, "Top 50 Cidades · Nº de Desembolsos", "#22c55e",
                                     n=50, pct_base=_n_det, show_abs=True)
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
                 tbl = _html_tabela_desemb(_cid_items, "Cidade", _n_det, n=50)
                 if tbl:
                     st.markdown(tbl, unsafe_allow_html=True)
