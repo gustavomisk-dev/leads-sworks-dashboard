@@ -3762,16 +3762,25 @@ try:
                         _hm_max = max(max(r) for r in _hm_mat.values()) or 1
                         _N_FAIXAS = len(_FAIXAS)
                         # ── Trilha C: anomalia vs referência (30d por hora × tipo-de-dia) ──────
-                        # Limiares ajustáveis: min. de amostras da ref., min. de contagem ao vivo
-                        # (evita ruído de células pequenas) e fator do MAD no limite superior.
+                        # DESATIVADA por ora (_ANOM_ATIVO=False): a referência ainda é prematura —
+                        # a mudança de regime ~02/08 (coletor passou a 24h) contamina os horários
+                        # de madrugada, e as faixas longas (>5d/4-5d) sofrem o artefato de
+                        # congelamento dos JSONs de 9-15 dias atrás. A coleta de snapshots e o
+                        # recompute diário seguem rodando (a referência amadurece sozinha).
+                        # Reativar quando a janela 30d for majoritariamente pós-regime (~set) E o
+                        # artefato das faixas longas for tratado. Limiares ajustáveis abaixo.
+                        _ANOM_ATIVO = False
                         _ANOM_MIN_N, _ANOM_MIN_CNT, _ANOM_K_MAD = 8, 3, 3.0
-                        _ref_map  = (_carregar_referencia() or {}).get("ref", {})
+                        _ref_map  = (_carregar_referencia() or {}).get("ref", {}) if _ANOM_ATIVO else {}
                         _anom_cls = "util" if _now_brt_nm.weekday() < 5 else "fds"
                         _anom_hr  = str(_now_brt_nm.hour)
                         def _hm_anom(_t, _i, v):
                             """(flagged, tooltip) — contagem ao vivo v vs referência da etapa `_t` /
                             faixa `_i` na classe+hora atuais. Sinaliza excesso robusto: acima de
-                            max(p90, med + K·MAD). Sem referência suficiente → não sinaliza."""
+                            max(p90, med + K·MAD). Sem referência suficiente → não sinaliza.
+                            Governado por _ANOM_ATIVO (desativado por ora — ver comentário acima)."""
+                            if not _ANOM_ATIVO:
+                                return False, ""
                             _s = ((((_ref_map.get(_t) or {}).get(str(_i)) or {}).get(_anom_cls)) or {}).get(_anom_hr)
                             if not _s or _s.get("n", 0) < _ANOM_MIN_N or v < _ANOM_MIN_CNT:
                                 return False, ""
@@ -3780,7 +3789,7 @@ try:
                             if v > _upper:
                                 _cl = "útil" if _anom_cls == "util" else "fim de semana"
                                 return True, (f"Anomalia: atual {v} · normal ~{_med:.0f} "
-                                              f"(p90 {_p90:.0f}) p/ {_anom_hr}h em dia {_cl}")
+                                              f"p/ {_anom_hr}h em dia {_cl}")
                             return False, ""
                         def _hm_base(_i):
                             # verde (2 primeiras) → amarelo (3 seguintes) → vermelho (restantes)
