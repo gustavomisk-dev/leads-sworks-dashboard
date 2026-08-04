@@ -1731,102 +1731,66 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     return title_html + wrapper + legend
 
 
-def _html_wf166_diagrama() -> str:
-    """Diagrama do Workflow 166 (v166, código 668) para a seção 9 — via st.markdown.
+def _html_wf166_flow(nivel: str = "root") -> str:
+    """HTML (st.markdown) do fluxo de UM nível do Workflow 166 — navegação drill-down.
 
-    Retângulo com scroll horizontal e vertical; as 16 fases de topo em fluxo da esquerda
-    para a direita; a fase 'Motor de Crédito' é um <details> expansível um nível (14
-    sub-etapas 53400–54900 em lista vertical + Decisão Motor). Sem iframe, sem JS."""
+    nivel='root'  -> as 16 fases de topo em fluxo horizontal (Motor de Crédito destacado).
+    nivel='motor' -> só o que há DENTRO do Motor de Crédito: 14 sub-etapas (53400–54900) em
+                     fluxo horizontal + Decisão Motor (Aprova/Reprova).
+    Retângulo com scroll horizontal/vertical; mostra apenas o nível atual (as demais fases
+    somem ao entrar). Só o nome nas caixas (sem número de ordem)."""
     fases = [
-        ("1",  "Inicializa Dados",              "400"),
-        ("2",  "Motor de Crédito",              "600"),   # <details> expansível
-        ("3",  "Cálculo Proposta",              "800"),
-        ("4",  "Cadastro Proposta",             "1200"),
-        ("5",  "Formalização",                  "1400"),
-        ("6",  "Atualização Dados Cliente",     "1600"),
-        ("7",  "Obter CCB",                     "1800"),
-        ("8",  "Envia CCB Único",               "2000"),
-        ("9",  "Averbação Dataprev",            "2200"),
-        ("10", "Nuvidio Antifraude",            "2400"),
-        ("11", "Envio de Informações Dataprev", "2600"),
-        ("12", "Pagamento Pix",                 "3000"),
-        ("13", "Atualizar Tesouraria",          "3200"),
-        ("14", "Atualizar Portal de Crédito",   "3400"),
-        ("15", "Contratar o Seguro",            "3600"),
-        ("16", "Aprovação Processo",            "5000"),
+        "Inicializa Dados", "Motor de Crédito", "Cálculo Proposta", "Cadastro Proposta",
+        "Formalização", "Atualização Dados Cliente", "Obter CCB", "Envia CCB Único",
+        "Averbação Dataprev", "Nuvidio Antifraude", "Envio de Informações Dataprev",
+        "Pagamento Pix", "Atualizar Tesouraria", "Atualizar Portal de Crédito",
+        "Contratar o Seguro", "Aprovação Processo",
     ]
     motor = [
-        ("Validações Iniciais", "53400"), ("Token", "53500"),
-        ("Dataprev Vínculos", "53600"), ("Dataprev Dados do Trabalhador", "53700"),
-        ("RF PJ", "53800"), ("RF PF", "54000"), ("SCR", "54100"),
-        ("BDC PJ Dados Básicos", "54200"), ("BDC PJ Dados Unificados", "54300"),
-        ("PH3A PJ", "54500"), ("BDC PF Dados Unificados", "54600"),
-        ("BDC PF Risco Financeiro", "54700"), ("BDC PF Dados Básicos", "54800"),
-        ("PH3A PF", "54900"),
+        "Validações Iniciais", "Token", "Dataprev Vínculos", "Dataprev Dados do Trabalhador",
+        "RF PJ", "RF PF", "SCR", "BDC PJ Dados Básicos", "BDC PJ Dados Unificados",
+        "PH3A PJ", "BDC PF Dados Unificados", "BDC PF Risco Financeiro",
+        "BDC PF Dados Básicos", "PH3A PF",
     ]
 
-    def _box(num, nome, ordem):
-        return (
-            '<div style="width:152px;min-width:152px;background:#15130e;border:1px solid #332e25;'
-            'border-radius:9px;padding:9px 11px;flex-shrink:0;align-self:flex-start;">'
-            '<div style="width:20px;height:20px;border-radius:50%;background:#26221a;color:#FEC52E;'
-            'font-size:11px;font-weight:700;line-height:20px;text-align:center;">' + num + '</div>'
-            '<div style="color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25;margin-top:6px;">' + nome + '</div>'
-            '</div>'
-        )
+    def _box(nome, tema="norm", extra=""):
+        if tema == "motor":
+            bg, bd, col, w = "rgba(99,102,241,0.12)", "1.5px solid #6366f1", "#c7d2fe", "154px"
+        elif tema == "sub":
+            bg, bd, col, w = "#141019", "1px solid rgba(99,102,241,0.35)", "#c4b5fd", "138px"
+        elif tema == "dec":
+            bg, bd, col, w = "#1a1420", "1px solid rgba(167,139,250,0.55)", "#e2e8f0", "150px"
+        else:
+            bg, bd, col, w = "#15130e", "1px solid #332e25", "#e2e8f0", "150px"
+        return ('<div style="width:' + w + ';min-width:' + w + ';min-height:54px;background:' + bg
+                + ';border:' + bd + ';border-radius:9px;padding:10px 11px;flex-shrink:0;display:flex;'
+                'flex-direction:column;justify-content:center;gap:4px;">'
+                '<div style="color:' + col + ';font-size:12px;font-weight:600;line-height:1.25;">' + nome + '</div>'
+                + extra + '</div>')
 
-    _arr = ('<div style="align-self:flex-start;color:#4b5563;font-size:15px;'
-            'padding:26px 5px 0;flex-shrink:0;">&#9656;</div>')
+    _arr = ('<div style="align-self:center;color:#4b5563;font-size:15px;padding:0 5px;flex-shrink:0;">&#9656;</div>')
+    _arm = ('<div style="align-self:center;color:#6366f1;font-size:12px;padding:0 3px;flex-shrink:0;">&#9656;</div>')
 
-    _sub_items = "".join(
-        '<div style="display:flex;align-items:center;gap:7px;padding:3px 7px;margin:2px 0;'
-        'background:#141019;border:1px solid rgba(99,102,241,0.3);border-radius:6px;">'
-        '<span style="color:#c4b5fd;font-size:10px;">' + nome + '</span></div>'
-        for nome, ordem in motor
-    )
+    if nivel == "motor":
+        parts = [_box(n, "sub") for n in motor]
+        dec = _box("Decisão Motor", "dec",
+                   '<div style="font-size:9.5px;font-weight:600;margin-top:1px;">'
+                   '<span style="color:#22c55e;">&#10003; Aprova</span>&nbsp;&nbsp;'
+                   '<span style="color:#f87171;">&#10007; Reprova</span></div>')
+        flow = _arm.join(parts) + _arm + dec
+    else:
+        parts = []
+        for n in fases:
+            if n == "Motor de Crédito":
+                parts.append(_box(n, "motor",
+                             '<div style="color:#8b93c9;font-size:8.5px;">&#128269; 14 sub-etapas &#183; clique em Abrir</div>'))
+            else:
+                parts.append(_box(n, "norm"))
+        flow = _arr.join(parts)
 
-    _motor = (
-        '<details open style="flex-shrink:0;align-self:flex-start;">'
-        '<summary style="list-style:none;cursor:pointer;width:162px;min-width:162px;'
-        'background:rgba(99,102,241,0.10);border:1.5px solid #6366f1;border-radius:9px;padding:9px 11px;">'
-        '<div style="display:flex;align-items:center;justify-content:space-between;">'
-        '<div style="width:20px;height:20px;border-radius:50%;background:#312e81;color:#c7d2fe;'
-        'font-size:11px;font-weight:700;line-height:20px;text-align:center;">2</div>'
-        '<span style="color:#a5b4fc;font-size:13px;">&#9662;</span></div>'
-        '<div style="color:#c7d2fe;font-size:12px;font-weight:700;line-height:1.25;margin-top:6px;">Motor de Cr&#233;dito</div>'
-        '<div style="color:#7c83a3;font-size:9px;margin-top:3px;">clique p/ abrir/fechar</div>'
-        '</summary>'
-        '<div style="width:232px;margin-top:8px;border:1px dashed rgba(99,102,241,0.45);'
-        'border-radius:9px;padding:8px 9px;background:rgba(99,102,241,0.05);">'
-        '<div style="color:#a5b4fc;font-size:8.5px;font-weight:700;text-transform:uppercase;'
-        'letter-spacing:0.5px;margin-bottom:6px;">Sub-etapas (n&#237;vel 1)</div>'
-        + _sub_items +
-        '<div style="display:flex;align-items:center;gap:8px;padding:4px 7px;margin-top:6px;'
-        'background:#1a1420;border:1px solid rgba(167,139,250,0.5);border-radius:6px;">'
-        '<span style="color:#e2e8f0;font-size:9.5px;font-weight:700;">Decis&#227;o Motor</span>'
-        '<span style="color:#22c55e;font-size:9.5px;">&#10003; Aprova</span>'
-        '<span style="color:#f87171;font-size:9.5px;">&#10007; Reprova</span></div>'
-        '</div></details>'
-    )
-
-    parts = [(_motor if num == "2" else _box(num, nome, ordem)) for num, nome, ordem in fases]
-    flow = _arr.join(parts)
-
-    header = (
-        '<div style="color:#FEC52E;font-size:13px;font-weight:700;margin:0 0 2px;">'
-        'Fluxo do Workflow 166 &#8212; Consignado Privado</div>'
-        '<div style="color:#64748b;font-size:11px;margin:0 0 10px;">'
-        'v166 (c&#243;digo 668, mestre 20) &#183; <b style="color:#94a3b8;">16 fases</b> &#183; '
-        'clique em <b style="color:#94a3b8;">Motor de Cr&#233;dito</b> para expandir/recolher as sub-etapas</div>'
-    )
-
-    return (
-        header +
-        '<div style="max-height:440px;overflow:auto;border:1px solid #2a2620;border-radius:10px;'
-        'background:#100e0a;padding:16px 18px;">'
-        '<div style="display:flex;align-items:flex-start;width:max-content;">' + flow + '</div>'
-        '</div>'
-    )
+    return ('<div style="overflow:auto;border:1px solid #2a2620;border-radius:10px;'
+            'background:#100e0a;padding:16px 18px;">'
+            '<div style="display:flex;align-items:stretch;width:max-content;">' + flow + '</div></div>')
 
 
 def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> str:
@@ -4196,9 +4160,36 @@ try:
             etapas_d = agg.get("etapas", {})
             etapa_motivos_d = agg.get("etapa_motivos", {})
             
-            # Diagrama interativo do Workflow 166 (retângulo com scroll H+V; 16 fases de
-            # topo em fluxo; Motor de Crédito expansível um nível). Via components.html (JS).
-            st.markdown(_html_wf166_diagrama(), unsafe_allow_html=True)
+            # Diagrama interativo do Workflow 166 — navegação drill-down por nível.
+            # @st.fragment: Abrir/Voltar faz rerun só desta seção (rápido, sem pular o
+            # scroll). components.html renderizava vazio no Streamlit Cloud.
+            @st.fragment
+            def _wf166_frag():
+                st.session_state.setdefault("wf166_lvl", "root")
+                if st.session_state["wf166_lvl"] == "motor":
+                    _cbk, _cbc = st.columns([1.4, 8], vertical_alignment="center")
+                    with _cbk:
+                        if st.button("◂ Voltar", key="wf166_back", use_container_width=True):
+                            st.session_state["wf166_lvl"] = "root"
+                            st.rerun(scope="fragment")
+                    with _cbc:
+                        st.markdown('<div style="color:#94a3b8;font-size:13px;padding-top:5px;">'
+                                    '&#128194; Workflow 166 &nbsp;&#8250;&nbsp; '
+                                    '<b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></div>',
+                                    unsafe_allow_html=True)
+                else:
+                    _cbc, _cbe = st.columns([7, 2.4], vertical_alignment="center")
+                    with _cbc:
+                        st.markdown('<div style="color:#94a3b8;font-size:13px;padding-top:5px;">'
+                                    '&#128194; Workflow 166 &#183; '
+                                    '<span style="color:#64748b;">n&#237;vel externo (16 fases)</span></div>',
+                                    unsafe_allow_html=True)
+                    with _cbe:
+                        if st.button("Abrir Motor de Crédito  ›", key="wf166_enter", use_container_width=True):
+                            st.session_state["wf166_lvl"] = "motor"
+                            st.rerun(scope="fragment")
+                st.markdown(_html_wf166_flow(st.session_state["wf166_lvl"]), unsafe_allow_html=True)
+            _wf166_frag()
             
             # 2 abas: Visão geral | Visão de Funil
             if etapas_d and n_rep > 0:
