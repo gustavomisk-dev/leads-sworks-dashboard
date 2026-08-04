@@ -1322,6 +1322,38 @@ def _fig_dist_prazo(prazo_dict: dict, titulo: str):
     return fig
 
 
+def _fig_barras_v(pairs, titulo: str, x_title: str = "", y_title: str = "Contratos"):
+    """Barras VERTICAIS a partir de pares ORDENADOS (label, valor). y = valor; rótulo = %
+    do total nas barras ≥3%. Genérico (faixas etárias, etc.); preserva a ordem dada."""
+    _pares = [(str(_l), _v) for _l, _v in pairs if _v]
+    if not _pares:
+        return None
+    _tot = sum(_v for _, _v in _pares)
+    if not _tot:
+        return None
+    _xs  = [_l for _l, _ in _pares]
+    _ys  = [_v for _, _v in _pares]
+    _pct = [100.0 * _v / _tot for _v in _ys]
+    _txt = [f"{_p:.0f}%" if _p >= 3 else "" for _p in _pct]
+    _mx  = max(_ys)
+    _shades = [f"rgba(96,165,250,{0.40 + 0.55*(_v/_mx):.2f})" for _v in _ys]
+    fig = go.Figure(go.Bar(
+        x=_xs, y=_ys, customdata=_pct,
+        marker=dict(color=_shades, line=dict(color="#0d0c0a", width=0.5)),
+        text=_txt, textposition="outside", textfont=dict(size=12, color="#cbd5e1"),
+        cliponaxis=False,
+        hovertemplate="%{x}: <b>%{y:,}</b> · %{customdata:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+        title=dict(text=titulo, font=_TF),
+        xaxis=dict(title=x_title, type="category", tickfont=_AF, showgrid=False, zeroline=False),
+        yaxis=dict(title=y_title, tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+        margin=dict(t=50, b=45, l=10, r=10), height=340,
+    )
+    return fig
+
+
 def _fig_barras_reais(data_dict: dict, titulo: str, hex_color: str, n: int = 12):
     """Barras horizontais com rótulos em R$. data_dict = {label: valor_float} (ordem desc)."""
     items = [(k, v) for k, v in data_dict.items() if v][:n]
@@ -4762,6 +4794,9 @@ try:
             else:
                 # ── Agrega por dimensão (soma contratos, valor contratado e liberado) ──────
                 _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
+                _cid_d: dict = {}        # cidade -> {n, valor, liberado}
+                _gen_d: dict = {}        # genero -> contagem
+                _idades: list = []       # idades dos tomadores
                 _iof_tot = 0.0
                 _prz_vals = []
                 _tx_pz    = []   # (taxa, prazo) para média ponderada pelo nº de parcelas
@@ -4780,6 +4815,13 @@ try:
                     _bump(_cnae_d, _rec.get("cnae"),   _rec)
                     _bump(_ori_d,  _rec.get("origem"), _rec)
                     _bump(_uf_d,   _rec.get("uf"),     _rec)
+                    _bump(_cid_d,  _rec.get("cidade"), _rec)
+                    _g = str(_rec.get("genero") or "").strip().upper()
+                    if _g:
+                        _gen_d[_g] = _gen_d.get(_g, 0) + 1
+                    _ida = _rec.get("idade")
+                    if _ida:
+                        _idades.append(int(_ida))
                     _iof_tot += _rec.get("iof", 0.0) or 0.0
                     if _rec.get("prazo"):
                         _prz_vals.append(_rec["prazo"])
@@ -4886,6 +4928,40 @@ try:
                                     pct_base=_n_det, show_abs=True)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+                # ── Distribuição de Idade do tomador (faixas etárias) ──────────────────────
+                _FAIXAS_IDADE = [("≤24", 0, 24), ("25-34", 25, 34), ("35-44", 35, 44),
+                                 ("45-54", 45, 54), ("55-64", 55, 64), ("65+", 65, 200)]
+                _id_counts = {_lbl: 0 for _lbl, _, _ in _FAIXAS_IDADE}
+                for _a in _idades:
+                    for _lbl, _lo, _hi in _FAIXAS_IDADE:
+                        if _lo <= _a <= _hi:
+                            _id_counts[_lbl] += 1
+                            break
+                fig = _fig_barras_v([(_lbl, _id_counts[_lbl]) for _lbl, _, _ in _FAIXAS_IDADE],
+                                    "Distribuição de Idade — Tomadores Desembolsados", "Faixa etária")
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+                # ── Distribuição por Gênero do tomador ─────────────────────────────────────
+                _GEN_LBL = {"M": "Masculino", "F": "Feminino"}
+                _gen_chart = {_GEN_LBL.get(_k, _k or "—"): _v
+                              for _k, _v in sorted(_gen_d.items(), key=lambda x: -x[1])}
+                fig = _fig_barras_h(_gen_chart, "Distribuição por Gênero — Tomadores", "#ec4899",
+                                    pct_base=sum(_gen_d.values()), show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+
+                # ── Top 50 Cidades por nº de desembolsos ────────────────────────────────────
+                _cid_items = _items(_cid_d, "n")
+                _cid_chart = {_trunc(it["label"]): it["n"] for it in _cid_items[:15]}
+                fig = _fig_barras_h(_cid_chart, "Top 15 Cidades · Nº de Desembolsos", "#22c55e",
+                                    pct_base=_n_det, show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True, config=_CONF)
+                tbl = _html_tabela_desemb(_cid_items, "Cidade", _n_det, n=50)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
 
 except Exception as _exc:
     import traceback as _tb
