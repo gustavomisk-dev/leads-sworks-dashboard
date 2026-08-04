@@ -1731,13 +1731,12 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     return title_html + wrapper + legend
 
 
-def _html_wf166_flow() -> str:
-    """Documento HTML completo (para components.html) do Workflow 166 — drill-down por clique.
+def _html_wf166_flow(nivel: str = "root") -> str:
+    """HTML (st.markdown) do fluxo de UM nível do Workflow 166 — drill-down por clique.
 
-    Nível externo: 16 fases em fluxo horizontal (só o nome). Clicar na caixa 'Motor de
-    Crédito' entra nela: as 16 fases somem e aparece o fluxo INTERNO (14 sub-etapas +
-    Decisão Motor). Voltar = setinha discreta no topo-esquerdo. Breadcrumb mostra onde
-    você está. Tudo client-side (JS), sem rerun."""
+    A caixa 'Motor de Crédito' é um link (?wf166=motor) — clicar entra nela; dentro,
+    uma setinha ◂ pequena (?wf166=root) volta. Só o nível atual aparece. Renderiza via
+    st.markdown (links de query-param; o components.html/iframe vinha vazio neste deploy)."""
     fases = [
         "Inicializa Dados", "Motor de Crédito", "Cálculo Proposta", "Cadastro Proposta",
         "Formalização", "Atualização Dados Cliente", "Obter CCB", "Envia CCB Único",
@@ -1751,86 +1750,55 @@ def _html_wf166_flow() -> str:
         "PH3A PJ", "BDC PF Dados Unificados", "BDC PF Risco Financeiro",
         "BDC PF Dados Básicos", "PH3A PF",
     ]
-    _arr = '<span class="arr">&#9656;</span>'
-    _arm = '<span class="arr sm">&#9656;</span>'
+    _box_base = ("min-height:56px;border-radius:9px;padding:10px 11px;flex-shrink:0;display:flex;"
+                 "flex-direction:column;justify-content:center;gap:4px;")
+    _arr = '<span style="align-self:center;color:#4b5563;font-size:15px;padding:0 5px;flex-shrink:0;">&#9656;</span>'
+    _arm = '<span style="align-self:center;color:#6366f1;font-size:12px;padding:0 3px;flex-shrink:0;">&#9656;</span>'
 
-    # nível externo (root)
-    root_parts = []
-    for n in fases:
-        if n == "Motor de Crédito":
-            root_parts.append(
-                '<div class="box motor" onclick="wfEnter()" title="Clique para entrar">'
-                '<div class="nm">Motor de Cr&#233;dito</div>'
-                '<div class="hint">&#128269; 14 sub-etapas &#183; clique para abrir</div></div>')
-        else:
-            root_parts.append('<div class="box"><div class="nm">' + n + '</div></div>')
-    root_flow = _arr.join(root_parts)
+    def _box(nome):
+        return ('<div style="width:150px;min-width:150px;background:#15130e;border:1px solid #332e25;'
+                + _box_base + '"><div style="color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25;">'
+                + nome + '</div></div>')
 
-    # dentro do Motor
-    motor_parts = ['<div class="box sub"><div class="nm">' + n + '</div></div>' for n in motor]
-    dec = ('<div class="box dec"><div class="nm">Decis&#227;o Motor</div>'
-           '<div class="decr"><span class="ok">&#10003; Aprova</span>&nbsp;&nbsp;'
-           '<span class="rej">&#10007; Reprova</span></div></div>')
-    motor_flow = _arm.join(motor_parts) + _arm + dec
+    if nivel == "motor":
+        crumb = ('<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+                 '<a href="?wf166=root" target="_self" title="Voltar" style="text-decoration:none;'
+                 'color:#a5b4fc;font-size:14px;line-height:1;padding:4px 10px;border:1px solid #332e25;'
+                 'border-radius:7px;background:#15130e;">&#9664;</a>'
+                 '<span style="color:#94a3b8;font-size:13px;">&#128194; Workflow 166 &nbsp;&#8250;&nbsp; '
+                 '<b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></span></div>')
+        parts = [
+            '<div style="width:140px;min-width:140px;background:#141019;border:1px solid rgba(99,102,241,0.35);'
+            + _box_base + '"><div style="color:#c4b5fd;font-size:12px;font-weight:600;line-height:1.25;">'
+            + n + '</div></div>'
+            for n in motor
+        ]
+        dec = ('<div style="width:150px;min-width:150px;background:#1a1420;border:1px solid rgba(167,139,250,0.55);'
+               + _box_base + '"><div style="color:#e2e8f0;font-size:12px;font-weight:600;">Decis&#227;o Motor</div>'
+               '<div style="font-size:9.5px;font-weight:600;"><span style="color:#22c55e;">&#10003; Aprova</span>'
+               '&nbsp;&nbsp;<span style="color:#f87171;">&#10007; Reprova</span></div></div>')
+        flow = _arm.join(parts) + _arm + dec
+    else:
+        crumb = ('<div style="margin-bottom:10px;color:#94a3b8;font-size:13px;">'
+                 '&#128194; Workflow 166 &#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; '
+                 'clique no Motor de Cr&#233;dito para entrar</span></div>')
+        parts = []
+        for n in fases:
+            if n == "Motor de Crédito":
+                parts.append(
+                    '<a href="?wf166=motor" target="_self" style="text-decoration:none;width:154px;min-width:154px;'
+                    'background:rgba(99,102,241,0.12);border:1.5px solid #6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.07);'
+                    + _box_base + '"><div style="color:#c7d2fe;font-size:12px;font-weight:700;line-height:1.25;">'
+                    'Motor de Cr&#233;dito</div>'
+                    '<div style="color:#8b93c9;font-size:8.5px;">&#128269; 14 sub-etapas &#183; clique para abrir</div></a>')
+            else:
+                parts.append(_box(n))
+        flow = _arr.join(parts)
 
-    css = (
-        "*{box-sizing:border-box}"
-        "html,body{margin:0;padding:0;background:#0f0e0b;"
-        "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}"
-        "#bar{display:flex;align-items:center;gap:10px;padding:0 2px 10px}"
-        "#back{display:none;cursor:pointer;color:#a5b4fc;font-size:15px;line-height:1;"
-        "padding:4px 9px;border:1px solid #332e25;border-radius:7px;background:#15130e;flex-shrink:0}"
-        "#back:hover{background:#1a1726;border-color:#6366f1}"
-        "#crumb{color:#94a3b8;font-size:13px}#crumb b{color:#c7d2fe}.muted{color:#64748b}"
-        ".rect{overflow-x:auto;overflow-y:hidden;border:1px solid #2a2620;border-radius:10px;"
-        "background:#100e0a;padding:14px 16px}"
-        ".flow{display:flex;align-items:stretch;width:max-content}"
-        ".box{width:150px;min-width:150px;min-height:56px;background:#15130e;border:1px solid #332e25;"
-        "border-radius:9px;padding:10px 11px;display:flex;flex-direction:column;justify-content:center;"
-        "gap:4px;flex-shrink:0}"
-        ".nm{color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25}"
-        ".box.motor{background:rgba(99,102,241,0.12);border:1.5px solid #6366f1;cursor:pointer;"
-        "box-shadow:0 0 0 3px rgba(99,102,241,0.07)}"
-        ".box.motor:hover{background:rgba(99,102,241,0.22)}.box.motor .nm{color:#c7d2fe}"
-        ".hint{color:#8b93c9;font-size:8.5px}"
-        ".box.sub{width:140px;min-width:140px;background:#141019;border:1px solid rgba(99,102,241,0.35)}"
-        ".box.sub .nm{color:#c4b5fd}"
-        ".box.dec{background:#1a1420;border:1px solid rgba(167,139,250,0.55)}"
-        ".arr{align-self:center;color:#4b5563;font-size:15px;padding:0 5px;flex-shrink:0}"
-        ".arr.sm{color:#6366f1;font-size:12px;padding:0 3px}"
-        ".decr{font-size:9.5px;font-weight:600}.ok{color:#22c55e}.rej{color:#f87171}"
-    )
-
-    js = (
-        "function wfEnter(){"
-        "document.getElementById('root').style.display='none';"
-        "document.getElementById('motor').style.display='flex';"
-        "document.getElementById('back').style.display='inline-block';"
-        "document.getElementById('crumb').innerHTML='&#128194; Workflow 166 &nbsp;&#8250;&nbsp; <b>Motor de Cr&#233;dito</b>';"
-        "document.getElementById('rect').scrollLeft=0;}"
-        "function wfBack(){"
-        "document.getElementById('motor').style.display='none';"
-        "document.getElementById('root').style.display='flex';"
-        "document.getElementById('back').style.display='none';"
-        "document.getElementById('crumb').innerHTML='&#128194; Workflow 166 &#183; <span class=muted>n&#237;vel externo (16 fases)</span>';"
-        "document.getElementById('rect').scrollLeft=0;}"
-    )
-
-    bar = ('<div id="bar"><span id="back" onclick="wfBack()" title="Voltar">&#9664;</span>'
-           '<span id="crumb">&#128194; Workflow 166 &#183; '
-           '<span class="muted">n&#237;vel externo (16 fases)</span></span></div>')
-
-    return (
-        '<!DOCTYPE html><html lang="pt-br"><head><meta charset="utf-8">'
-        '<style>' + css + '</style></head><body>'
-        + bar +
-        '<div class="rect" id="rect">'
-        '<div class="flow" id="root">' + root_flow + '</div>'
-        '<div class="flow" id="motor" style="display:none">' + motor_flow + '</div>'
-        '</div>'
-        '<script>' + js + '</script>'
-        '</body></html>'
-    )
+    return (crumb +
+            '<div style="overflow:auto;border:1px solid #2a2620;border-radius:10px;background:#100e0a;'
+            'padding:14px 16px;"><div style="display:flex;align-items:stretch;width:max-content;">'
+            + flow + '</div></div>')
 
 
 def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> str:
@@ -4204,7 +4172,11 @@ try:
             # client-side, instantâneo). Clicar na caixa 'Motor de Crédito' entra nela; a
             # setinha ◂ discreta no topo-esquerdo volta. Documento HTML completo (renderiza
             # de forma confiável no iframe, ao contrário do fragmento HTML anterior).
-            components.html(_html_wf166_flow(), height=195, scrolling=False)
+            # Diagrama do Workflow 166 — drill-down por clique via link de query-param
+            # (st.markdown renderiza sempre; o iframe do components.html vinha vazio aqui).
+            _wf_lvl = st.query_params.get("wf166", "root")
+            _wf_lvl = _wf_lvl if _wf_lvl in ("root", "motor") else "root"
+            st.markdown(_html_wf166_flow(_wf_lvl), unsafe_allow_html=True)
             
             # 2 abas: Visão geral | Visão de Funil
             if etapas_d and n_rep > 0:
