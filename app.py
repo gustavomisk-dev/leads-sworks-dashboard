@@ -3183,20 +3183,28 @@ try:
             if st.session_state.get("_baixando"):
                 components.html('''
 <script>
-setTimeout(function(){
-  try{
-    var d=window.parent.document, o=d.location.origin;
+(function(){
+  var d=window.parent.document;
+  // Pronto = sem DOM "stale" (do rerun) e todos os graficos plotly ja com <svg>.
+  function ready(){
+    if(d.querySelector('[data-stale="true"]')) return false;
+    var divs=d.querySelectorAll('.js-plotly-plot'), drawn=0;
+    for(var k=0;k<divs.length;k++){ if(divs[k].querySelector('svg')) drawn++; }
+    return divs.length===0 || drawn>=divs.length;
+  }
+  function capture(){
+   try{
+    var o=d.location.origin;
     // Le TODAS as folhas (externas + inline). O emotion do Streamlit usa "speedy mode":
-    // injeta as regras no CSSOM e deixa as <style> VAZIAS no HTML -> tem que ler .cssRules
-    // (nao o texto das <style>), senao o estilo dos componentes se perde. Ordem do
-    // document.styleSheets = ordem da cascata; concatenando na ordem, preserva a cascata.
+    // injeta as regras no CSSOM e deixa as <style> VAZIAS no HTML -> tem que ler .cssRules.
+    // Ordem do document.styleSheets = ordem da cascata; concatenando, preserva a cascata.
     var css='';
     for(var i=0;i<d.styleSheets.length;i++){
       var ss=d.styleSheets[i]; if(!ss) continue;
       try{ var r=ss.cssRules; for(var j=0;j<r.length;j++){ css+=r[j].cssText; } }catch(_e){}
     }
     var c=d.documentElement.cloneNode(true);
-    c.querySelectorAll('script,iframe,style,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
+    c.querySelectorAll('script,iframe,style,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"],[data-stale="true"]').forEach(function(n){n.remove();});
     var hd=c.querySelector('head');
     if(hd){
       var b=d.createElement('base'); b.setAttribute('href',o+'/'); hd.insertBefore(b,hd.firstChild);
@@ -3209,8 +3217,11 @@ setTimeout(function(){
     a.download='zileads_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.html';
     d.body.appendChild(a); a.click(); d.body.removeChild(a); URL.revokeObjectURL(u);
     var sp=d.getElementById('_dlspin'); if(sp){sp.innerHTML='<div style="color:#8a8a8a;text-align:center;line-height:38px">&#8595;</div>';}
-  }catch(e){ try{window.parent.alert('Falha ao gerar HTML: '+e.message);}catch(_){}}
-},700);
+   }catch(e){ try{window.parent.alert('Falha ao gerar HTML: '+e.message);}catch(_){}}
+  }
+  var tries=0;
+  (function w(){ if(ready()||tries>50){ capture(); } else { tries++; setTimeout(w,200); } })();
+})();
 </script>
 ''', height=0)
                 st.session_state["_baixando"] = False
