@@ -550,6 +550,11 @@ def listar_datas() -> list:
 # mudam) → cache permanente: baixam 1x e reusam pela vida do app (compartilhado entre
 # sessões). Isso elimina o "Running carregar_dia" nas interações repetidas.
 _DIAS_MUTAVEIS = 8
+# Versão do modelo de dados dos JSONs diários. BUMP quando re-exportar dias históricos
+# (novos campos em desembolsos_detalhe etc.) — muda a chave do cache e força re-fetch,
+# sem depender do processo reiniciar. Histórico ganha TTL de 12h como rede de segurança
+# (auto-heal), mantendo a performance dentro da sessão.
+_DATA_VER = "2026-08-04-desemb-demografia"
 
 
 def _fetch_dia(dia_str: str) -> dict:
@@ -561,20 +566,21 @@ def _fetch_dia(dia_str: str) -> dict:
 
 
 @st.cache_data(ttl=1800, max_entries=30)   # recentes: 30 min (coletor publica a cada ~30 min)
-def _carregar_dia_recente(dia_str: str) -> dict:
+def _carregar_dia_recente(dia_str: str, _ver: str = "") -> dict:
     return _fetch_dia(dia_str)
 
 
-@st.cache_data(max_entries=400)            # históricos: sem TTL = cache permanente
-def _carregar_dia_hist(dia_str: str) -> dict:
+@st.cache_data(ttl=43200, max_entries=400)  # históricos: TTL 12h (auto-heal) + _ver p/ bust
+def _carregar_dia_hist(dia_str: str, _ver: str = "") -> dict:
     return _fetch_dia(dia_str)
 
 
 def carregar_dia(dia_str: str) -> dict:
     # BRT (Brasil sem horário de verão desde 2019). Comparação lexicográfica de "YYYYMMDD"
-    # = cronológica. Dia dentro da janela mutável → cache curto; senão → permanente.
+    # = cronológica. Dia dentro da janela mutável → cache curto; senão → 12h + versão.
     _limite = (datetime.utcnow() - timedelta(hours=3) - timedelta(days=_DIAS_MUTAVEIS)).strftime("%Y%m%d")
-    return _carregar_dia_recente(dia_str) if dia_str >= _limite else _carregar_dia_hist(dia_str)
+    return (_carregar_dia_recente(dia_str, _DATA_VER) if dia_str >= _limite
+            else _carregar_dia_hist(dia_str, _DATA_VER))
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
