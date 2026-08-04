@@ -3194,11 +3194,13 @@ setTimeout(function(){
       try{ var r=ss.cssRules; for(var j=0;j<r.length;j++){ ext+=r[j].cssText; } }catch(_e){}
     }
     var c=d.documentElement.cloneNode(true);
-    c.querySelectorAll('script,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
+    c.querySelectorAll('script,iframe,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
     var hd=c.querySelector('head');
     if(hd){
+      // CSS externo embutido vai ANTES dos <style> do emotion (preserva a cascata original);
+      // <base> logo acima, para as fontes (url() relativos) carregarem da origem do app.
+      if(ext){ var st=d.createElement('style'); st.textContent=ext; hd.insertBefore(st,hd.firstChild); }
       var b=d.createElement('base'); b.setAttribute('href',o+'/'); hd.insertBefore(b,hd.firstChild);
-      if(ext){ var st=d.createElement('style'); st.textContent=ext; hd.appendChild(st); }
     }
     var s2=c.querySelector('#_dlspin'); if(s2){s2.innerHTML='';}
     var h='<!doctype html>'+c.outerHTML;
