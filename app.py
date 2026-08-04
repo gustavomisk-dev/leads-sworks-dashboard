@@ -3228,6 +3228,8 @@ try:
             # já aplicando o filtro de Origem — `desembolsos_detalhe` carrega o campo
             # `origem` por registro. Toda a informação de desembolso do dash (KPIs do
             # topo, seção 1 e seção 14) é derivada daqui, então tudo respeita o filtro.
+            # Desembolso = QUALQUER status com PaymentDate (não só aprovados; inclui casos
+            # raros s7/s8 que tiveram ordem de pagamento). Cada registro traz `status`.
             _ori_set = set(_ori_ativas) if _ori_ativas else None
             _desemb_det: list = []
             for _dd in _d_desemb_datas:
