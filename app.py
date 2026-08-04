@@ -582,7 +582,7 @@ def _merge_segmentos(segs: list) -> dict:
     """Combina segmentos por-origem (mesma forma dos campos globais do JSON) em um
     único dict com a MESMA forma que `agregar` lê por dia. Usado para reconstruir um
     dia filtrado somando apenas as origens selecionadas."""
-    _flat = ["taxa_dist", "etapas", "bloqueios", "top_motivos", "top_motivos_det",
+    _flat = ["taxa_dist", "prazo_dist", "etapas", "bloqueios", "top_motivos", "top_motivos_det",
              "top_empregadores", "top_cbos", "top_empregadores_rep", "top_cnaes",
              "top_cbos_rep", "top_ufs"]
     out: dict = {f: {} for f in _flat}
@@ -710,6 +710,7 @@ def agregar(dias_raw: list) -> dict:
     origens_all: set = set()
     emp_ap_stats_raw: dict = {}
     taxa_dist: dict = {}
+    prazo_dist: dict = {}
     valores_cont     = []
     aguardando          = 0
     aguardando_valor    = 0.0
@@ -829,6 +830,9 @@ def agregar(dias_raw: list) -> dict:
                     _tk = f"{_st / _nt:.2f}"
                     taxa_dist[_tk] = taxa_dist.get(_tk, 0) + _nt
 
+        for _pk, _pcnt in (d.get("prazo_dist") or {}).items():
+            prazo_dist[_pk] = prazo_dist.get(_pk, 0) + _pcnt
+
         valores_cont.extend(d.get("valores_contratacao", []))
         aguardando          += d.get("aguardando", 0)
         aguardando_valor    += d.get("aguardando_valor", 0.0)
@@ -920,6 +924,7 @@ def agregar(dias_raw: list) -> dict:
         "emp_motivos_leads": {emp: dict(m) for emp, m in emp_motivos_leads.items()},
         "emp_ap_stats":      emp_ap_stats_final,
         "taxa_dist":         taxa_dist,
+        "prazo_dist":        prazo_dist,
         "valores_contratacao": valores_cont,
         "projecao_tipos": {
             ts: {
@@ -1263,6 +1268,41 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
         yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
         margin=dict(t=50, b=20, l=20, r=110 if text_auto else 60), height=h,
+    )
+    return fig
+
+
+def _fig_dist_prazo(prazo_dict: dict, titulo: str):
+    """Barras VERTICAIS da distribuição de nº de parcelas ({prazo: contagem}),
+    ordenadas por prazo crescente (12, 24, 36, 48, …). y = contratos; rótulo = % do total.
+    Vertical (e não horizontal como a de taxa) porque há muitos prazos distintos: a ordem
+    numérica no eixo X evidencia os picos em 12/24/36/48 sem cortar nenhum valor."""
+    if not prazo_dict:
+        return None
+    _itens = sorted(((int(float(k)), v) for k, v in prazo_dict.items()), key=lambda x: x[0])
+    _tot = sum(v for _, v in _itens)
+    if not _tot:
+        return None
+    _xs  = [str(k) for k, _ in _itens]
+    _ys  = [v for _, v in _itens]
+    _pct = [100.0 * v / _tot for v in _ys]
+    _txt = [f"{p:.0f}%" if p >= 3 else "" for p in _pct]   # rotula só barras ≥3% (evita poluir)
+    _mx  = max(_ys)
+    _shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/_mx):.2f})" for v in _ys]
+    fig = go.Figure(go.Bar(
+        x=_xs, y=_ys, customdata=_pct,
+        marker=dict(color=_shades, line=dict(color="#0d0c0a", width=0.5)),
+        text=_txt, textposition="outside", textfont=dict(size=12, color="#cbd5e1"),
+        cliponaxis=False,
+        hovertemplate="%{x} parcelas: <b>%{y:,}</b> contrato(s) · %{customdata:.1f}%<extra></extra>",
+    ))
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+        title=dict(text=titulo, font=_TF),
+        xaxis=dict(title="Número de parcelas", type="category", tickfont=_AF,
+                   showgrid=False, zeroline=False),
+        yaxis=dict(title="Contratos", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+        margin=dict(t=50, b=45, l=10, r=10), height=360,
     )
     return fig
 
@@ -3462,6 +3502,20 @@ try:
                 _msg_ori = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
                 st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
 
+            # Distribuição do número de parcelas — desembolsados (de _desemb_det, por registro).
+            # Usa n_parcelas (só NumeroParcelasContrato, sem fallback p/ PrazoDigitado):
+            # registros do histórico sem esse campo (< 26/06/2026) ficam de fora de propósito.
+            _dz_prazo_dist: dict = {}
+            for _dd in _desemb_det:
+                _pz = _dd.get("n_parcelas")
+                if _pz and _pz > 0:
+                    _pk = str(int(round(_pz)))
+                    _dz_prazo_dist[_pk] = _dz_prazo_dist.get(_pk, 0) + 1
+            _fig_pz_dz = _fig_dist_prazo(
+                _dz_prazo_dist, "Distribuição de Nº de Parcelas — Desembolsados")
+            if _fig_pz_dz:
+                st.plotly_chart(_fig_pz_dz, use_container_width=True, config=_CONF)
+
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
             @st.fragment
             def _sec2_frag():
@@ -4408,6 +4462,12 @@ try:
                     )
                     if fig_taxa:
                         st.plotly_chart(fig_taxa, use_container_width=True, config=_CONF)
+
+            # Distribuição do número de parcelas — aprovados
+            _fig_pz_ap = _fig_dist_prazo(
+                agg.get("prazo_dist", {}), "Distribuição de Nº de Parcelas — Aprovados")
+            if _fig_pz_ap:
+                st.plotly_chart(_fig_pz_ap, use_container_width=True, config=_CONF)
 
             # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
 
