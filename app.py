@@ -4954,9 +4954,9 @@ try:
 
                 # ── Top 50 Cidades por nº de desembolsos ────────────────────────────────────
                 _cid_items = _items(_cid_d, "n")
-                _cid_chart = {_trunc(it["label"]): it["n"] for it in _cid_items[:15]}
-                fig = _fig_barras_h(_cid_chart, "Top 15 Cidades · Nº de Desembolsos", "#22c55e",
-                                    pct_base=_n_det, show_abs=True)
+                _cid_chart = {_trunc(it["label"]): it["n"] for it in _cid_items[:50]}
+                fig = _fig_barras_h(_cid_chart, "Top 50 Cidades · Nº de Desembolsos", "#22c55e",
+                                    n=50, pct_base=_n_det, show_abs=True)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
                 tbl = _html_tabela_desemb(_cid_items, "Cidade", _n_det, n=50)
