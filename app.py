@@ -3186,21 +3186,21 @@ try:
 setTimeout(function(){
   try{
     var d=window.parent.document, o=d.location.origin;
-    // Embute o CSS das folhas EXTERNAS (as <style> inline ja vao no clone) -> self-contained
-    var ext='';
+    // Le TODAS as folhas (externas + inline). O emotion do Streamlit usa "speedy mode":
+    // injeta as regras no CSSOM e deixa as <style> VAZIAS no HTML -> tem que ler .cssRules
+    // (nao o texto das <style>), senao o estilo dos componentes se perde. Ordem do
+    // document.styleSheets = ordem da cascata; concatenando na ordem, preserva a cascata.
+    var css='';
     for(var i=0;i<d.styleSheets.length;i++){
-      var ss=d.styleSheets[i];
-      if(!ss||!ss.href) continue;
-      try{ var r=ss.cssRules; for(var j=0;j<r.length;j++){ ext+=r[j].cssText; } }catch(_e){}
+      var ss=d.styleSheets[i]; if(!ss) continue;
+      try{ var r=ss.cssRules; for(var j=0;j<r.length;j++){ css+=r[j].cssText; } }catch(_e){}
     }
     var c=d.documentElement.cloneNode(true);
-    c.querySelectorAll('script,iframe,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
+    c.querySelectorAll('script,iframe,style,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
     var hd=c.querySelector('head');
     if(hd){
-      // CSS externo embutido vai ANTES dos <style> do emotion (preserva a cascata original);
-      // <base> logo acima, para as fontes (url() relativos) carregarem da origem do app.
-      if(ext){ var st=d.createElement('style'); st.textContent=ext; hd.insertBefore(st,hd.firstChild); }
       var b=d.createElement('base'); b.setAttribute('href',o+'/'); hd.insertBefore(b,hd.firstChild);
+      if(css){ var st=d.createElement('style'); st.textContent=css; hd.insertBefore(st,b.nextSibling); }
     }
     var s2=c.querySelector('#_dlspin'); if(s2){s2.innerHTML='';}
     var h='<!doctype html>'+c.outerHTML;
