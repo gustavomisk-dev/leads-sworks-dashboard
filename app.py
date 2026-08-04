@@ -3140,9 +3140,18 @@ try:
                 _cp_dl, _cp_dat, _cp_orig, _cp_ref = st.columns([0.4, 2.1, 2, 0.5])
                 with _cp_dl:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                    if st.button("↓", key="_dl_html_btn", width='stretch',
-                                 help="Baixar um HTML da visualização atual"):
-                        st.session_state["_baixar_html"] = True
+                    if st.session_state.get("_baixando"):
+                        st.markdown(
+                            "<div id='_dlspin' style='height:38px;display:flex;align-items:center;"
+                            "justify-content:center'><div style='width:15px;height:15px;border:2px solid "
+                            "#3a3733;border-top-color:#FEC52E;border-radius:50%;"
+                            "animation:_dlsp .7s linear infinite'></div></div>"
+                            "<style>@keyframes _dlsp{to{transform:rotate(360deg)}}</style>",
+                            unsafe_allow_html=True)
+                    elif st.button("↓", key="_dl_html_btn", width='stretch',
+                                   help="Baixar um HTML da visualização atual"):
+                        st.session_state["_baixando"] = True
+                        st.rerun()
                 with _cp_dat:
                     intervalo = st.date_input(
                         "Período de análise",
@@ -3167,26 +3176,33 @@ try:
                         listar_datas.clear()
                         st.rerun()
 
-            # Download de um HTML da visualização atual: ao clicar no ↓, injeta um JS
-            # (client-side) que captura o DOM ao vivo do parent e baixa como .html.
-            # setTimeout dá tempo do restante da página renderizar antes da captura.
-            if st.session_state.pop("_baixar_html", False):
-                components.html(
-                    "<script>"
-                    "setTimeout(function(){"
-                    "try{"
-                    "var d=window.parent.document;"
-                    "var h='<!doctype html>'+d.documentElement.outerHTML;"
-                    "var b=new Blob([h],{type:'text/html;charset=utf-8'});"
-                    "var u=URL.createObjectURL(b);"
-                    "var a=d.createElement('a');a.href=u;"
-                    "a.download='zileads_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.html';"
-                    "d.body.appendChild(a);a.click();d.body.removeChild(a);URL.revokeObjectURL(u);"
-                    "}catch(e){try{window.parent.alert('Falha ao gerar HTML: '+e.message);}catch(_){}}"
-                    "},700);"
-                    "</script>",
-                    height=0,
-                )
+            # Download de um HTML da visualização atual: com o spinner no lugar do ↓, injeta
+            # um JS que clona o DOM ao vivo do parent, REMOVE os <script> (evita re-hidratação
+            # que apagaria o snapshot) e insere <base href> na origem do app (p/ o CSS/fontes
+            # relativos carregarem). setTimeout dá tempo do restante da página renderizar.
+            if st.session_state.get("_baixando"):
+                components.html('''
+<script>
+setTimeout(function(){
+  try{
+    var d=window.parent.document, o=d.location.origin;
+    var c=d.documentElement.cloneNode(true);
+    c.querySelectorAll('script').forEach(function(s){s.remove();});
+    c.querySelectorAll('link[rel="modulepreload"],link[rel="preload"]').forEach(function(l){l.remove();});
+    var hd=c.querySelector('head');
+    if(hd){var b=d.createElement('base');b.setAttribute('href',o+'/');hd.insertBefore(b,hd.firstChild);}
+    var s2=c.querySelector('#_dlspin'); if(s2){s2.innerHTML='';}
+    var h='<!doctype html>'+c.outerHTML;
+    var bl=new Blob([h],{type:'text/html;charset=utf-8'}); var u=URL.createObjectURL(bl);
+    var a=d.createElement('a'); a.href=u;
+    a.download='zileads_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.html';
+    d.body.appendChild(a); a.click(); d.body.removeChild(a); URL.revokeObjectURL(u);
+    var sp=d.getElementById('_dlspin'); if(sp){sp.innerHTML='<div style="color:#8a8a8a;text-align:center;line-height:38px">&#8595;</div>';}
+  }catch(e){ try{window.parent.alert('Falha ao gerar HTML: '+e.message);}catch(_){}}
+},700);
+</script>
+''', height=0)
+                st.session_state["_baixando"] = False
 
             if isinstance(intervalo, (list, tuple)):
                 d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
