@@ -229,6 +229,7 @@ def _login_page(cookies: CookieController) -> None:
                         "display_name": user.get("display_name", email_in),
                         "_cookie_set":  True,
                         "_cookie_checked": True,
+                        "_login_via":   "senha",
                     })
                     st.rerun()
                 else:
@@ -239,6 +240,177 @@ def _login_page(cookies: CookieController) -> None:
                     st.error("E-mail ou senha incorretos.")
 
     st.stop()
+
+
+# ── Admin & histórico de acessos ────────────────────────────────────────────────
+# Papel de administrador + registro/consulta de acessos. Os acessos são gravados no
+# repositório PRIVADO (leads-sworks-data, o mesmo dos JSONs diários), em acessos/YYYYMMDD.json,
+# usando o token de st.secrets["github"] — nunca ficam no repositório público.
+
+_ADMIN_EMAILS = {"gustavo.misk@zilicred.com.br"}   # admins fixos; além do campo admin=true no secrets
+_ACESSOS_DIR  = "acessos"                           # pasta no repo privado
+
+
+def _is_admin_user(email: str) -> bool:
+    """True se o e-mail é admin — via lista fixa OU campo `admin` no bloco do usuário no secrets."""
+    if not email:
+        return False
+    if email.strip().lower() in _ADMIN_EMAILS:
+        return True
+    u = _find_user(email)
+    return bool(u and u.get("admin"))
+
+
+def _gh_get_file(path: str):
+    """(texto, sha) do arquivo no repo privado; (None, None) se não existir ou em erro."""
+    url = f"https://api.github.com/repos/{_REPO}/contents/{path}"
+    try:
+        r = requests.get(url, headers=_HEADERS_JSON, timeout=15)
+    except requests.RequestException:
+        return None, None
+    if r.status_code != 200:
+        return None, None
+    j = r.json()
+    try:
+        return base64.b64decode(j.get("content", "")).decode("utf-8"), j.get("sha")
+    except Exception:
+        return None, j.get("sha")
+
+
+def _gh_put_file(path: str, content: str, message: str, sha=None) -> bool:
+    """Cria/atualiza um arquivo no repo privado. sha obrigatório para atualizar."""
+    url = f"https://api.github.com/repos/{_REPO}/contents/{path}"
+    payload = {"message": message,
+               "content": base64.b64encode(content.encode("utf-8")).decode("ascii")}
+    if sha:
+        payload["sha"] = sha
+    try:
+        r = requests.put(url, headers=_HEADERS_JSON, json=payload, timeout=20)
+    except requests.RequestException:
+        return None
+    return r.status_code
+
+
+def _registrar_acesso(email: str, nome: str, via: str = "cookie") -> None:
+    """Anexa 1 evento de acesso ao arquivo do dia (acessos/YYYYMMDD.json) no repo privado.
+    Robusto: retry em 409 (escrita concorrente) e NUNCA levanta exceção (não pode derrubar o login)."""
+    try:
+        agora = datetime.utcnow() - timedelta(hours=3)   # BRT (Brasil sem horário de verão)
+        evento = {"ts": agora.strftime("%Y-%m-%dT%H:%M:%S"), "email": email, "nome": nome, "via": via}
+        path = f"{_ACESSOS_DIR}/{agora.strftime('%Y%m%d')}.json"
+        for _ in range(3):
+            content, sha = _gh_get_file(path)
+            try:
+                eventos = json.loads(content) if content else []
+                if not isinstance(eventos, list):
+                    eventos = []
+            except Exception:
+                eventos = []
+            eventos.append(evento)
+            corpo = json.dumps(eventos, ensure_ascii=False, indent=1)
+            code = _gh_put_file(path, corpo, f"acesso: {email} {evento['ts']}", sha)
+            if code in (200, 201):
+                return
+            if code != 409:      # 403/rede/etc — repetir não resolve
+                return
+    except Exception:
+        pass
+
+
+def _listar_acessos_arquivos() -> list:
+    """Nomes dos arquivos em acessos/ (YYYYMMDD.json), mais recentes primeiro."""
+    url = f"https://api.github.com/repos/{_REPO}/contents/{_ACESSOS_DIR}"
+    try:
+        r = requests.get(url, headers=_HEADERS_JSON, timeout=15)
+    except requests.RequestException:
+        return []
+    if r.status_code != 200:
+        return []
+    nomes = [it.get("name", "") for it in r.json()
+             if isinstance(it, dict) and str(it.get("name", "")).endswith(".json")]
+    return sorted(nomes, reverse=True)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _ler_acessos(max_dias: int = 90) -> list:
+    """Eventos de acesso dos últimos `max_dias` arquivos-dia do repo privado, mais recentes 1º.
+    Cache curto (2 min) para não refazer a leitura a cada rerun da página admin."""
+    eventos = []
+    for nome in _listar_acessos_arquivos()[:max_dias]:
+        content, _ = _gh_get_file(f"{_ACESSOS_DIR}/{nome}")
+        if not content:
+            continue
+        try:
+            arr = json.loads(content)
+            if isinstance(arr, list):
+                eventos.extend(x for x in arr if isinstance(x, dict))
+        except Exception:
+            pass
+    eventos.sort(key=lambda e: e.get("ts", ""), reverse=True)
+    return eventos
+
+
+def _pagina_acessos() -> None:
+    """Página admin: histórico de acessos (só chamada quando o usuário é admin)."""
+    st.markdown("<style>[data-testid='stHeader']{display:none!important}</style>", unsafe_allow_html=True)
+    _cb, _ct = st.columns([0.5, 9], vertical_alignment="center")
+    with _cb:
+        if st.button("◂", key="acessos_voltar", help="Voltar ao dashboard", use_container_width=True):
+            try:
+                del st.query_params["page"]
+            except Exception:
+                st.query_params.clear()
+            st.rerun()
+    with _ct:
+        st.markdown(
+            "<div style='font-size:22px;font-weight:700;color:#e2e8f0'>&#128274; Hist&#243;rico de Acessos</div>"
+            "<div style='color:#64748b;font-size:12px'>Vis&#237;vel apenas para administradores &#183; "
+            "registro no reposit&#243;rio privado</div>", unsafe_allow_html=True)
+
+    if st.button("↻ Atualizar", key="acessos_refresh"):
+        _ler_acessos.clear()
+
+    with st.spinner("Carregando histórico do repositório privado…"):
+        eventos = _ler_acessos()
+
+    if not eventos:
+        st.info("Nenhum acesso registrado ainda. Os registros começam a partir de agora, a cada login "
+                "(pode levar um instante para o primeiro aparecer).")
+        return
+
+    def _fmt(ts: str) -> str:
+        try:
+            return datetime.strptime(str(ts)[:19], "%Y-%m-%dT%H:%M:%S").strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            return str(ts)
+
+    _emails = {e.get("email") for e in eventos}
+    _c1, _c2, _c3 = st.columns(3)
+    _c1.metric("Acessos registrados", _nbr(len(eventos)))
+    _c2.metric("Usuários distintos", _nbr(len(_emails)))
+    _c3.metric("Último acesso", _fmt(eventos[0].get("ts", "")))
+
+    resumo: dict = {}
+    for e in eventos:
+        k = e.get("email", "?")
+        r = resumo.setdefault(k, {"Usuário": e.get("nome", ""), "E-mail": k, "Acessos": 0, "Último acesso": ""})
+        r["Acessos"] += 1
+        if e.get("ts", "") > r["Último acesso"]:
+            r["Último acesso"] = e.get("ts", "")
+        if e.get("nome"):
+            r["Usuário"] = e.get("nome")
+    resumo_rows = sorted(resumo.values(), key=lambda r: r["Último acesso"], reverse=True)
+    for r in resumo_rows:
+        r["Último acesso"] = _fmt(r["Último acesso"])
+
+    st.markdown("##### Resumo por usuário")
+    st.dataframe(resumo_rows, use_container_width=True, hide_index=True)
+
+    st.markdown("##### Acessos recentes")
+    _det = [{"Data/hora": _fmt(e.get("ts", "")), "Usuário": e.get("nome", ""),
+             "E-mail": e.get("email", ""), "Via": e.get("via", "")} for e in eventos[:500]]
+    st.dataframe(_det, use_container_width=True, hide_index=True)
+    st.caption(f"Mostrando os {len(_det)} acessos mais recentes · fonte: repositório privado (acessos/).")
 
 
 # ── Constantes ────────────────────────────────────────────────────────────────
@@ -2555,6 +2727,7 @@ if not st.session_state.get("logged_in"):
                     "display_name": user_from_cookie.get("display_name", email_from_cookie),
                     "_cookie_set":  True,
                     "_cookie_checked": True,
+                    "_login_via":   "cookie",
                 })
                 st.rerun()
         _cookies.remove(_COOKIE_NAME)
@@ -2574,6 +2747,33 @@ if not st.session_state.get("_is_tv"):
             st.stop()
     if not st.session_state.get("_cookie_set"):
         st.session_state["_cookie_set"] = True
+
+# ── Admin & registro de acesso ────────────────────────────────────────────────
+_user_email_sess = st.session_state.get("user_email", "")
+_is_admin_sess   = (not st.session_state.get("_is_tv")) and _is_admin_user(_user_email_sess)
+
+# Registra o acesso 1× por sessão (grava no repo privado; falha de escrita não derruba o app).
+if (st.session_state.get("logged_in") and not st.session_state.get("_is_tv")
+        and not st.session_state.get("_acesso_registrado")):
+    import threading
+    threading.Thread(
+        target=_registrar_acesso,
+        args=(_user_email_sess,
+              st.session_state.get("display_name", _user_email_sess),
+              st.session_state.pop("_login_via", "cookie")),
+        daemon=True,
+    ).start()
+    st.session_state["_acesso_registrado"] = True
+
+# Página admin — histórico de acessos (apenas admin, via ?page=acessos).
+if _is_admin_sess and st.query_params.get("page") == "acessos":
+    try:
+        _pagina_acessos()
+    except Exception as _e_acc:
+        st.error("Erro ao carregar o histórico de acessos.")
+        with st.expander("Detalhes do erro"):
+            st.exception(_e_acc)
+    st.stop()
 
 try:
     # ── Carrega datas disponiveis ─────────────────────────────────────────────────
@@ -2762,7 +2962,11 @@ try:
             col_title, col_picker = st.columns([1, 1])
             
             with col_title:
-                _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
+                if _is_admin_sess:
+                    _c_tit, _c_adm, _c_tv, _c_out = st.columns([3, 1.25, 1, 1])
+                else:
+                    _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
+                    _c_adm = None
                 with _c_tit:
                     st.markdown(
                         '<div style="display:flex;align-items:flex-end;gap:10px;margin:4px 0 6px">'
@@ -2794,6 +2998,13 @@ try:
                         f'até {data_max.strftime("%d/%m/%Y")}</div>',
                         unsafe_allow_html=True,
                     )
+                if _c_adm is not None:
+                    with _c_adm:
+                        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                        if st.button("🔐 Acessos", use_container_width=True,
+                                     help="Histórico de acessos (admin)"):
+                            st.query_params["page"] = "acessos"
+                            st.rerun()
                 with _c_tv:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("📺 Modo TV", use_container_width=True):
