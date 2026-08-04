@@ -260,6 +260,27 @@ def _is_admin_user(email: str) -> bool:
     return bool(u and u.get("admin"))
 
 
+_ORG_POR_DOMINIO = {
+    "zilicred.com.br":  "Zili",
+    "xpi.com.br":       "XP",
+    "xpprivate.com":    "XP",
+    "poligono.com":     "Polígono",
+    "angaasset.com.br": "Angá",
+}
+
+
+def _user_org(email: str) -> str:
+    """Categoria/empresa do usuário. Prioriza o campo `org` no secrets; senão infere pelo
+    domínio do e-mail (domínio é informação pública, não sensível — pode ficar no código)."""
+    if not email:
+        return "—"
+    u = _find_user(email) or {}
+    if u.get("org"):
+        return str(u["org"])
+    dom = email.split("@")[-1].strip().lower()
+    return _ORG_POR_DOMINIO.get(dom, "Outros")
+
+
 def _gh_get_file(path: str):
     """(texto, sha) do arquivo no repo privado; (None, None) se não existir ou em erro."""
     url = f"https://api.github.com/repos/{_REPO}/contents/{path}"
@@ -384,15 +405,31 @@ def _pagina_acessos() -> None:
             return str(ts)
 
     _emails = {e.get("email") for e in eventos}
-    _c1, _c2, _c3 = st.columns(3)
+    _orgs   = {_user_org(e.get("email", "")) for e in eventos}
+    _c1, _c2, _c3, _c4 = st.columns(4)
     _c1.metric("Acessos registrados", _nbr(len(eventos)))
     _c2.metric("Usuários distintos", _nbr(len(_emails)))
-    _c3.metric("Último acesso", _fmt(eventos[0].get("ts", "")))
+    _c3.metric("Empresas", _nbr(len(_orgs)))
+    _c4.metric("Último acesso", _fmt(eventos[0].get("ts", "")))
+
+    # Resumo por empresa (categoria)
+    _org_ag: dict = {}
+    for e in eventos:
+        o = _user_org(e.get("email", ""))
+        a = _org_ag.setdefault(o, {"emails": set(), "n": 0})
+        a["emails"].add(e.get("email", ""))
+        a["n"] += 1
+    _org_rows = sorted(
+        [{"Empresa": o, "Usuários": len(a["emails"]), "Acessos": a["n"]} for o, a in _org_ag.items()],
+        key=lambda r: -r["Acessos"])
+    st.markdown("##### Por empresa")
+    st.dataframe(_org_rows, use_container_width=True, hide_index=True)
 
     resumo: dict = {}
     for e in eventos:
         k = e.get("email", "?")
-        r = resumo.setdefault(k, {"Usuário": e.get("nome", ""), "E-mail": k, "Acessos": 0, "Último acesso": ""})
+        r = resumo.setdefault(k, {"Usuário": e.get("nome", ""), "Empresa": _user_org(k),
+                                  "E-mail": k, "Acessos": 0, "Último acesso": ""})
         r["Acessos"] += 1
         if e.get("ts", "") > r["Último acesso"]:
             r["Último acesso"] = e.get("ts", "")
@@ -402,12 +439,13 @@ def _pagina_acessos() -> None:
     for r in resumo_rows:
         r["Último acesso"] = _fmt(r["Último acesso"])
 
-    st.markdown("##### Resumo por usuário")
+    st.markdown("##### Por usuário")
     st.dataframe(resumo_rows, use_container_width=True, hide_index=True)
 
     st.markdown("##### Acessos recentes")
     _det = [{"Data/hora": _fmt(e.get("ts", "")), "Usuário": e.get("nome", ""),
-             "E-mail": e.get("email", ""), "Via": e.get("via", "")} for e in eventos[:500]]
+             "Empresa": _user_org(e.get("email", "")), "E-mail": e.get("email", ""),
+             "Via": e.get("via", "")} for e in eventos[:500]]
     st.dataframe(_det, use_container_width=True, hide_index=True)
     st.caption(f"Mostrando os {len(_det)} acessos mais recentes · fonte: repositório privado (acessos/).")
 
