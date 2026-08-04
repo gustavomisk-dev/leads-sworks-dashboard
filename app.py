@@ -4936,8 +4936,10 @@ try:
                     st.plotly_chart(fig, use_container_width=True, config=_CONF)
 
                 # ── Distribuição de Idade do tomador (faixas etárias) ──────────────────────
-                _FAIXAS_IDADE = [("≤24", 0, 24), ("25-34", 25, 34), ("35-44", 35, 44),
-                                 ("45-54", 45, 54), ("55-64", 55, 64), ("65+", 65, 200)]
+                # Faixas meio-abertas: o limite superior cai na faixa seguinte (25 -> "25-30").
+                _FAIXAS_IDADE = [("21-25", 21, 24), ("25-30", 25, 29), ("30-35", 30, 34),
+                                 ("35-40", 35, 39), ("40-45", 40, 44), ("45-50", 45, 49),
+                                 ("50-55", 50, 54), ("55-60", 55, 59)]
                 _id_counts = {_lbl: 0 for _lbl, _, _ in _FAIXAS_IDADE}
                 for _a in _idades:
                     for _lbl, _lo, _hi in _FAIXAS_IDADE:
