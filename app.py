@@ -3186,11 +3186,20 @@ try:
 setTimeout(function(){
   try{
     var d=window.parent.document, o=d.location.origin;
+    // Embute o CSS das folhas EXTERNAS (as <style> inline ja vao no clone) -> self-contained
+    var ext='';
+    for(var i=0;i<d.styleSheets.length;i++){
+      var ss=d.styleSheets[i];
+      if(!ss||!ss.href) continue;
+      try{ var r=ss.cssRules; for(var j=0;j<r.length;j++){ ext+=r[j].cssText; } }catch(_e){}
+    }
     var c=d.documentElement.cloneNode(true);
-    c.querySelectorAll('script').forEach(function(s){s.remove();});
-    c.querySelectorAll('link[rel="modulepreload"],link[rel="preload"]').forEach(function(l){l.remove();});
+    c.querySelectorAll('script,link[rel="stylesheet"],link[rel="modulepreload"],link[rel="preload"]').forEach(function(n){n.remove();});
     var hd=c.querySelector('head');
-    if(hd){var b=d.createElement('base');b.setAttribute('href',o+'/');hd.insertBefore(b,hd.firstChild);}
+    if(hd){
+      var b=d.createElement('base'); b.setAttribute('href',o+'/'); hd.insertBefore(b,hd.firstChild);
+      if(ext){ var st=d.createElement('style'); st.textContent=ext; hd.appendChild(st); }
+    }
     var s2=c.querySelector('#_dlspin'); if(s2){s2.innerHTML='';}
     var h='<!doctype html>'+c.outerHTML;
     var bl=new Blob([h],{type:'text/html;charset=utf-8'}); var u=URL.createObjectURL(bl);
