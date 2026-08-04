@@ -3014,7 +3014,8 @@ try:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("Sair", use_container_width=True):
                         _cookies.remove(_COOKIE_NAME)
-                        for _k in ["logged_in", "user_email", "display_name", "_cookie_set", "_cookie_checked"]:
+                        for _k in ["logged_in", "user_email", "display_name", "_cookie_set",
+                                   "_cookie_checked", "_acesso_registrado", "_login_via"]:
                             st.session_state.pop(_k, None)
                         st.session_state["_cookie_checked"] = True  # evita tela preta pós-logout
                         st.session_state["_force_logout"] = True    # impede restore do cookie no mesmo rerun
