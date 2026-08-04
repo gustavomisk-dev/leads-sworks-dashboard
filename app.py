@@ -576,6 +576,21 @@ def carregar_dia(dia_str: str) -> dict:
     _limite = (datetime.utcnow() - timedelta(hours=3) - timedelta(days=_DIAS_MUTAVEIS)).strftime("%Y%m%d")
     return _carregar_dia_recente(dia_str) if dia_str >= _limite else _carregar_dia_hist(dia_str)
 
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _carregar_referencia() -> dict:
+    """Referência de anomalia do heatmap (heatmap_ref/referencia.json no repo privado).
+    Estrutura: ref[etapa][faixa_idx][classe util|fds][hora] = {n, med, mad, p10, p90, ...}.
+    Retorna {} se ausente/erro (o heatmap então não sinaliza nada)."""
+    url = f"https://api.github.com/repos/{_REPO}/contents/heatmap_ref/referencia.json"
+    try:
+        r = requests.get(url, headers=_HEADERS_RAW, timeout=15)
+        if r.status_code != 200:
+            return {}
+        return json.loads(r.text)
+    except Exception:
+        return {}
+
 # ── Agregacao ─────────────────────────────────────────────────────────────────
 
 def _merge_segmentos(segs: list) -> dict:
@@ -3502,20 +3517,6 @@ try:
                 _msg_ori = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
                 st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
 
-            # Distribuição do número de parcelas — desembolsados (de _desemb_det, por registro).
-            # Usa n_parcelas (só NumeroParcelasContrato, sem fallback p/ PrazoDigitado):
-            # registros do histórico sem esse campo (< 26/06/2026) ficam de fora de propósito.
-            _dz_prazo_dist: dict = {}
-            for _dd in _desemb_det:
-                _pz = _dd.get("n_parcelas")
-                if _pz and _pz > 0:
-                    _pk = str(int(round(_pz)))
-                    _dz_prazo_dist[_pk] = _dz_prazo_dist.get(_pk, 0) + 1
-            _fig_pz_dz = _fig_dist_prazo(
-                _dz_prazo_dist, "Distribuição de Nº de Parcelas — Desembolsados")
-            if _fig_pz_dz:
-                st.plotly_chart(_fig_pz_dz, use_container_width=True, config=_CONF)
-
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
             @st.fragment
             def _sec2_frag():
@@ -3760,6 +3761,27 @@ try:
                     if _hm_mat:
                         _hm_max = max(max(r) for r in _hm_mat.values()) or 1
                         _N_FAIXAS = len(_FAIXAS)
+                        # ── Trilha C: anomalia vs referência (30d por hora × tipo-de-dia) ──────
+                        # Limiares ajustáveis: min. de amostras da ref., min. de contagem ao vivo
+                        # (evita ruído de células pequenas) e fator do MAD no limite superior.
+                        _ANOM_MIN_N, _ANOM_MIN_CNT, _ANOM_K_MAD = 8, 3, 3.0
+                        _ref_map  = (_carregar_referencia() or {}).get("ref", {})
+                        _anom_cls = "util" if _now_brt_nm.weekday() < 5 else "fds"
+                        _anom_hr  = str(_now_brt_nm.hour)
+                        def _hm_anom(_t, _i, v):
+                            """(flagged, tooltip) — contagem ao vivo v vs referência da etapa `_t` /
+                            faixa `_i` na classe+hora atuais. Sinaliza excesso robusto: acima de
+                            max(p90, med + K·MAD). Sem referência suficiente → não sinaliza."""
+                            _s = ((((_ref_map.get(_t) or {}).get(str(_i)) or {}).get(_anom_cls)) or {}).get(_anom_hr)
+                            if not _s or _s.get("n", 0) < _ANOM_MIN_N or v < _ANOM_MIN_CNT:
+                                return False, ""
+                            _med = _s.get("med", 0.0); _mad = _s.get("mad", 0.0); _p90 = _s.get("p90", 0.0)
+                            _upper = max(_p90, _med + _ANOM_K_MAD * _mad)
+                            if v > _upper:
+                                _cl = "útil" if _anom_cls == "util" else "fim de semana"
+                                return True, (f"Anomalia: atual {v} · normal ~{_med:.0f} "
+                                              f"(p90 {_p90:.0f}) p/ {_anom_hr}h em dia {_cl}")
+                            return False, ""
                         def _hm_base(_i):
                             # verde (2 primeiras) → amarelo (3 seguintes) → vermelho (restantes)
                             # → cinza escuro na última faixa (>5d). Tonalidade varia pela contagem.
@@ -3770,12 +3792,16 @@ try:
                             if _i <= 4:
                                 return (254, 197, 46)    # amarelo
                             return (239, 68, 68)         # vermelho
-                        def _hm_cell(v, _i):
+                        def _hm_cell(v, _i, _t):
                             if not v:
                                 return '<td class="hm-c hm-0">·</td>'
                             _r, _g, _b = _hm_base(_i)
                             _a = 0.12 + 0.88 * (v / _hm_max)
-                            return '<td class="hm-c" style="background:rgba(%d,%d,%d,%.2f)">%d</td>' % (_r, _g, _b, _a, v)
+                            _fl, _tp = _hm_anom(_t, _i, v)
+                            _cls = "hm-c hm-anom" if _fl else "hm-c"
+                            _tt  = (' title="%s"' % _tp) if _tp else ""
+                            return '<td class="%s" style="background:rgba(%d,%d,%d,%.2f)"%s>%d</td>' % (
+                                _cls, _r, _g, _b, _a, _tt, v)
                         def _hm_lk_color(_i):
                             # cor da faixa; >5d (cinza escuro) clareia p/ legibilidade do link
                             if _i >= _N_FAIXAS - 1:
@@ -3889,7 +3915,7 @@ try:
                                 _dttl = "Sem dados ainda (aguardando exportação)" if not _leads_t else "Libere no cadeado acima"
                                 _dlcell = f'<td class="hm-dl"><span class="hm-dlbtn hm-dlbtn-off" title="{_dttl}">&#8595;</span></td>'
                             _hrows += ('<tr><td class="hm-lbl">' + _cell + '</td>'
-                                       + "".join(_hm_cell(v, _ci) for _ci, v in enumerate(_hm_mat[_t]))
+                                       + "".join(_hm_cell(v, _ci, _t) for _ci, v in enumerate(_hm_mat[_t]))
                                        + '<td class="hm-tot">' + str(sum(_hm_mat[_t])) + '</td>'
                                        + _dlcell + '</tr>')
                         _hhead = "".join('<th class="hm-c">' + _fl + '</th>' for _fl, _, _ in _FAIXAS)
@@ -3902,6 +3928,7 @@ try:
                 .hm-lbl{color:#cbd5e1;white-space:nowrap;padding:5px 12px 5px 4px;border-bottom:1px solid #1c1a17}
                 .hm-c{text-align:center;padding:5px 9px;border-bottom:1px solid #1c1a17;color:#e2e8f0;font-variant-numeric:tabular-nums;min-width:46px}
                 .hm-0{color:#3f3b35}
+                .hm-anom{box-shadow:inset 0 0 0 2px #ef4444;font-weight:700;cursor:help}
                 .hm-tot{text-align:center;padding:5px 11px;color:#FEC52E;font-weight:700;border-bottom:1px solid #1c1a17;border-left:2px solid #272420}
                 .hm-det summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px}
                 .hm-det summary::-webkit-details-marker{display:none}
@@ -3919,9 +3946,11 @@ try:
                 .hm-dlbtn-off{opacity:.28;cursor:not-allowed}
                 </style>
                 """
+                        _anom_leg = ("  <span style='color:#ef4444'>Contorno vermelho</span> = acima do normal para o horário (referência de 30 dias por hora × dia útil/fim de semana)."
+                                     if _ref_map else "")
                         st.markdown(
                             _hm_css
-                            + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção. ↓ = baixar os leads da etapa (libere no 🔒 ao lado do título).</p>"
+                            + "<p style='color:#475569;font-size:.78em;margin:0 0 6px'>Nº de leads por faixa de tempo desde a última mudança de status/etapa — atualiza com o \"agora\". Faixas à direita = candidatos a intervenção. ↓ = baixar os leads da etapa (libere no 🔒 ao lado do título)." + _anom_leg + "</p>"
                             + '<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-lbl-h">Etapa</th>'
                             + _hhead + '<th class="hm-c">Total</th><th class="hm-c hm-dl-h">&#8595;</th></tr></thead><tbody>'
                             + _hrows + "</tbody></table></div>",
@@ -4774,6 +4803,18 @@ try:
                     "Contratos com data de desembolso (Pix) dentro do período filtrado · "
                     "inclui leads criados até 7 dias antes do início do período."
                 )
+
+                # ── Distribuição do nº de parcelas (só NumeroParcelasContrato; sem fallback) ─
+                _pzn_dist: dict = {}
+                for _rec in _desemb_det:
+                    _npz = _rec.get("n_parcelas")
+                    if _npz and _npz > 0:
+                        _npk = str(int(round(_npz)))
+                        _pzn_dist[_npk] = _pzn_dist.get(_npk, 0) + 1
+                _fig_pzn = _fig_dist_prazo(
+                    _pzn_dist, "Distribuição de Nº de Parcelas — Desembolsados")
+                if _fig_pzn:
+                    st.plotly_chart(_fig_pzn, use_container_width=True, config=_CONF)
 
                 # ── Ordenações ─────────────────────────────────────────────────────────────
                 def _items(_m, by="valor"):
