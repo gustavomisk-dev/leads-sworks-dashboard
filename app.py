@@ -13,6 +13,7 @@ import time
 import bcrypt
 import requests
 import streamlit as st
+import streamlit.components.v1 as components  # usado só p/ o download HTML (JS client-side)
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -3136,7 +3137,12 @@ try:
                         st.rerun()
             
             with col_picker:
-                _cp_dat, _cp_orig, _cp_ref = st.columns([2.5, 2, 0.5])
+                _cp_dl, _cp_dat, _cp_orig, _cp_ref = st.columns([0.4, 2.1, 2, 0.5])
+                with _cp_dl:
+                    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                    if st.button("↓", key="_dl_html_btn", width='stretch',
+                                 help="Baixar um HTML da visualização atual"):
+                        st.session_state["_baixar_html"] = True
                 with _cp_dat:
                     intervalo = st.date_input(
                         "Período de análise",
@@ -3160,7 +3166,28 @@ try:
                         _carregar_dia_recente.clear()
                         listar_datas.clear()
                         st.rerun()
-            
+
+            # Download de um HTML da visualização atual: ao clicar no ↓, injeta um JS
+            # (client-side) que captura o DOM ao vivo do parent e baixa como .html.
+            # setTimeout dá tempo do restante da página renderizar antes da captura.
+            if st.session_state.pop("_baixar_html", False):
+                components.html(
+                    "<script>"
+                    "setTimeout(function(){"
+                    "try{"
+                    "var d=window.parent.document;"
+                    "var h='<!doctype html>'+d.documentElement.outerHTML;"
+                    "var b=new Blob([h],{type:'text/html;charset=utf-8'});"
+                    "var u=URL.createObjectURL(b);"
+                    "var a=d.createElement('a');a.href=u;"
+                    "a.download='zileads_'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.html';"
+                    "d.body.appendChild(a);a.click();d.body.removeChild(a);URL.revokeObjectURL(u);"
+                    "}catch(e){try{window.parent.alert('Falha ao gerar HTML: '+e.message);}catch(_){}}"
+                    "},700);"
+                    "</script>",
+                    height=0,
+                )
+
             if isinstance(intervalo, (list, tuple)):
                 d_ini, d_fim = (intervalo[0], intervalo[1]) if len(intervalo) == 2 else (intervalo[0], intervalo[0])
             else:
