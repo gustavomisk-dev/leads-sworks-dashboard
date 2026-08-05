@@ -479,72 +479,72 @@ _ETAPA_TOOLTIPS = {
     "AVERBACAO_PENDENTE_MANUAL": "São leads cujos perfis foram aprovados pelo motor de crédito, cujas propostas enviadas foram aceitas e já cadastradas com sucesso, passaram pela formalização e atualização de dados, cujos tomadores já assinaram a CCB gerada e enviada a eles, mas houve alguma falha na etapa de Averbação, a ser investigada.",
 }
 
-_ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"})
+_ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas", "Validações Iniciais"})
 
-# Ordem das etapas de reprovação por versão do workflow do SWorks.
-# v38 = fluxo legado. v39 = novo Motor de Crédito (Dataprev→RF→SCR→BigDataCorp→PH3A),
-# com a caixa BigDataCorp separada da PH3A e política de empregador PF.
-# _ETAPA_WORKFLOW_ORDER é o MERGE (usado quando o período tem os dois workflows).
-_ETAPA_ORDER_V38 = [
-    "Já Reprovado (reentrada)",
-    "Validações Internas",
-    "Receita Federal PF",
-    "Consulta Dataprev",
-    "Receita Federal PJ",
-    "Análise PH3A (PJ)",
-    "SCR",
-    "Análise PH3A (PF)",
-    "Cálculo de Proposta",
-    "Cadastro Proposta",
-    "Envia CCB Único",
-    "Averbação",
+# Conceitos de etapa de reprovação e o nome em cada workflow: (nome_v38, nome_v39).
+# None = a etapa não existe naquele workflow. Os nomes do v39 seguem as caixas do
+# próprio workflow v39 (RF PJ/PF, PH3A PJ/PF, Validações Iniciais…); o v38 mantém os
+# rótulos legados. Cada workflow respeita o próprio nome; quando o período tem os dois
+# e o conceito aparece nos dois, a coluna ETAPA mostra "nome_v38 | nome_v39".
+_ETAPA_CONCEITOS = [
+    ("Já Reprovado (reentrada)", None),
+    ("Validações Internas",      "Validações Iniciais"),
+    (None,                       "Empregador PF (não-Leilão)"),
+    ("Consulta Dataprev",        "Consulta Dataprev"),
+    ("Receita Federal PJ",       "RF PJ"),
+    ("Receita Federal PF",       "RF PF"),
+    ("SCR",                      "SCR"),
+    (None,                       "BigDataCorp (PJ)"),
+    (None,                       "BigDataCorp (PF)"),
+    ("Análise PH3A (PJ)",        "PH3A PJ"),
+    ("Análise PH3A (PF)",        "PH3A PF"),
+    ("Cálculo de Proposta",      "Cálculo de Proposta"),
+    ("Cadastro Proposta",        "Cadastro Proposta"),
+    ("Envia CCB Único",          "Envia CCB Único"),
+    ("Averbação",                "Averbação"),
+    ("A identificar",            "A identificar"),
 ]
-_ETAPA_ORDER_V39 = [
-    "Já Reprovado (reentrada)",
-    "Validações Internas",
-    "Empregador PF (não-Leilão)",
-    "Consulta Dataprev",
-    "Receita Federal PJ",
-    "Receita Federal PF",
-    "SCR",
-    "BigDataCorp (PJ)",
-    "BigDataCorp (PF)",
-    "Análise PH3A (PJ)",
-    "Análise PH3A (PF)",
-    "Cálculo de Proposta",
-    "Cadastro Proposta",
-    "Envia CCB Único",
-    "Averbação",
-]
-# Merge (dois workflows no período): v39 como espinha + as exclusivas do v38.
-_ETAPA_WORKFLOW_ORDER = [
-    "Já Reprovado (reentrada)",
-    "Validações Internas",
-    "Empregador PF (não-Leilão)",   # v39: nova política de empregador PF
-    "Consulta Dataprev",
-    "Receita Federal PJ",
-    "Receita Federal PF",
-    "SCR",
-    "BigDataCorp (PJ)",             # v39: caixa BDC separada da PH3A
-    "BigDataCorp (PF)",
-    "Análise PH3A (PJ)",
-    "Análise PH3A (PF)",
-    "Cálculo de Proposta",
-    "Cadastro Proposta",
-    "Envia CCB Único",
-    "Averbação",
-]
+# Ordem default (todos os nomes, na ordem dos conceitos) p/ quem não combina (ex.: TV).
+_ETAPA_WORKFLOW_ORDER = [n for c in _ETAPA_CONCEITOS for n in c if n]
 
 
-def _etapa_order(workflows) -> list:
-    """Ordem de etapas conforme os workflows presentes no período:
-    só v39 ⇒ ordem v39; só v38 ⇒ ordem v38; ambos (ou desconhecido) ⇒ merge."""
-    s = set(workflows or [])
-    if s == {"v39"}:
-        return _ETAPA_ORDER_V39
-    if s == {"v38"}:
-        return _ETAPA_ORDER_V38
-    return _ETAPA_WORKFLOW_ORDER
+def _combinar_etapas_conceito(etapas: dict, etapa_motivos: dict):
+    """Agrupa as etapas por CONCEITO. O rótulo de cada conceito é a junção por ' | '
+    dos nomes (v38 e v39) que TÊM leads no período — assim período de um só workflow
+    mostra só o nome dele, e período misto mostra 'nome_v38 | nome_v39'. As contagens
+    e os motivos dos dois nomes são somados no mesmo conceito.
+    Retorna (etapas_comb, etapa_motivos_comb, ordem_comb)."""
+    etapas_c: dict = {}
+    motivos_c: dict = {}
+    ordem_c: list = []
+    mapeados: set = set()
+    for n38, n39 in _ETAPA_CONCEITOS:
+        nomes = []
+        for nm in (n38, n39):
+            if nm:
+                mapeados.add(nm)
+                if nm not in nomes and etapas.get(nm, 0) > 0:
+                    nomes.append(nm)
+        if not nomes:
+            continue
+        label = " | ".join(nomes)
+        etapas_c[label] = sum(etapas.get(nm, 0) for nm in nomes)
+        mm: dict = {}
+        for nm in nomes:
+            for mot, c in (etapa_motivos.get(nm) or {}).items():
+                mm[mot] = mm.get(mot, 0) + c
+        if mm:
+            motivos_c[label] = mm
+        ordem_c.append(label)
+    # Etapas fora do mapa de conceitos (defensivo) → mantém o nome cru, ao fim.
+    for nm, c in etapas.items():
+        if nm not in mapeados and c > 0:
+            etapas_c[nm] = etapas_c.get(nm, 0) + c
+            if etapa_motivos.get(nm):
+                motivos_c[nm] = dict(etapa_motivos[nm])
+            if nm not in ordem_c:
+                ordem_c.append(nm)
+    return etapas_c, motivos_c, ordem_c
 
 _TEMPLATE = "plotly_dark"
 _CONF     = {"displayModeBar": False, "responsive": True}
@@ -2791,7 +2791,8 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         _tv_h("Etapas de Reprovação — Funil", periodo)
         etapas_d = agg.get("etapas", {})
         if etapas_d and n_rep > 0:
-            result_f = _fig_funil_etapa(etapas_d, n_rep)
+            _etapas_c, _, _ordem_c = _combinar_etapas_conceito(etapas_d, agg.get("etapa_motivos", {}))
+            result_f = _fig_funil_etapa(_etapas_c, n_rep, order=_ordem_c)
             if result_f:
                 fig_f, _ = result_f
                 fig_f.update_traces(textfont=dict(size=40, color="rgba(255,255,255,0.92)"),
@@ -4731,14 +4732,14 @@ try:
             if etapas_d and n_rep > 0:
                 tab_g, tab_f = st.tabs(["Visão geral", "Visão de Funil"])
 
-                # Ordem das etapas conforme os workflows presentes no período:
-                # só um workflow ⇒ etapas/ordem dele; período misto ⇒ os dois juntos.
-                _eorder = _etapa_order(agg.get("workflows"))
+                # Agrupa por conceito: cada workflow com seu nome; conceito presente nos
+                # dois (período misto) vira "nome_v38 | nome_v39" numa linha só.
+                _etapas_c, _motivos_c, _ordem_c = _combinar_etapas_conceito(etapas_d, etapa_motivos_d)
 
                 with tab_g:
-                    _order_idx = {e: i for i, e in enumerate(_eorder)}
+                    _order_idx = {e: i for i, e in enumerate(_ordem_c)}
                     ordered = sorted(
-                        [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
+                        [(e, _etapas_c.get(e, 0)) for e in _etapas_c if _etapas_c.get(e, 0) > 0],
                         key=lambda x: _order_idx.get(x[0], 999)
                     )
                     max_v = max(v for _, v in ordered) if ordered else 1
@@ -4766,12 +4767,12 @@ try:
                     )
                     st.plotly_chart(fig_g, width='stretch', config=_CONF)
 
-                    tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep, order=_eorder)
+                    tbl_g = _html_tabela_etapa_motivo(_motivos_c, _etapas_c, n_rep, order=_ordem_c)
                     if tbl_g:
                         st.markdown(tbl_g, unsafe_allow_html=True)
 
                 with tab_f:
-                    result_f = _fig_funil_etapa(etapas_d, n_rep, order=_eorder)
+                    result_f = _fig_funil_etapa(_etapas_c, n_rep, order=_ordem_c)
                     if result_f:
                         fig_f, rows_f = result_f
                         st.plotly_chart(fig_f, width='stretch', config=_CONF)
