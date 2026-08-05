@@ -484,11 +484,14 @@ _ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"}
 _ETAPA_WORKFLOW_ORDER = [
     "Já Reprovado (reentrada)",
     "Validações Internas",
-    "Receita Federal PF",
+    "Empregador PF (não-Leilão)",   # v39: nova política de empregador PF
     "Consulta Dataprev",
     "Receita Federal PJ",
-    "Análise PH3A (PJ)",
+    "Receita Federal PF",
     "SCR",
+    "BigDataCorp (PJ)",             # v39: caixa BDC separada da PH3A
+    "BigDataCorp (PF)",
+    "Análise PH3A (PJ)",
     "Análise PH3A (PF)",
     "Cálculo de Proposta",
     "Cadastro Proposta",
@@ -1926,11 +1929,13 @@ def _html_diagrama(etapas: dict, n_rep: int) -> str:
     # Motor de Crédito: caixa compacta no snake + detalhamento abaixo
     _MC_ITEMS = [
         ("Valid. Internas",  ["Validações Internas"]),
-        ("RF PF",            ["Receita Federal PF"]),
         ("Dataprev",         ["Consulta Dataprev"]),
         ("RF PJ",            ["Receita Federal PJ"]),
-        ("PH3A PJ",          ["Análise PH3A (PJ)"]),
+        ("RF PF",            ["Receita Federal PF"]),
         ("SCR",              ["SCR"]),
+        ("BDC PJ",           ["BigDataCorp (PJ)"]),
+        ("BDC PF",           ["BigDataCorp (PF)"]),
+        ("PH3A PJ",          ["Análise PH3A (PJ)"]),
         ("PH3A PF",          ["Análise PH3A (PF)"]),
     ]
     mc_total = sum(sum(etapas.get(e, 0) for e in keys) for _, keys in _MC_ITEMS)
@@ -4644,11 +4649,11 @@ try:
                             st.session_state["wf166_lvl"] = "root"
                             st.rerun(scope="fragment")
                     with _cr:
-                        st.markdown('<div style="color:#94a3b8;font-size:13px;">&#128194; Workflow 166 '
+                        st.markdown('<div style="color:#94a3b8;font-size:13px;">&#128194; Workflow 37 &#183; v39 '
                                     '&nbsp;&#8250;&nbsp; <b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></div>',
                                     unsafe_allow_html=True)
                 else:
-                    st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Workflow 166 '
+                    st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Workflow 37 &#183; v39 '
                                 '&#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; clique no '
                                 'Motor de Cr&#233;dito para entrar</span></div>', unsafe_allow_html=True)
                 with st.container(key="wf166flow"):
