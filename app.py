@@ -481,6 +481,42 @@ _ETAPA_TOOLTIPS = {
 
 _ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas"})
 
+# Ordem das etapas de reprovação por versão do workflow do SWorks.
+# v38 = fluxo legado. v39 = novo Motor de Crédito (Dataprev→RF→SCR→BigDataCorp→PH3A),
+# com a caixa BigDataCorp separada da PH3A e política de empregador PF.
+# _ETAPA_WORKFLOW_ORDER é o MERGE (usado quando o período tem os dois workflows).
+_ETAPA_ORDER_V38 = [
+    "Já Reprovado (reentrada)",
+    "Validações Internas",
+    "Receita Federal PF",
+    "Consulta Dataprev",
+    "Receita Federal PJ",
+    "Análise PH3A (PJ)",
+    "SCR",
+    "Análise PH3A (PF)",
+    "Cálculo de Proposta",
+    "Cadastro Proposta",
+    "Envia CCB Único",
+    "Averbação",
+]
+_ETAPA_ORDER_V39 = [
+    "Já Reprovado (reentrada)",
+    "Validações Internas",
+    "Empregador PF (não-Leilão)",
+    "Consulta Dataprev",
+    "Receita Federal PJ",
+    "Receita Federal PF",
+    "SCR",
+    "BigDataCorp (PJ)",
+    "BigDataCorp (PF)",
+    "Análise PH3A (PJ)",
+    "Análise PH3A (PF)",
+    "Cálculo de Proposta",
+    "Cadastro Proposta",
+    "Envia CCB Único",
+    "Averbação",
+]
+# Merge (dois workflows no período): v39 como espinha + as exclusivas do v38.
 _ETAPA_WORKFLOW_ORDER = [
     "Já Reprovado (reentrada)",
     "Validações Internas",
@@ -498,6 +534,17 @@ _ETAPA_WORKFLOW_ORDER = [
     "Envia CCB Único",
     "Averbação",
 ]
+
+
+def _etapa_order(workflows) -> list:
+    """Ordem de etapas conforme os workflows presentes no período:
+    só v39 ⇒ ordem v39; só v38 ⇒ ordem v38; ambos (ou desconhecido) ⇒ merge."""
+    s = set(workflows or [])
+    if s == {"v39"}:
+        return _ETAPA_ORDER_V39
+    if s == {"v38"}:
+        return _ETAPA_ORDER_V38
+    return _ETAPA_WORKFLOW_ORDER
 
 _TEMPLATE = "plotly_dark"
 _CONF     = {"displayModeBar": False, "responsive": True}
@@ -746,7 +793,10 @@ def agregar(dias_raw: list) -> dict:
     assinado_iof        = 0.0
     projecao_tipos_agg  = defaultdict(lambda: {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
     bloqueados_total_ag = 0
+    workflows_set: set = set()
     for d in dias_raw:
+        # Versões de workflow presentes no período (dias sem o campo = histórico v38).
+        workflows_set.update(d.get("workflows") or ["v38"])
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
             d_status[int(k)] += v
 
@@ -929,6 +979,7 @@ def agregar(dias_raw: list) -> dict:
 
     return {
         "funil":             funil,
+        "workflows":         sorted(workflows_set) or ["v38"],
         "financeiro":        financeiro,
         "evolucao_diaria":   {k: dict(v) for k, v in sorted(evolucao_d.items())},
         "evolucao_horaria":  {k: dict(v) for k, v in sorted(evolucao_h.items())},
@@ -1500,10 +1551,10 @@ def _fig_etapas_split(etapas: dict, n_rep: int):
     return fig
 
 
-def _fig_funil_etapa(etapas: dict, n_rep: int):
+def _fig_funil_etapa(etapas: dict, n_rep: int, order: list = None):
     if not etapas or n_rep == 0:
         return None
-    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+    _order_idx = {e: i for i, e in enumerate(order or _ETAPA_WORKFLOW_ORDER)}
     etapas_sorted = sorted(etapas.keys(), key=lambda e: _order_idx.get(e, 999))
     restante = n_rep
     rows = []
@@ -2108,10 +2159,10 @@ def _html_wf166_flow(nivel: str = "root") -> str:
             + flow + '</div></div>')
 
 
-def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int) -> str:
+def _html_tabela_etapa_motivo(etapa_motivos: dict, etapas: dict, n_rep: int, order: list = None) -> str:
     if not etapa_motivos or not etapas or n_rep == 0:
         return ""
-    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+    _order_idx = {e: i for i, e in enumerate(order or _ETAPA_WORKFLOW_ORDER)}
     etapas_sorted = sorted(etapas.keys(), key=lambda e: (_order_idx.get(e, 999), -etapas.get(e, 0)))
 
     thead = (
@@ -4680,8 +4731,12 @@ try:
             if etapas_d and n_rep > 0:
                 tab_g, tab_f = st.tabs(["Visão geral", "Visão de Funil"])
 
+                # Ordem das etapas conforme os workflows presentes no período:
+                # só um workflow ⇒ etapas/ordem dele; período misto ⇒ os dois juntos.
+                _eorder = _etapa_order(agg.get("workflows"))
+
                 with tab_g:
-                    _order_idx = {e: i for i, e in enumerate(_ETAPA_WORKFLOW_ORDER)}
+                    _order_idx = {e: i for i, e in enumerate(_eorder)}
                     ordered = sorted(
                         [(e, etapas_d.get(e, 0)) for e in etapas_d if etapas_d.get(e, 0) > 0],
                         key=lambda x: _order_idx.get(x[0], 999)
@@ -4711,12 +4766,12 @@ try:
                     )
                     st.plotly_chart(fig_g, width='stretch', config=_CONF)
 
-                    tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep)
+                    tbl_g = _html_tabela_etapa_motivo(etapa_motivos_d, etapas_d, n_rep, order=_eorder)
                     if tbl_g:
                         st.markdown(tbl_g, unsafe_allow_html=True)
 
                 with tab_f:
-                    result_f = _fig_funil_etapa(etapas_d, n_rep)
+                    result_f = _fig_funil_etapa(etapas_d, n_rep, order=_eorder)
                     if result_f:
                         fig_f, rows_f = result_f
                         st.plotly_chart(fig_f, width='stretch', config=_CONF)
