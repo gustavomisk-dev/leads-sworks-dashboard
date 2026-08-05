@@ -489,7 +489,6 @@ _ETAPAS_ANTES = frozenset({"Já Reprovado (reentrada)", "Validações Internas",
 _ETAPA_CONCEITOS = [
     ("Já Reprovado (reentrada)", None),
     ("Validações Internas",      "Validações Iniciais"),
-    (None,                       "Empregador PF (não-Leilão)"),
     ("Consulta Dataprev",        "Consulta Dataprev"),
     ("Receita Federal PJ",       "RF PJ"),
     ("Receita Federal PF",       "RF PF"),
