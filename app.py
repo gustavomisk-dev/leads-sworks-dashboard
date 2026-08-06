@@ -823,9 +823,12 @@ def agregar(dias_raw: list) -> dict:
     projecao_tipos_agg  = defaultdict(lambda: {"count": 0, "valor": 0.0, "liberado": 0.0, "iof": 0.0})
     bloqueados_total_ag = 0
     workflows_set: set = set()
+    natureza_leads: dict = defaultdict(int)
     for d in dias_raw:
         # Versões de workflow presentes no período (dias sem o campo = histórico v38).
         workflows_set.update(d.get("workflows") or ["v38"])
+        for _nk, _nv in (d.get("natureza_leads") or {}).items():
+            natureza_leads[_nk] += _nv
         for k, v in d.get("funil", {}).get("_d_status", {}).items():
             d_status[int(k)] += v
 
@@ -1009,6 +1012,7 @@ def agregar(dias_raw: list) -> dict:
     return {
         "funil":             funil,
         "workflows":         sorted(workflows_set) or ["v38"],
+        "natureza_leads":    dict(natureza_leads),
         "financeiro":        financeiro,
         "evolucao_diaria":   {k: dict(v) for k, v in sorted(evolucao_d.items())},
         "evolucao_horaria":  {k: dict(v) for k, v in sorted(evolucao_h.items())},
@@ -3646,6 +3650,13 @@ try:
             _pess_tip = _proj_tip(_pess_etapas)
             _otim_tip = _proj_tip(_otim_etapas)
 
+            _nat_ag = agg.get("natureza_leads") or {}
+            _nat_pf_n = int(_nat_ag.get("PF", 0)); _nat_pj_n = int(_nat_ag.get("PJ", 0))
+            _nat_base = _nat_pf_n + _nat_pj_n
+            _nat_pf_fmt, _nat_pj_fmt = _nbr(_nat_pf_n), _nbr(_nat_pj_n)
+            _nat_pf_sub = (f"{100*_nat_pf_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
+            _nat_pj_sub = (f"{100*_nat_pj_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
+
             st.markdown(f"""
             <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -3653,6 +3664,11 @@ try:
               <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
+            </div>
+            <div class="kpi-grp">Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
+              <div class="kpi-card"><div class="kpi-label">Empregador PF (CPF)</div><div class="kpi-value">{_nat_pf_fmt}</div><div class="kpi-sub">{_nat_pf_sub}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Empregador PJ (CNPJ)</div><div class="kpi-value">{_nat_pj_fmt}</div><div class="kpi-sub">{_nat_pj_sub}</div></div>
             </div>
             <div class="kpi-grp">2 · Aprovados <span>(leads aprovados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -4985,6 +5001,7 @@ try:
                 _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
                 _cid_d: dict = {}        # cidade -> {n, valor, liberado}
                 _gen_d: dict = {}        # genero -> contagem
+                _nat_d: dict = {}        # natureza do empregador (PF/PJ) -> contagem
                 _idades: list = []       # idades dos tomadores
                 _iof_tot = 0.0
                 _prz_vals = []
@@ -5008,6 +5025,9 @@ try:
                     _g = str(_rec.get("genero") or "").strip().upper()
                     if _g:
                         _gen_d[_g] = _gen_d.get(_g, 0) + 1
+                    _nt = str(_rec.get("natureza") or "").strip().upper()
+                    if _nt:
+                        _nat_d[_nt] = _nat_d.get(_nt, 0) + 1
                     _ida = _rec.get("idade")
                     if _ida:
                         _idades.append(int(_ida))
@@ -5140,6 +5160,15 @@ try:
                               for _k, _v in sorted(_gen_d.items(), key=lambda x: -x[1])}
                 fig = _fig_barras_h(_gen_chart, "Distribuição por Gênero — Tomadores", "#ec4899",
                                     pct_base=sum(_gen_d.values()), show_abs=True)
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
+
+                # ── Distribuição por Natureza do Empregador (PF/PJ) ────────────────────────
+                _NAT_LBL = {"PJ": "Empregador PJ (CNPJ)", "PF": "Empregador PF (CPF)"}
+                _nat_chart = {_NAT_LBL.get(_k, _k): _v
+                              for _k, _v in sorted(_nat_d.items(), key=lambda x: -x[1])}
+                fig = _fig_barras_h(_nat_chart, "Distribuição por Natureza do Empregador — Desembolsados",
+                                    "#8b5cf6", pct_base=sum(_nat_d.values()), show_abs=True)
                 if fig:
                     st.plotly_chart(fig, width='stretch', config=_CONF)
 
