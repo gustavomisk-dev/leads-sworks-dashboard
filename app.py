@@ -3665,12 +3665,12 @@ try:
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
             </div>
-            <div class="kpi-grp">Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
+            <div class="kpi-grp">2 · Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
               <div class="kpi-card"><div class="kpi-label">Empregador PF (CPF)</div><div class="kpi-value">{_nat_pf_fmt}</div><div class="kpi-sub">{_nat_pf_sub}</div></div>
               <div class="kpi-card"><div class="kpi-label">Empregador PJ (CNPJ)</div><div class="kpi-value">{_nat_pj_fmt}</div><div class="kpi-sub">{_nat_pj_sub}</div></div>
             </div>
-            <div class="kpi-grp">2 · Aprovados <span>(leads aprovados no período)</span></div>
+            <div class="kpi-grp">3 · Aprovados <span>(leads aprovados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
@@ -3681,7 +3681,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
             </div>
-            <div class="kpi-grp">3 · Desembolsados <span>(leads desembolsados no período)</span></div>
+            <div class="kpi-grp">4 · Desembolsados <span>(leads desembolsados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
@@ -3692,7 +3692,7 @@ try:
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
             </div>
-            <div class="kpi-grp">4 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
+            <div class="kpi-grp">5 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
               <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_pess_comiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
