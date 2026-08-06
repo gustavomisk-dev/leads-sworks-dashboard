@@ -3667,8 +3667,8 @@ try:
             </div>
             <div class="kpi-grp">2 · Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Empregador PF (CPF)</div><div class="kpi-value">{_nat_pf_fmt}</div><div class="kpi-sub">{_nat_pf_sub}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Empregador PJ (CNPJ)</div><div class="kpi-value">{_nat_pj_fmt}</div><div class="kpi-sub">{_nat_pj_sub}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Empregador Pessoa Física</div><div class="kpi-value">{_nat_pf_fmt}</div><div class="kpi-sub">{_nat_pf_sub}</div></div>
+              <div class="kpi-card"><div class="kpi-label">Empregador Pessoa Jurídica</div><div class="kpi-value">{_nat_pj_fmt}</div><div class="kpi-sub">{_nat_pj_sub}</div></div>
             </div>
             <div class="kpi-grp">3 · Aprovados <span>(leads aprovados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
@@ -5164,7 +5164,7 @@ try:
                     st.plotly_chart(fig, width='stretch', config=_CONF)
 
                 # ── Distribuição por Natureza do Empregador (PF/PJ) ────────────────────────
-                _NAT_LBL = {"PJ": "Empregador PJ (CNPJ)", "PF": "Empregador PF (CPF)"}
+                _NAT_LBL = {"PJ": "Empregador Pessoa Jurídica", "PF": "Empregador Pessoa Física"}
                 _nat_chart = {_NAT_LBL.get(_k, _k): _v
                               for _k, _v in sorted(_nat_d.items(), key=lambda x: -x[1])}
                 fig = _fig_barras_h(_nat_chart, "Distribuição por Natureza do Empregador — Desembolsados",
