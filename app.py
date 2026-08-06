@@ -311,6 +311,36 @@ def _gh_put_file(path: str, content: str, message: str, sha=None) -> bool:
     return r.status_code
 
 
+# ── Aviso de manutenção (flag global no repo privado; admin liga/desliga) ────────
+_MANUT_PATH = "manutencao.json"
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _ler_manutencao() -> dict:
+    """Lê o aviso de manutenção do repo privado. Cache 60s p/ propagar a todos os
+    usuários sem custo por render; o admin que altera limpa o cache na hora."""
+    content, _sha = _gh_get_file(_MANUT_PATH)
+    if not content:
+        return {"ativo": False, "mensagem": "", "desde": "", "por": ""}
+    try:
+        d = json.loads(content)
+        return {"ativo": bool(d.get("ativo")), "mensagem": str(d.get("mensagem", "")),
+                "desde": str(d.get("desde", "")), "por": str(d.get("por", ""))}
+    except Exception:
+        return {"ativo": False, "mensagem": "", "desde": "", "por": ""}
+
+
+def _set_manutencao(ativo: bool, mensagem: str, por: str) -> bool:
+    """Grava o aviso de manutenção (ação de admin). Retorna True em sucesso."""
+    agora = datetime.utcnow() - timedelta(hours=3)   # BRT (Brasil sem horário de verão)
+    d = {"ativo": bool(ativo), "mensagem": mensagem.strip(),
+         "desde": agora.strftime("%Y-%m-%dT%H:%M:%S"), "por": por}
+    _content, sha = _gh_get_file(_MANUT_PATH)
+    code = _gh_put_file(_MANUT_PATH, json.dumps(d, ensure_ascii=False, indent=1),
+                        f"manutencao: {'ativar' if ativo else 'desativar'} por {por}", sha=sha)
+    return code in (200, 201)
+
+
 def _registrar_acesso(email: str, nome: str, via: str = "cookie") -> None:
     """Anexa 1 evento de acesso ao arquivo do dia (acessos/YYYYMMDD.json) no repo privado.
     Robusto: retry em 409 (escrita concorrente) e NUNCA levanta exceção (não pode derrubar o login)."""
@@ -3127,16 +3157,36 @@ try:
 
         with _slot.container():
 
+            # ── Aviso de manutenção (banner global; ligado/desligado por admin) ────────────
+            _manut = _ler_manutencao()
+            if _manut.get("ativo"):
+                _mmsg = _manut.get("mensagem") or "Os dados podem estar temporariamente desatualizados — já estamos atualizando."
+                _mdesde = ""
+                try:
+                    _mdesde = " · desde " + datetime.fromisoformat(_manut["desde"]).strftime("%d/%m %H:%M")
+                except Exception:
+                    pass
+                st.markdown(
+                    '<div style="background:rgba(254,197,46,0.12);border:1px solid rgba(254,197,46,0.45);'
+                    'border-left:4px solid #FEC52E;border-radius:10px;padding:11px 16px;margin:2px 0 14px;'
+                    'display:flex;align-items:center;gap:12px">'
+                    '<span style="font-size:19px;line-height:1">&#128295;</span>'
+                    '<div style="font-size:14px;color:#e2e8f0;line-height:1.45">'
+                    f'<b style="color:#FEC52E">Em manutenção</b> &mdash; {_mmsg}'
+                    f'<span style="color:#94a3b8">{_mdesde}</span></div></div>',
+                    unsafe_allow_html=True,
+                )
+
             # ── Header + seletor ──────────────────────────────────────────────────────────
-            
+
             col_title, col_picker = st.columns([1, 1])
-            
+
             with col_title:
                 if _is_admin_sess:
-                    _c_tit, _c_adm, _c_tv, _c_out = st.columns([3, 1.25, 1, 1])
+                    _c_tit, _c_adm, _c_man, _c_tv, _c_out = st.columns([3, 1.05, 0.9, 1, 1])
                 else:
                     _c_tit, _c_tv, _c_out = st.columns([3, 1, 1])
-                    _c_adm = None
+                    _c_adm = _c_man = None
                 with _c_tit:
                     st.markdown(
                         '<div style="display:flex;align-items:flex-end;gap:10px;margin:4px 0 6px">'
@@ -3175,6 +3225,31 @@ try:
                                      help="Histórico de acessos (admin)"):
                             st.query_params["page"] = "acessos"
                             st.rerun()
+                if _c_man is not None:
+                    with _c_man:
+                        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                        with st.popover("🛠", help="Aviso de manutenção (admin)"):
+                            st.markdown("**Aviso de manutenção** — visível a todos os usuários")
+                            _mc = _ler_manutencao()
+                            st.caption("🟠 ATIVO agora" if _mc.get("ativo") else "⚪ Inativo")
+                            _mtxt = st.text_area(
+                                "Mensagem exibida no topo",
+                                value=(_mc.get("mensagem")
+                                       or "Os dados podem estar temporariamente desatualizados — já estamos atualizando."),
+                                key="_manut_txt", height=90)
+                            _mb1, _mb2 = st.columns(2)
+                            with _mb1:
+                                if st.button("Ativar", key="_manut_on", width='stretch', type="primary"):
+                                    _ok = _set_manutencao(True, _mtxt, _user_email_sess)
+                                    _ler_manutencao.clear()
+                                    st.toast("Manutenção ativada." if _ok else "Falha ao ativar (token sem escrita?).")
+                                    st.rerun()
+                            with _mb2:
+                                if st.button("Desativar", key="_manut_off", width='stretch'):
+                                    _ok = _set_manutencao(False, _mtxt, _user_email_sess)
+                                    _ler_manutencao.clear()
+                                    st.toast("Manutenção desativada." if _ok else "Falha ao desativar.")
+                                    st.rerun()
                 with _c_tv:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("📺 Modo TV", width='stretch'):
