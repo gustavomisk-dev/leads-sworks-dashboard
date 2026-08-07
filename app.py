@@ -768,9 +768,9 @@ def _merge_segmentos(segs: list) -> dict:
 
 
 def _info_i(_inner: str) -> str:
-    """Ícone 'i' (pj-i) + balão estilizado (.ftip). `_inner` deve ser HTML já pronto
+    """Ícone '?' (pj-i) + balão estilizado (.ftip). `_inner` deve ser HTML já pronto
     (use <br> p/ quebras e <b> p/ negrito). Padrão dos tooltips de informação do Zileads."""
-    return (f'<span class="ftip"><span class="pj-i">i</span>'
+    return (f'<span class="ftip"><span class="pj-i">?</span>'
             f'<span class="ftip-box">{_inner}</span></span>')
 
 
@@ -3960,7 +3960,7 @@ try:
                             return ""
                         _tx = (_tx.replace("&", "&amp;").replace('"', "&quot;")
                                   .replace("<", "&lt;").replace(">", "&gt;"))
-                        return f"<span class='pj-i' title=\"{_tx}\">i</span>"
+                        return f"<span class='pj-i' title=\"{_tx}\">?</span>"
                     _HIDE_VALOR_TIPOS = {"PRE_APROVADO"}  # ASSINATURA voltou a exibir valor/liberado
             
                     _sorted = sorted(_pt_sec.items(), key=lambda x: (_etapa_key(x[0]), -x[1]["valor"]))
