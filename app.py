@@ -1183,6 +1183,7 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
         return None
     fig = go.Figure()
     _sel_status = set([3, 4, 5, 2, 0, 7, 8, 1, 6] if statuses_sel is None else statuses_sel)
+    _mostra_total = "TOTAL" in _sel_status
     for s in [3, 4, 5, 2, 0, 7, 8, 1, 6]:
         if s not in _sel_status:
             continue
@@ -1199,6 +1200,17 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
             fillcolor="rgba(34,197,94,0.08)" if s == 3 else None,
             hovertemplate=f"{_STATUS_NOMES.get(s, str(s))}: %{{y:,}}<extra></extra>",
         ))
+    if _mostra_total:
+        y_tot = [sum(ev.get(x, {}).values()) for x in eixo]
+        if sum(y_tot) > 0:
+            fig.add_trace(go.Scatter(
+                x=eixo, y=y_tot,
+                name="Total",
+                mode=trace_mode,
+                line=dict(color="#e2e8f0", width=2.5, dash="dot"),
+                marker=dict(size=4),
+                hovertemplate="Total: %{y:,}<extra></extra>",
+            ))
     fig.update_layout(
         template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
         title=dict(text=titulo, font=_TF),
@@ -4574,17 +4586,19 @@ try:
             
                 # Botões (1 linha, multi-seleção) p/ mostrar/ocultar cada status no gráfico.
                 # Mantidos sempre os 9 visíveis; toggle roda só o fragment (não recarrega a página).
-                _EVO_ORDEM = [3, 4, 5, 2, 0, 7, 8, 1, 6]   # ordem dos botões = ordem das linhas
+                _EVO_ORDEM = [3, 4, 5, 2, 0, 7, 8, 1, 6]   # ordem dos status = ordem das linhas
+                _EVO_BTNS = _EVO_ORDEM + ["TOTAL"]         # 10º botão = linha do Total (soma dos status)
                 if "evo_status_sel" not in st.session_state:
-                    st.session_state["evo_status_sel"] = list(_EVO_ORDEM)   # todos visíveis por padrão
+                    st.session_state["evo_status_sel"] = list(_EVO_ORDEM)   # 9 status on; Total off por padrão
 
                 @st.fragment
                 def _evo_frag():
                     _sel = set(st.session_state.get("evo_status_sel", _EVO_ORDEM))
-                    _cols = st.columns(9, gap="small")
-                    for _i, _s in enumerate(_EVO_ORDEM):
+                    _cols = st.columns(10, gap="small")
+                    for _i, _s in enumerate(_EVO_BTNS):
                         _on = _s in _sel
-                        if _cols[_i].button(_STATUS_NOMES.get(_s, str(_s)),
+                        _lbl = "Total" if _s == "TOTAL" else _STATUS_NOMES.get(_s, str(_s))
+                        if _cols[_i].button(_lbl,
                                             key=f"evo_btn_{_s}",
                                             type=("primary" if _on else "secondary"),
                                             width='stretch'):
@@ -4592,7 +4606,7 @@ try:
                                 _sel.discard(_s)
                             else:
                                 _sel.add(_s)
-                            st.session_state["evo_status_sel"] = [x for x in _EVO_ORDEM if x in _sel]
+                            st.session_state["evo_status_sel"] = [x for x in _EVO_BTNS if x in _sel]
                             st.rerun(scope="fragment")
                     _sel_now = st.session_state.get("evo_status_sel", _EVO_ORDEM)
                     _fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel,
