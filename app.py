@@ -1143,7 +1143,8 @@ def _fig_funil_rico(funil: dict):
     return fig
 
 
-def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list = None):
+def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list = None,
+                  statuses_sel: list = None):
     slots = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 15)]
     if n_dias == 1:
         ev         = agg["evolucao_horaria"]
@@ -1181,7 +1182,10 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
     if not eixo:
         return None
     fig = go.Figure()
+    _sel_status = set([3, 4, 5, 2, 0, 7, 8, 1, 6] if statuses_sel is None else statuses_sel)
     for s in [3, 4, 5, 2, 0, 7, 8, 1, 6]:
+        if s not in _sel_status:
+            continue
         y = [ev.get(x, {}).get(s, 0) for x in eixo]
         if sum(y) == 0:
             continue
@@ -4568,9 +4572,37 @@ try:
 
                 st.markdown('<div class="sec">Evolução Temporal</div>', unsafe_allow_html=True)
             
-                fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                # Botões (1 linha, multi-seleção) p/ mostrar/ocultar cada status no gráfico.
+                # Mantidos sempre os 9 visíveis; toggle roda só o fragment (não recarrega a página).
+                _EVO_ORDEM = [3, 4, 5, 2, 0, 7, 8, 1, 6]   # ordem dos botões = ordem das linhas
+                if "evo_status_sel" not in st.session_state:
+                    st.session_state["evo_status_sel"] = list(_EVO_ORDEM)   # todos visíveis por padrão
+
+                @st.fragment
+                def _evo_frag():
+                    _sel = set(st.session_state.get("evo_status_sel", _EVO_ORDEM))
+                    _cols = st.columns(9, gap="small")
+                    for _i, _s in enumerate(_EVO_ORDEM):
+                        _on = _s in _sel
+                        if _cols[_i].button(_STATUS_NOMES.get(_s, str(_s)),
+                                            key=f"evo_btn_{_s}",
+                                            type=("primary" if _on else "secondary"),
+                                            width='stretch'):
+                            if _on:
+                                _sel.discard(_s)
+                            else:
+                                _sel.add(_s)
+                            st.session_state["evo_status_sel"] = [x for x in _EVO_ORDEM if x in _sel]
+                            st.rerun(scope="fragment")
+                    _sel_now = st.session_state.get("evo_status_sel", _EVO_ORDEM)
+                    _fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel,
+                                         statuses_sel=_sel_now) if _sel_now else None
+                    if _fig:
+                        st.plotly_chart(_fig, width='stretch', config=_CONF)
+                    else:
+                        st.caption("Selecione ao menos um status nos botões acima para ver as linhas.")
+
+                _evo_frag()
             
             if _show("evolucao_leads"):
                 @st.fragment
