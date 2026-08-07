@@ -3615,11 +3615,12 @@ try:
             _pct_novos_s = _pct_tot(f.get("novos", 0))
             _pct_aprov_s = _pct_tot(f["aprovados"])
             _pct_repro_s = _pct_tot(f["reprovados"])
-            # Distribuição de Leads — Total + 9 status (SWorks 0-8). Sob filtro de origem,
-            # os não-terminais vêm consolidados em -1 (em_curso) → somados em "Em andamento".
+            # Distribuição de Leads — Total + 9 status (SWorks 0-8). Cada KPI = 1 status
+            # específico. O bucket -1 (em_curso, que só aparece sob filtro de origem, onde os
+            # não-terminais vêm consolidados) NÃO é somado a nenhum status — é descartado,
+            # pra "Em andamento" refletir só o status 2, batendo com o S-Works.
             _dist = dict(f.get("_d_status", {}))
-            if -1 in _dist:
-                _dist[2] = _dist.get(2, 0) + _dist.pop(-1)
+            _dist.pop(-1, None)
             def _dnum(_c): return _nbr(_dist.get(_c, 0))
             def _dpct(_c): return _pct_tot(_dist.get(_c, 0))
             def _esc_ttl(_s):
