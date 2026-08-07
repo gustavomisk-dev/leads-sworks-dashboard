@@ -1217,8 +1217,8 @@ def _fig_evolucao(agg: dict, n_dias: int, dias_raw: list = None, datas_sel: list
         xaxis=dict(title=xlab, tickfont=_AF, showgrid=True, gridcolor=_GRID, **xaxis_extra),
         yaxis=dict(title="Leads", tickfont=_AF, showgrid=True, gridcolor=_GRID),
         legend=dict(font=dict(size=10, color="#94a3b8"), bgcolor=_BG,
-                    orientation="h", y=-0.22, x=0.5, xanchor="center"),
-        margin=dict(t=50, b=70, l=10, r=10), height=360,
+                    orientation="h", y=-0.38, x=0.5, xanchor="center"),
+        margin=dict(t=50, b=110, l=10, r=10), height=400,
         hovermode="x unified",
     )
     return fig
