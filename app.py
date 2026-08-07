@@ -3301,6 +3301,16 @@ try:
                         default=[],
                         key="origem_sel",
                         placeholder="Todas",
+                        help=(
+                            "Os leads possuem as seguintes origens:\n\n"
+                            "- **B2C** → Leads originados pelo cliente via Site e direcionados ao Bot do WhatsApp\n"
+                            "- **B2B** → Leads originados pelos Corbans via Zili+\n"
+                            "- **B2B-API** → Leads originados pelos Corbans via API\n"
+                            "- **CTPS** → Leads originados via Leilão e direcionados ao Bot do WhatsApp\n"
+                            "- **B2C-CT** → Leads originados via Leilão e direcionados ao Bot do WhatsApp que, "
+                            "por não terem perfis adequados à taxa inicial ofertada, receberam nova proposta, "
+                            "fora do Leilão, com uma taxa maior"
+                        ),
                     )
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
