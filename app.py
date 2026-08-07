@@ -3880,11 +3880,20 @@ try:
                 while _next_ref_nm.weekday() >= 5:
                     _next_ref_nm += timedelta(days=1)
                 st.session_state.setdefault("proj_prox_dia_nm", False)   # default: DESLIGADO
-                _c2ttl, _c2tog = st.columns([3, 7], gap="small", vertical_alignment="bottom")
-                with _c2tog:
+                _c2ttl, _c2sw, _c2lbl = st.columns([3, 1, 6], gap="small", vertical_alignment="bottom")
+                with _c2sw:
+                    # label do widget colapsado; o rótulo + "?" (balão padrão) vão ao lado
                     _ver_prox_nm = st.toggle(
                         "dia útil seguinte", key="proj_prox_dia_nm",
-                        help=f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em bloqueio temporário com validade a partir das 18h30 do último dia útil.",
+                        label_visibility="collapsed",
+                    )
+                with _c2lbl:
+                    _tog_tip = (f"Projeção do próximo dia útil ({_next_ref_nm.strftime('%d/%m')}): só leads em "
+                                "bloqueio temporário com validade a partir das 18h30 do último dia útil.")
+                    st.markdown(
+                        f'<div style="font-size:0.9rem;line-height:2.2;white-space:nowrap">'
+                        f'dia útil seguinte {_info_i(_tog_tip)}</div>',
+                        unsafe_allow_html=True,
                     )
                 _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
                 with _c2ttl:
