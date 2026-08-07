@@ -1366,7 +1366,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
             texts = [f"{_nbr(v)}  |  {100*v/pct_base:.1f}%" for v in values]
         else:
             texts  = [f"{100*v/pct_base:.1f}%" for v in values]
-        tpos   = "auto" if text_auto else "inside"
+        tpos   = "auto" if text_auto else "outside"   # % sempre horizontal, fora da barra
     else:
         shades = color
         texts  = [f"{_nbr(v)}" for v in values]
@@ -1375,9 +1375,9 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         x=values, y=labels, orientation="h",
         marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
         text=texts, textposition=tpos,
-        insidetextanchor="end" if pct_base else None,
+        insidetextanchor="end" if (pct_base and text_auto) else None,
         cliponaxis=False,   # não corta o rótulo que cai fora da barra (à direita)
-        textfont=dict(size=13, color="rgba(255,255,255,0.85)" if pct_base else "#94a3b8"),
+        textfont=dict(size=13, color="rgba(255,255,255,0.85)" if (pct_base and text_auto) else "#94a3b8"),
         hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
     ))
     h = max(280, len(items) * 34 + 80)
@@ -1386,7 +1386,7 @@ def _fig_barras_h(data_dict: dict, titulo: str, color: str, n: int = 15, pct_bas
         title=dict(text=titulo, font=_TF),
         xaxis=dict(tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
         yaxis=dict(tickfont=dict(size=13, color="#cbd5e1"), autorange="reversed", automargin=True),
-        margin=dict(t=50, b=20, l=20, r=110 if text_auto else 60), height=h,
+        margin=dict(t=50, b=20, l=20, r=110 if text_auto else (90 if pct_base else 60)), height=h,
     )
     return fig
 
@@ -5004,26 +5004,23 @@ try:
 
                 st.markdown('<div class="sec">Motivos de Reprovação</div>', unsafe_allow_html=True)
             
-                col_m1, col_m2 = st.columns(2)
-            
-                with col_m1:
-                    fig = _fig_barras_h(agg.get("top_motivos", {}),
-                                        "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
+                # Uma coluna (empilhados): primeiro Alto Nível, depois Detalhado.
+                fig = _fig_barras_h(agg.get("top_motivos", {}),
+                                    "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                else:
+                    st.info("Sem dados de motivos.")
+
+                mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
+                if mot_det:
+                    n_det = sum(mot_det.values())
+                    fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
+                                        pct_base=n_det)
                     if fig:
                         st.plotly_chart(fig, width='stretch', config=_CONF)
-                    else:
-                        st.info("Sem dados de motivos.")
-            
-                with col_m2:
-                    mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
-                    if mot_det:
-                        n_det = sum(mot_det.values())
-                        fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
-                                            pct_base=n_det)
-                        if fig:
-                            st.plotly_chart(fig, width='stretch', config=_CONF)
-                    else:
-                        st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
+                else:
+                    st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
             # ── 11. Bloqueios ─────────────────────────────────────────────────────────────
             if _show("leads_reprovados"):
