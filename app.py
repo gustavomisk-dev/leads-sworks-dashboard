@@ -44,6 +44,10 @@ st.markdown("""
 .kpi-label { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
 .pj-i { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; margin-left:5px; border-radius:50%; background:#334155; color:#cbd5e1; font:italic 700 8px Georgia,serif; vertical-align:super; line-height:1; cursor:help; flex-shrink:0; text-transform:none; letter-spacing:normal; }
 .pj-i:hover { background:#FEC52E; color:#1c1a17; }
+.ftip { position:relative; display:inline-flex; }
+.ftip .ftip-box { visibility:hidden; opacity:0; transition:opacity .12s ease; position:absolute; top:150%; left:50%; transform:translateX(-50%); z-index:1000; width:320px; max-width:80vw; background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:10px 12px; font-size:12.5px; line-height:1.55; font-weight:400; white-space:normal; text-align:left; text-transform:none; letter-spacing:normal; box-shadow:0 8px 26px rgba(0,0,0,.4); pointer-events:none; }
+.ftip:hover .ftip-box { visibility:visible; opacity:1; }
+.ftip-box b { color:#FEC52E; }
 .kpi-value { color: #FEC52E; font-size: 21px; font-weight: 700; line-height: 1.1; }
 .kpi-sub   { color: #64748b; font-size: 10px; margin-top: 3px; }
 .kpi-grp   { color: #FEC52E; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 4px; border-bottom: 1px solid #272420; padding-bottom: 3px; }
@@ -761,6 +765,13 @@ def _merge_segmentos(segs: list) -> dict:
         fin_out[campo] = item
     out["financeiro"] = fin_out
     return out
+
+
+def _info_i(_inner: str) -> str:
+    """Ícone 'i' (pj-i) + balão estilizado (.ftip). `_inner` deve ser HTML já pronto
+    (use <br> p/ quebras e <b> p/ negrito). Padrão dos tooltips de informação do Zileads."""
+    return (f'<span class="ftip"><span class="pj-i">i</span>'
+            f'<span class="ftip-box">{_inner}</span></span>')
 
 
 def _apply_origem(d: dict, origens) -> dict:
@@ -3295,22 +3306,30 @@ try:
                         format="DD/MM/YYYY",
                     )
                 with _cp_orig:
+                    # Rótulo custom "Origem" + "i" (pj-i) com balão estilizado ao lado do rótulo.
+                    # Label do widget colapsado p/ não duplicar e p/ o "i" ficar colado em "Origem".
+                    _origem_tip = (
+                        "Os leads possuem as seguintes origens:<br><br>"
+                        "<b>B2C</b> → Leads originados pelo cliente via Site e direcionados ao Bot do WhatsApp<br>"
+                        "<b>B2B</b> → Leads originados pelos Corbans via Zili+<br>"
+                        "<b>B2B-API</b> → Leads originados pelos Corbans via API<br>"
+                        "<b>CTPS</b> → Leads originados via Leilão e direcionados ao Bot do WhatsApp<br>"
+                        "<b>B2C-CT</b> → Leads originados via Leilão e direcionados ao Bot do WhatsApp que, por não "
+                        "terem perfis adequados à taxa inicial ofertada, receberam nova proposta, fora do "
+                        "Leilão, com uma taxa maior"
+                    )
+                    st.markdown(
+                        '<div style="font-size:0.875rem;line-height:1.6;margin-bottom:0.35rem;'
+                        f'white-space:nowrap">Origem {_info_i(_origem_tip)}</div>',
+                        unsafe_allow_html=True,
+                    )
                     _origem_raw = st.multiselect(
                         "Origem",
                         options=_origins_avail,
                         default=[],
                         key="origem_sel",
                         placeholder="Todas",
-                        help=(
-                            "Os leads possuem as seguintes origens:\n\n"
-                            "- **B2C** → Leads originados pelo cliente via Site e direcionados ao Bot do WhatsApp\n"
-                            "- **B2B** → Leads originados pelos Corbans via Zili+\n"
-                            "- **B2B-API** → Leads originados pelos Corbans via API\n"
-                            "- **CTPS** → Leads originados via Leilão e direcionados ao Bot do WhatsApp\n"
-                            "- **B2C-CT** → Leads originados via Leilão e direcionados ao Bot do WhatsApp que, "
-                            "por não terem perfis adequados à taxa inicial ofertada, receberam nova proposta, "
-                            "fora do Leilão, com uma taxa maior"
-                        ),
+                        label_visibility="collapsed",
                     )
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
@@ -3622,7 +3641,7 @@ try:
             for _dc, _dl, _dt in _DIST_CARDS:
                 _dv = _f_total_fmt if _dc is None else _dnum(_dc)
                 _dp = ("100,00%" if f.get("total") else "—") if _dc is None else _dpct(_dc)
-                _di = f'<span class="pj-i" title="{_esc_ttl(_dt)}">i</span>'
+                _di = _info_i(_esc_ttl(_dt))
                 _dist_html += (f'<div class="kpi-card"><div class="kpi-label">{_dl} {_di}</div>'
                                f'<div class="kpi-value">{_dv}</div>'
                                f'<div class="kpi-sub">{_dp} do Total</div></div>')
@@ -3686,7 +3705,7 @@ try:
                 _nm = [_esc(_TIPO_LABEL_MAP.get(_c, _c)) for _c in _codes]
                 if not _nm:
                     return "Nenhuma etapa com valor liberado no período."
-                return "Etapas consideradas:&#10;" + "&#10;".join("• " + _lbl for _lbl in _nm)
+                return "Etapas consideradas:<br>" + "<br>".join("• " + _lbl for _lbl in _nm)
             _pess_tip = _proj_tip(_pess_etapas)
             _otim_tip = _proj_tip(_otim_etapas)
 
@@ -3790,10 +3809,10 @@ try:
                 st.markdown(f"""
             <div class="kpi-grp">Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads {_info_i(_pess_tip)}</div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_pess_comiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_pess_semiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
-              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads <span class="pj-i" title="{_otim_tip}">i</span></div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
+              <div class="kpi-card"><div class="kpi-label">Projeção otimista de leads {_info_i(_otim_tip)}</div><div class="kpi-value">{_proj_otim_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_otim_comiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_otim_semiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
             </div>
