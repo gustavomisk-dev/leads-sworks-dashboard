@@ -4587,7 +4587,7 @@ try:
                 # Botões (1 linha, multi-seleção) p/ mostrar/ocultar cada status no gráfico.
                 # Mantidos sempre os 9 visíveis; toggle roda só o fragment (não recarrega a página).
                 _EVO_ORDEM = [3, 4, 5, 2, 0, 7, 8, 1, 6]   # ordem dos status = ordem das linhas
-                _EVO_BTNS = _EVO_ORDEM + ["TOTAL"]         # 10º botão = linha do Total (soma dos status)
+                _EVO_BTNS = ["TOTAL"] + _EVO_ORDEM         # 1º botão = linha do Total (soma dos status)
                 if "evo_status_sel" not in st.session_state:
                     st.session_state["evo_status_sel"] = list(_EVO_ORDEM)   # 9 status on; Total off por padrão
 
