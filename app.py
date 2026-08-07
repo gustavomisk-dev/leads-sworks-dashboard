@@ -3657,6 +3657,8 @@ try:
             _nat_pf_sub = (f"{100*_nat_pf_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
             _nat_pj_sub = (f"{100*_nat_pj_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
 
+            _pf = agg.get("pipeline_financeiro", {})   # usado por Alertas e Desembolsos por Data
+            _dup = agg.get("duplicatas_cpf", [])       # idem (hoisted p/ ficar sempre disponivel)
             # ── Hub de navegação ──────────────────────────────────────────────
             # 6 botões (3 col × 2 linhas) que selecionam um grupo de seções.
             # ETAPA 1 (esta): apenas criar os botões e guardar a escolha em
@@ -3686,20 +3688,31 @@ try:
                             st.session_state["hub_sel"] = _hkey
                             st.rerun()
 
-            st.markdown(f"""
-            <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
+            def _show(*_keys):
+                """True se o hub tem um dos grupos `_keys` selecionado (None => nada)."""
+                return st.session_state.get("hub_sel") in _keys
+
+            if _show("principais_kpis", "evolucao_leads"):
+                st.markdown(f"""
+            <div class="kpi-grp">Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
               <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
             </div>
-            <div class="kpi-grp">2 · Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
+                """, unsafe_allow_html=True)
+            if _show("principais_kpis"):
+                st.markdown(f"""
+            <div class="kpi-grp">Distribuição de Leads por Natureza do Empregador <span>(entre os leads com natureza identificada)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
               <div class="kpi-card"><div class="kpi-label">Empregador Pessoa Física</div><div class="kpi-value">{_nat_pf_fmt}</div><div class="kpi-sub">{_nat_pf_sub}</div></div>
               <div class="kpi-card"><div class="kpi-label">Empregador Pessoa Jurídica</div><div class="kpi-value">{_nat_pj_fmt}</div><div class="kpi-sub">{_nat_pj_sub}</div></div>
             </div>
-            <div class="kpi-grp">3 · Aprovados <span>(leads aprovados no período)</span></div>
+                """, unsafe_allow_html=True)
+            if _show("principais_kpis", "leads_aprovados"):
+                st.markdown(f"""
+            <div class="kpi-grp">Aprovados <span>(leads aprovados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">leads aprovados</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{vol_s}</div><div class="kpi-sub">valor contratado total</div></div>
@@ -3710,7 +3723,10 @@ try:
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_ap_lib_tk_s}</div><div class="kpi-sub">por contrato aprovado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{prazo_s}</div><div class="kpi-sub">contratos aprovados</div></div>
             </div>
-            <div class="kpi-grp">4 · Desembolsados <span>(leads desembolsados no período)</span></div>
+                """, unsafe_allow_html=True)
+            if _show("principais_kpis", "leads_desembolsados"):
+                st.markdown(f"""
+            <div class="kpi-grp">Desembolsados <span>(leads desembolsados no período)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
               <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
               <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
@@ -3721,7 +3737,10 @@ try:
               <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
               <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
             </div>
-            <div class="kpi-grp">5 · Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
+                """, unsafe_allow_html=True)
+            if _show("principais_kpis", "projecao_desembolsos"):
+                st.markdown(f"""
+            <div class="kpi-grp">Projeção a desembolsar <span>{_pix_ref_sub}</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
               <div class="kpi-card"><div class="kpi-label">Projeção pessimista de leads <span class="pj-i" title="{_pess_tip}">i</span></div><div class="kpi-value">{_proj_pess_fmt}</div><div class="kpi-sub">leads</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_pess_comiof_fmt}</div><div class="kpi-sub">cenário pessimista</div></div>
@@ -3730,56 +3749,56 @@ try:
               <div class="kpi-card"><div class="kpi-label">Valor contratado (com IOF)</div><div class="kpi-value">{_otim_comiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
               <div class="kpi-card"><div class="kpi-label">Valor liberado (sem IOF)</div><div class="kpi-value">{_otim_semiof_fmt}</div><div class="kpi-sub">cenário otimista</div></div>
             </div>
-            """, unsafe_allow_html=True)
-
+                """, unsafe_allow_html=True)
             # ── 1. Desembolsos no Período ─────────────────────────────────────────────────
+            if _show("leads_desembolsados"):
 
-            st.markdown('<div class="sec">1. Desembolsos no Período</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Desembolsos no Período</div>', unsafe_allow_html=True)
 
-            if _desemb_agg:
-                _desemb_sorted = dict(sorted(_desemb_agg.items()))
-                _d_x    = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _desemb_sorted]
-                _d_y_val = [round(v["valor"],    2) for v in _desemb_sorted.values()]
-                _d_y_cnt = [v["count"]              for v in _desemb_sorted.values()]
-                _d_y_lib = [round(v["liberado"],  2) for v in _desemb_sorted.values()]
-                _cap_val_s = "R$ " + f"{_desemb_tot_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                _fig_desemb = go.Figure()
-                _fig_desemb.add_trace(go.Scatter(
-                    x=_d_x,
-                    y=_d_y_val,
-                    name="Valor Contratado",
-                    mode="lines+markers",
-                    line=dict(color="#10b981", width=2),
-                    marker=dict(size=6, color="#10b981"),
-                    fill="tozeroy",
-                    fillcolor="rgba(16,185,129,0.08)",
-                    customdata=list(zip(_d_y_cnt, _d_y_lib)),
-                    hovertemplate=(
-                        "<b>%{x}</b><br>"
-                        "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
-                        "Contratos: <b>%{customdata[0]}</b><br>"
-                        "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
-                        "<extra></extra>"
-                    ),
-                ))
-                _fig_desemb.update_layout(
-                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                    title=dict(text="Evolução Temporal de Desembolsos", font=_TF),
-                    xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
-                    yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
-                    showlegend=False,
-                    margin=dict(t=50, b=40, l=10, r=10),
-                    height=360,
-                    hovermode="x unified",
-                )
-                st.plotly_chart(_fig_desemb, width='stretch', config=_CONF)
-                st.caption(
-                    f"Inclui leads criados até 7 dias antes do período filtrado · "
-                    f"{_desemb_tot_count} contrato(s) · {_cap_val_s}"
-                )
-            else:
-                _msg_ori = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
-                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
+                if _desemb_agg:
+                    _desemb_sorted = dict(sorted(_desemb_agg.items()))
+                    _d_x    = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _desemb_sorted]
+                    _d_y_val = [round(v["valor"],    2) for v in _desemb_sorted.values()]
+                    _d_y_cnt = [v["count"]              for v in _desemb_sorted.values()]
+                    _d_y_lib = [round(v["liberado"],  2) for v in _desemb_sorted.values()]
+                    _cap_val_s = "R$ " + f"{_desemb_tot_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    _fig_desemb = go.Figure()
+                    _fig_desemb.add_trace(go.Scatter(
+                        x=_d_x,
+                        y=_d_y_val,
+                        name="Valor Contratado",
+                        mode="lines+markers",
+                        line=dict(color="#10b981", width=2),
+                        marker=dict(size=6, color="#10b981"),
+                        fill="tozeroy",
+                        fillcolor="rgba(16,185,129,0.08)",
+                        customdata=list(zip(_d_y_cnt, _d_y_lib)),
+                        hovertemplate=(
+                            "<b>%{x}</b><br>"
+                            "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
+                            "Contratos: <b>%{customdata[0]}</b><br>"
+                            "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
+                            "<extra></extra>"
+                        ),
+                    ))
+                    _fig_desemb.update_layout(
+                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                        title=dict(text="Evolução Temporal de Desembolsos", font=_TF),
+                        xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                        yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
+                        showlegend=False,
+                        margin=dict(t=50, b=40, l=10, r=10),
+                        height=360,
+                        hovermode="x unified",
+                    )
+                    st.plotly_chart(_fig_desemb, width='stretch', config=_CONF)
+                    st.caption(
+                        f"Inclui leads criados até 7 dias antes do período filtrado · "
+                        f"{_desemb_tot_count} contrato(s) · {_cap_val_s}"
+                    )
+                else:
+                    _msg_ori = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                    st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori}.")
 
             # ── 2. Projeção de Desembolso ────────────────────────────────────────────────
             @st.fragment
@@ -3802,7 +3821,7 @@ try:
                     )
                 _proj_ref_show_nm = _next_ref_nm if _ver_prox_nm else _default_ref_nm
                 with _c2ttl:
-                    st.markdown(f'<div class="sec">2. Projeção de Desembolso ({_proj_ref_show_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="sec">Projeção de Desembolso ({_proj_ref_show_nm.strftime("%d/%m/%Y")})</div>', unsafe_allow_html=True)
 
                 # Data de referência Pix — próximo horário Pix possível (igual aos KPI cards)
                 _data_ref_nm = _default_ref_nm
@@ -3813,20 +3832,6 @@ try:
                 # Non-BT e breakdown por dia (seção 1) — 5 dias relativo a _data_ref_nm
                 _non_bt_sec_nm: dict = {}
                 _pt_por_dia: dict = {}
-                # Heatmap: ultima_atualizacao por etapa. Janela de 15 dias p/ capturar
-                # leads antigos ainda nao-terminais e preencher as faixas mais longas
-                # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
-                # ficam em cache permanente, entao so pesa no 1o load da sessao.
-                _hm_ts: dict = {}
-                for _dhm in range(15):
-                    _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
-                    if _shm not in datas:
-                        continue
-                    _djhm = carregar_dia(_shm)
-                    if not _djhm:
-                        continue
-                    for _tsh, _lst in (_djhm.get("heatmap_ts", {}) or {}).items():
-                        _hm_ts.setdefault(_tsh, []).extend(_lst)
                 # 5 dias — projecao / breakdown da secao 1 (separado do heatmap)
                 for _d5pd in range(5):
                     _s5pd = (_data_ref_nm - timedelta(days=_d5pd)).strftime("%Y%m%d")
@@ -3986,6 +3991,528 @@ try:
                 </div>
                 """, unsafe_allow_html=True)
 
+                else:
+                    st.markdown(
+                        "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
+                        unsafe_allow_html=True,
+                    )
+            
+            if _show("projecao_desembolsos"):
+                _sec2_frag()
+
+            # ── 3. Desembolsos por Data de Criação ───────────────────────────────────────
+            if _show("leads_desembolsados"):
+
+                st.markdown('<div class="sec">Desembolsos por Data de Criação</div>', unsafe_allow_html=True)
+
+
+                # Mesmo padrão do gráfico da seção 1 (Evolução Temporal de Desembolsos), mas
+                # distribui os contratos DESEMBOLSADOS no período pela DATA DE CRIAÇÃO do lead
+                # (não pela data de desembolso). Reaproveita o mesmo `_desemb_det`, já filtrado
+                # por período (data de desembolso) e por Origem.
+                _cr_agg: dict = {}
+                _cr_sem_dc = 0
+                for _det in _desemb_det:
+                    _dck = _det.get("data_criacao")
+                    if not _dck:
+                        _cr_sem_dc += 1
+                        continue
+                    try:
+                        datetime.strptime(str(_dck), "%Y%m%d")
+                    except (ValueError, TypeError):
+                        _cr_sem_dc += 1
+                        continue
+                    _slot = _cr_agg.setdefault(str(_dck), {"count": 0, "valor": 0.0, "liberado": 0.0})
+                    _slot["count"]    += 1
+                    _slot["valor"]    += _det.get("valor", 0.0) or 0.0
+                    _slot["liberado"] += _det.get("liberado", 0.0) or 0.0
+
+                if not _cr_agg:
+                    _msg_ori3 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                    st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori3}.")
+                else:
+                    _cr_sorted = dict(sorted(_cr_agg.items()))
+                    _c_x     = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _cr_sorted]
+                    _c_y_val = [round(v["valor"], 2)    for v in _cr_sorted.values()]
+                    _c_y_cnt = [v["count"]              for v in _cr_sorted.values()]
+                    _c_y_lib = [round(v["liberado"], 2) for v in _cr_sorted.values()]
+                    _cr_tot_cnt = sum(_c_y_cnt)
+                    _cr_tot_val = sum(_c_y_val)
+                    _cap_cr_s = "R$ " + f"{_cr_tot_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    _fig_cr = go.Figure()
+                    _fig_cr.add_trace(go.Scatter(
+                        x=_c_x,
+                        y=_c_y_val,
+                        name="Valor Contratado",
+                        mode="lines+markers",
+                        line=dict(color="#10b981", width=2),
+                        marker=dict(size=6, color="#10b981"),
+                        fill="tozeroy",
+                        fillcolor="rgba(16,185,129,0.08)",
+                        customdata=list(zip(_c_y_cnt, _c_y_lib)),
+                        hovertemplate=(
+                            "<b>%{x}</b><br>"
+                            "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
+                            "Contratos: <b>%{customdata[0]}</b><br>"
+                            "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
+                            "<extra></extra>"
+                        ),
+                    ))
+                    _fig_cr.update_layout(
+                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                        title=dict(text="Evolução Temporal por Data de Criação", font=_TF),
+                        xaxis=dict(title="Data de Criação do Lead", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                        yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
+                        showlegend=False,
+                        margin=dict(t=50, b=40, l=10, r=10),
+                        height=360,
+                        hovermode="x unified",
+                    )
+                    st.plotly_chart(_fig_cr, width='stretch', config=_CONF)
+                    _cap_cr = (f"Distribui os {_cr_tot_cnt} contrato(s) desembolsados no período "
+                               f"pela data de criação do lead · {_cap_cr_s}")
+                    if _cr_sem_dc:
+                        _cap_cr += f" · {_cr_sem_dc} sem data de criação (ignorado(s))"
+                    st.caption(_cap_cr)
+
+            # ── 4. Evolução Temporal — Médias por Dia ──────────────────────────────────
+            if _show("leads_desembolsados"):
+
+                st.markdown('<div class="sec">Evolução Temporal — Médias por Dia</div>', unsafe_allow_html=True)
+
+                # Médias por DATA DE DESEMBOLSO, sobre os contratos DESEMBOLSADOS do período
+                # (o mesmo _desemb_det já filtrado por período + Origem). Um ponto por dia.
+                if not _desemb_det:
+                    _msg_ori4 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                    st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori4}.")
+                else:
+                    # taxa = [Σ(taxa×prazo), nº contratos, Σ(prazo)] -> média ponderada pelo prazo;
+                    # demais campos = [soma, count] -> média simples.
+                    _ev_dia: dict = {}
+                    for _r in _desemb_det:
+                        _pdk = _r.get("pd")
+                        if not _pdk:
+                            continue
+                        _slot = _ev_dia.setdefault(_pdk, {"taxa": [0.0, 0, 0.0], "prazo": [0.0, 0],
+                                                          "liberado": [0.0, 0], "parcela": [0.0, 0]})
+                        for _k in ("prazo", "liberado", "parcela"):
+                            _v = _r.get(_k)
+                            if _v:
+                                _slot[_k][0] += _v
+                                _slot[_k][1] += 1
+                        _tx, _pz = _r.get("taxa"), _r.get("prazo")
+                        if _tx and _pz:
+                            _slot["taxa"][0] += _tx * _pz   # Σ(taxa×prazo)
+                            _slot["taxa"][1] += 1           # nº de contratos (hover)
+                            _slot["taxa"][2] += _pz         # Σ(prazo) = peso
+
+                    _dias_ev = sorted(_ev_dia.keys())
+                    _x_ev = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_ev]
+
+                    def _serie_ev(_campo):
+                        _y, _cnt = [], []
+                        for _dk in _dias_ev:
+                            _slotv = _ev_dia[_dk][_campo]
+                            if _campo == "taxa":
+                                _wsum, _c, _psum = _slotv
+                                _y.append(round(_wsum / _psum, 4) if _psum else None)
+                            else:
+                                _s, _c = _slotv
+                                _y.append(round(_s / _c, 4) if _c else None)
+                            _cnt.append(_c)
+                        return _y, _cnt
+
+                    def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval="", _ymin=None, _dtick=None):
+                        _y, _cnt = _serie_ev(_campo)
+                        _yax = dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
+                                    tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf)
+                        if _ymin is not None:
+                            _vals = [v for v in _y if v is not None]
+                            if _vals and max(_vals) > _ymin:
+                                _top = max(_vals)
+                                _yax["range"] = [_ymin, _top + (_top - _ymin) * 0.08]
+                                # 1º tick (base) = exatamente o mínimo (tickmode linear a partir de _ymin)
+                                if _dtick:
+                                    _yax["tickmode"] = "linear"
+                                    _yax["tick0"] = _ymin
+                                    _yax["dtick"] = _dtick
+                        _figm = go.Figure()
+                        _figm.add_trace(go.Scatter(
+                            x=_x_ev, y=_y, name=_titulo, mode="lines+markers",
+                            line=dict(color="#10b981", width=2),
+                            marker=dict(size=6, color="#10b981"),
+                            fill="tozeroy", fillcolor="rgba(16,185,129,0.08)",
+                            connectgaps=True, customdata=_cnt,
+                            hovertemplate=(f"<b>%{{x}}</b><br>{_titulo}: <b>{_hval}</b><br>"
+                                           "Contratos: <b>%{customdata}</b><extra></extra>"),
+                        ))
+                        _figm.update_layout(
+                            template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                            separators=",.",   # vírgula decimal, ponto milhar (pt-BR)
+                            title=dict(text=_titulo, font=_TF),
+                            xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
+                            yaxis=_yax,
+                            showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
+                            height=360, hovermode="x unified",
+                        )
+                        return _figm
+
+                    _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
+                        ["Taxa média", "Número de parcelas médio", "Valor liberado médio", "Valor da parcela médio"])
+                    with _tab_tx:
+                        st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
+                                        _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98, _dtick=0.5),
+                                        width='stretch', config=_CONF)
+                    with _tab_pz:
+                        st.plotly_chart(_fig_media("prazo", "Número de parcelas médio", "Número de parcelas", ".0f",
+                                        _hval="%{y:.1f} parcelas", _ymin=12.0, _dtick=6),
+                                        width='stretch', config=_CONF)
+                    with _tab_lb:
+                        st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.2f",
+                                        _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600, _dtick=1000),
+                                        width='stretch', config=_CONF)
+                    with _tab_pc:
+                        _yp, _cp = _serie_ev("parcela")
+                        if any(_cp):
+                            st.plotly_chart(_fig_media("parcela", "Valor da parcela médio", "Valor (R$)",
+                                            ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50, _dtick=50),
+                                            width='stretch', config=_CONF)
+                        else:
+                            st.info("Sem valor de parcela nos desembolsos do período.")
+                    st.caption(
+                        "Média por data de desembolso entre os contratos desembolsados no período."
+                    )
+
+            # ── 5. Alertas ────────────────────────────────────────────────────────────────
+            if _show("principais_kpis"):
+
+                st.markdown('<div class="sec">Alertas</div>', unsafe_allow_html=True)
+
+                if _dup:
+                    _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+                    # Pre-load historical approved leads for each CPF in _dup
+                    _dup_cpf_set = {str(_it["cpf"]).strip().zfill(11) for _it in _dup}
+                    _dup_hist: dict = {}
+                    for _dd_h in datas:
+                        _dj_h = carregar_dia(_dd_h)
+                        if not _dj_h:
+                            continue
+                        for _cpf_h, _vh in (_dj_h.get("aprovados_por_cpf") or {}).items():
+                            _cpf_h_z = str(_cpf_h).strip().zfill(11)
+                            if _cpf_h_z not in _dup_cpf_set:
+                                continue
+                            if _cpf_h_z not in _dup_hist:
+                                _dup_hist[_cpf_h_z] = {"_seen": set(), "leads": []}
+                            for _lh in (_vh.get("leads") or []):
+                                if _ori_ativas and (_lh.get("origem") or "Outros") not in _ori_ativas:
+                                    continue
+                                _lid_h = _lh.get("id", "")
+                                if _lid_h and _lid_h in _dup_hist[_cpf_h_z]["_seen"]:
+                                    continue
+                                if _lid_h:
+                                    _dup_hist[_cpf_h_z]["_seen"].add(_lid_h)
+                                _dup_hist[_cpf_h_z]["leads"].append(_lh)
+
+                    def _mask_ccb_dup(c):
+                        c = str(c).strip()
+                        if len(c) <= 4:
+                            return c
+                        return c[:3] + "*" * (len(c) - 4) + c[-1]
+
+                    def _fmt_d_dup(d):
+                        if not d:
+                            return "—"
+                        try:
+                            return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
+                        except ValueError:
+                            return d
+
+                    _dup_rows = []
+                    for _i, _item in enumerate(_dup):
+                        _rc = "g0" if _i % 2 == 0 else "g1"
+                        _conts = "<br>".join(
+                            f'{c["codigo"] or c["identificador"][:8]} — {c["etapa"]} — {_brl2(c["valor"])}'
+                            for c in _item["contratos"]
+                        )
+                        _cpf_d = str(_item["cpf"]).strip().zfill(11)
+                        _cpf_d_mask = f"{_cpf_d[:3]}.***.***-**"
+                        _nome_d = str(_item["nome"]).strip().split()
+                        _nome_d_mask = (_nome_d[0].capitalize() + (" *" if len(_nome_d) > 1 else "")) if _nome_d else "—"
+
+                        _hist_leads = _dup_hist.get(_cpf_d, {}).get("leads", [])
+                        if _hist_leads:
+                            _dup_det_hdr = (
+                                "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
+                                "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
+                                "<span class='pj-det-dt'>CCB</span>"
+                                "<span class='pj-det-n'>C&#243;digo do Lead</span>"
+                                "<span class='pj-det-n'>Data do Lead</span>"
+                                "<span class='pj-det-n'>Data Desembolso</span>"
+                                "</div>"
+                            )
+                            _dup_det_body = "".join(
+                                f"<div class='pj-det-row'>"
+                                f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb_dup(_lh.get('ccb',''))}</span>"
+                                f"<span class='pj-det-n'>{_lh.get('codigo','—')}</span>"
+                                f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_criacao'))}</span>"
+                                f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_desembolso'))}</span>"
+                                f"</div>"
+                                for _lh in _hist_leads
+                            )
+                            _nome_cell = (
+                                f"<details class='pj-det'><summary>{_nome_d_mask}</summary>"
+                                f"{_dup_det_hdr}{_dup_det_body}</details>"
+                            )
+                        else:
+                            _nome_cell = _nome_d_mask
+
+                        _dup_rows.append(
+                            f'<tr class="{_rc}">'
+                            f'<td style="font-family:monospace">{_cpf_d_mask}</td>'
+                            f'<td>{_nome_cell}</td>'
+                            f'<td class="r">{len(_item["contratos"])}</td>'
+                            f'<td class="r">{_brl2(_item["total"])}</td>'
+                            f'<td style="font-size:.82em;line-height:1.5">{_conts}</td>'
+                            f'</tr>'
+                        )
+                    _dup_html = (
+                        '<div class="dtbl-title" style="color:#f59e0b">&#9888; CPFs com múltiplos contratos &mdash; total liberado &gt; R$&nbsp;15k</div>'
+                        '<div class="dtbl-wrap"><table class="dtbl">'
+                        '<thead><tr>'
+                        '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
+                        '<th class="r">Liberado</th><th>Detalhes</th>'
+                        '</tr></thead>'
+                        '<tbody>' + "".join(_dup_rows) + '</tbody>'
+                        '</table></div>'
+                    )
+                    st.markdown(_dup_html, unsafe_allow_html=True)
+                elif _pf:
+                    st.markdown(
+                        "<p style='color:#475569;font-size:.88em'>Nenhum CPF com múltiplos contratos acima de R$&nbsp;15k.</p>",
+                        unsafe_allow_html=True,
+                    )
+
+                # ── Clientes aprovados com total histórico > 15k ──────────────────────────
+                _cpfs_periodo: set = set()
+                for _dj_p in dias_raw:
+                    for _cpf_k in (_dj_p.get("aprovados_por_cpf") or {}).keys():
+                        if _cpf_k:
+                            _cpfs_periodo.add(_cpf_k)
+
+                if _cpfs_periodo:
+                    # Agrega todos os dias, deduplicando por lead ID para evitar dupla contagem
+                    _aprov_glob: dict = {}
+                    for _dd_all in datas:
+                        _dj_all = carregar_dia(_dd_all)
+                        if not _dj_all:
+                            continue
+                        for _cpf_k, _vk in (_dj_all.get("aprovados_por_cpf") or {}).items():
+                            if not _cpf_k:
+                                continue
+                            if _cpf_k not in _aprov_glob:
+                                _aprov_glob[_cpf_k] = {"nome": _vk.get("nome", ""), "valor": 0.0, "liberado": 0.0, "_seen": set(), "leads": []}
+                            if not _aprov_glob[_cpf_k]["nome"] and _vk.get("nome"):
+                                _aprov_glob[_cpf_k]["nome"] = _vk["nome"]
+                            for _lv in (_vk.get("leads") or []):
+                                if _ori_ativas and (_lv.get("origem") or "Outros") not in _ori_ativas:
+                                    continue
+                                _lid = _lv.get("id", "")
+                                if _lid and _lid in _aprov_glob[_cpf_k]["_seen"]:
+                                    continue
+                                if _lid:
+                                    _aprov_glob[_cpf_k]["_seen"].add(_lid)
+                                _aprov_glob[_cpf_k]["valor"]    += _lv.get("valor", 0.0)
+                                _aprov_glob[_cpf_k]["liberado"] += _lv.get("liberado", 0.0)
+                                _aprov_glob[_cpf_k]["leads"].append(_lv)
+
+                    def _mask_cpf(c):
+                        c = str(c).strip().zfill(11)
+                        return f"{c[:3]}.***.***-**"
+
+                    def _mask_nome(n):
+                        parts = str(n).strip().split()
+                        if not parts:
+                            return "—"
+                        return parts[0].capitalize() + (" *" if len(parts) > 1 else "")
+
+                    def _mask_ccb(c):
+                        c = str(c).strip()
+                        if len(c) <= 4:
+                            return c
+                        return c[:3] + "*" * (len(c) - 4) + c[-1]
+
+                    _brl3 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+                    _alto_valor = sorted(
+                        [
+                            (cpf, d)
+                            for cpf, d in _aprov_glob.items()
+                            if cpf in _cpfs_periodo and d["liberado"] > 15_000
+                        ],
+                        key=lambda x: x[1]["liberado"],
+                        reverse=True,
+                    )
+
+                    if _alto_valor:
+                        _av_rows = ""
+                        for _cpf_v, _dv in _alto_valor:
+                            def _fmt_d(d):
+                                if not d:
+                                    return "—"
+                                try:
+                                    return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
+                                except ValueError:
+                                    return d
+                            _det_hdr = (
+                                "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
+                                "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
+                                "<span class='pj-det-dt'>CCB</span>"
+                                "<span class='pj-det-n'>C&#243;digo do Lead</span>"
+                                "<span class='pj-det-n'>Data do Lead</span>"
+                                "<span class='pj-det-n'>Data Desembolso</span>"
+                                "</div>"
+                            )
+                            _det_inner = _det_hdr + "".join(
+                                f"<div class='pj-det-row'>"
+                                f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb(_ld.get('ccb',''))}</span>"
+                                f"<span class='pj-det-n'>{_ld.get('codigo','—')}</span>"
+                                f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_criacao'))}</span>"
+                                f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_desembolso'))}</span>"
+                                f"</div>"
+                                for _ld in _dv["leads"]
+                            )
+                            _name_cell = (
+                                f"<details class='pj-det'><summary>{_mask_nome(_dv['nome'])}</summary>"
+                                f"{_det_inner}</details>"
+                            )
+                            _av_rows += (
+                                f"<tr>"
+                                f"<td class='pj-lbl'>{_name_cell}</td>"
+                                f"<td class='pj-n' style='font-family:monospace'>{_mask_cpf(_cpf_v)}</td>"
+                                f"<td class='pj-n'>{len(_dv['leads'])}</td>"
+                                f"<td class='pj-n'>{_brl3(_dv['valor'])}</td>"
+                                f"<td class='pj-n'>{_brl3(_dv['liberado'])}</td>"
+                                f"</tr>"
+                            )
+                        _av_html = f"""
+    <style>
+    .av-wrap{{overflow-x:auto;margin:6px 0 18px}}
+    .av-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
+    .av-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
+                text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
+    .av-tbl th.pj-n{{text-align:right}}
+    .av-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
+    .av-tbl tr:hover td{{background:#1a1815}}
+    .pj-lbl{{color:#cbd5e1;white-space:nowrap}}
+    .pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
+    .pj-det{{cursor:pointer}}
+    .pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
+                     cursor:pointer;color:#cbd5e1;white-space:nowrap}}
+    .pj-det summary::-webkit-details-marker{{display:none}}
+    .pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
+                              transition:transform .15s;flex-shrink:0}}
+    .pj-det[open] summary::before{{transform:rotate(90deg)}}
+    .pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
+                 color:#94a3b8;border-top:1px solid #272420}}
+    .pj-det-dt{{min-width:120px;color:#64748b}}
+    .pj-det-n{{min-width:80px}}
+    </style>
+    <div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total liberado &gt; R$&nbsp;15k (histórico completo)</div>
+    <div class="av-wrap"><table class="av-tbl">
+    <thead><tr>
+      <th>Nome</th><th>CPF</th>
+      <th class="pj-n">Contratos</th>
+      <th class="pj-n">Total Contratado</th>
+      <th class="pj-n">Total Liberado</th>
+    </tr></thead>
+    <tbody>{_av_rows}</tbody>
+    </table></div>"""
+                        st.markdown(_av_html, unsafe_allow_html=True)
+
+            # ── 6. Distribuição por Status ────────────────────────────────────────────────
+            if _show("evolucao_leads"):
+
+                st.markdown('<div class="sec">Distribuição por Status</div>', unsafe_allow_html=True)
+            
+                col_d, col_f = st.columns(2)
+                with col_d:
+                    fig = _fig_donut(f.get("_d_status", {}))
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                with col_f:
+                    fig = _fig_funil_rico(f)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+            
+            # ── 7. Status Novo — CTPS ─────────────────────────────────────────────────────
+
+            # OCULTA temporariamente (pedido): 'CTPS — Aguardando clique' fica SUPERESTIMADO e
+            # 'CTPS — Bot WhatsApp iniciado' SUBESTIMADO, pois só sabemos do clique quando o lead
+            # entra no fluxo do S-Works (aceite dos termos), nao no clique real no WhatsApp.
+            # Para reativar a secao 7: trocar para _MOSTRAR_SEC7_CTPS = True.
+            _MOSTRAR_SEC7_CTPS = False
+            if _MOSTRAR_SEC7_CTPS:
+                st.markdown('<div class="sec">7. Status Novo — CTPS</div>', unsafe_allow_html=True)
+                _ncs = agg.get("novo_ctps_status", {})
+                if _ncs:
+                    _ctps_total     = _ncs.get("ctps_total", 0)
+                    _ctps_antes     = _ncs.get("ctps_antes", 0)
+                    _ctps_apos      = _ncs.get("ctps_apos", 0)
+                    _ctps_outros_st = _ncs.get("ctps_outros_status", 0)
+                    _ctps_bot_total = _ctps_apos + _ctps_outros_st
+                    _outros_all     = _ncs.get("outros_total_all", 0)
+                    _grand_total    = _ctps_antes + _ctps_bot_total + _outros_all
+                    _pct_antes      = f"{100 * _ctps_antes     / _grand_total:.1f}%" if _grand_total else "—"
+                    _pct_bot        = f"{100 * _ctps_bot_total / _grand_total:.1f}%" if _grand_total else "—"
+                    _pct_outros     = f"{100 * _outros_all     / _grand_total:.1f}%" if _grand_total else "—"
+                    st.markdown(f"""
+    <div class="kpi-row" style="grid-template-columns: repeat(3, 1fr); max-width: 860px;">
+      <div class="kpi-card">
+        <div class="kpi-label">CTPS — Aguardando clique</div>
+        <div class="kpi-value">{_nbr(_ctps_antes)}</div>
+        <div class="kpi-sub">{_pct_antes} do total · {_nbr(_ctps_total)} CTPS Novos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
+        <div class="kpi-value">{_nbr(_ctps_bot_total)}</div>
+        <div class="kpi-sub">{_pct_bot} do total · {_nbr(_ctps_outros_st)} em outros status</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Outros na esteira</div>
+        <div class="kpi-value">{_nbr(_outros_all)}</div>
+        <div class="kpi-sub">{_pct_outros} do total · não-CTPS (todos os status)</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+            # ── 7. Evolução Temporal ──────────────────────────────────────────────────────
+            if _show("evolucao_leads"):
+
+                st.markdown('<div class="sec">Evolução Temporal</div>', unsafe_allow_html=True)
+            
+                fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
+            
+            if _show("evolucao_leads"):
+                @st.fragment
+                def _heatmap_frag():
+                    _data_ref_nm = _default_ref_nm
+                    # Heatmap: ultima_atualizacao por etapa. Janela de 15 dias p/ capturar
+                    # leads antigos ainda nao-terminais e preencher as faixas mais longas
+                    # (4-5d, >5d) — leads parados ha dias vivem em JSONs antigos. Historicos
+                    # ficam em cache permanente, entao so pesa no 1o load da sessao.
+                    _hm_ts: dict = {}
+                    for _dhm in range(15):
+                        _shm = (_data_ref_nm - timedelta(days=_dhm)).strftime("%Y%m%d")
+                        if _shm not in datas:
+                            continue
+                        _djhm = carregar_dia(_shm)
+                        if not _djhm:
+                            continue
+                        for _tsh, _lst in (_djhm.get("heatmap_ts", {}) or {}).items():
+                            _hm_ts.setdefault(_tsh, []).extend(_lst)
                     # ── Heatmap: tempo desde a ultima_atualizacao, por etapa ──────────
                     _FAIXAS = [
                         ("<1h", 0, 1), ("1–3h", 1, 3), ("3–6h", 3, 6), ("6–12h", 6, 12),
@@ -4231,986 +4758,495 @@ try:
                         )
                     else:
                         st.markdown("<p style='color:#475569;font-size:.78em'>Heatmap de tempo: aguardando os primeiros dados de <code>ultima_atualizacao</code> (aparece após a próxima coleta).</p>", unsafe_allow_html=True)
-                else:
-                    st.markdown(
-                        "<p style='color:#475569;font-size:.88em'>Sem dados de projeção para o período.</p>",
-                        unsafe_allow_html=True,
-                    )
-            
-            _sec2_frag()
+                _heatmap_frag()
 
-            # ── 3. Desembolsos por Data de Criação ───────────────────────────────────────
-
-            st.markdown('<div class="sec">3. Desembolsos por Data de Criação</div>', unsafe_allow_html=True)
-
-            _pf = agg.get("pipeline_financeiro", {})   # ainda usado pela seção 5 (Alertas)
-            _dup = agg.get("duplicatas_cpf", [])
-
-            # Mesmo padrão do gráfico da seção 1 (Evolução Temporal de Desembolsos), mas
-            # distribui os contratos DESEMBOLSADOS no período pela DATA DE CRIAÇÃO do lead
-            # (não pela data de desembolso). Reaproveita o mesmo `_desemb_det`, já filtrado
-            # por período (data de desembolso) e por Origem.
-            _cr_agg: dict = {}
-            _cr_sem_dc = 0
-            for _det in _desemb_det:
-                _dck = _det.get("data_criacao")
-                if not _dck:
-                    _cr_sem_dc += 1
-                    continue
-                try:
-                    datetime.strptime(str(_dck), "%Y%m%d")
-                except (ValueError, TypeError):
-                    _cr_sem_dc += 1
-                    continue
-                _slot = _cr_agg.setdefault(str(_dck), {"count": 0, "valor": 0.0, "liberado": 0.0})
-                _slot["count"]    += 1
-                _slot["valor"]    += _det.get("valor", 0.0) or 0.0
-                _slot["liberado"] += _det.get("liberado", 0.0) or 0.0
-
-            if not _cr_agg:
-                _msg_ori3 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
-                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori3}.")
-            else:
-                _cr_sorted = dict(sorted(_cr_agg.items()))
-                _c_x     = [datetime.strptime(d, "%Y%m%d").strftime("%d/%m") for d in _cr_sorted]
-                _c_y_val = [round(v["valor"], 2)    for v in _cr_sorted.values()]
-                _c_y_cnt = [v["count"]              for v in _cr_sorted.values()]
-                _c_y_lib = [round(v["liberado"], 2) for v in _cr_sorted.values()]
-                _cr_tot_cnt = sum(_c_y_cnt)
-                _cr_tot_val = sum(_c_y_val)
-                _cap_cr_s = "R$ " + f"{_cr_tot_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                _fig_cr = go.Figure()
-                _fig_cr.add_trace(go.Scatter(
-                    x=_c_x,
-                    y=_c_y_val,
-                    name="Valor Contratado",
-                    mode="lines+markers",
-                    line=dict(color="#10b981", width=2),
-                    marker=dict(size=6, color="#10b981"),
-                    fill="tozeroy",
-                    fillcolor="rgba(16,185,129,0.08)",
-                    customdata=list(zip(_c_y_cnt, _c_y_lib)),
-                    hovertemplate=(
-                        "<b>%{x}</b><br>"
-                        "Valor contratado: <b>R$ %{y:,.2f}</b><br>"
-                        "Contratos: <b>%{customdata[0]}</b><br>"
-                        "Liberado: <b>R$ %{customdata[1]:,.2f}</b>"
-                        "<extra></extra>"
-                    ),
-                ))
-                _fig_cr.update_layout(
-                    template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                    title=dict(text="Evolução Temporal por Data de Criação", font=_TF),
-                    xaxis=dict(title="Data de Criação do Lead", tickfont=_AF, showgrid=True, gridcolor=_GRID),
-                    yaxis=dict(title="Valor (R$)", tickfont=_AF, showgrid=True, gridcolor=_GRID, tickformat=",.0f", tickprefix="R$ "),
-                    showlegend=False,
-                    margin=dict(t=50, b=40, l=10, r=10),
-                    height=360,
-                    hovermode="x unified",
-                )
-                st.plotly_chart(_fig_cr, width='stretch', config=_CONF)
-                _cap_cr = (f"Distribui os {_cr_tot_cnt} contrato(s) desembolsados no período "
-                           f"pela data de criação do lead · {_cap_cr_s}")
-                if _cr_sem_dc:
-                    _cap_cr += f" · {_cr_sem_dc} sem data de criação (ignorado(s))"
-                st.caption(_cap_cr)
-
-            # ── 4. Evolução Temporal — Médias por Dia ──────────────────────────────────
-
-            st.markdown('<div class="sec">4. Evolução Temporal — Médias por Dia</div>', unsafe_allow_html=True)
-
-            # Médias por DATA DE DESEMBOLSO, sobre os contratos DESEMBOLSADOS do período
-            # (o mesmo _desemb_det já filtrado por período + Origem). Um ponto por dia.
-            if not _desemb_det:
-                _msg_ori4 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
-                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori4}.")
-            else:
-                # taxa = [Σ(taxa×prazo), nº contratos, Σ(prazo)] -> média ponderada pelo prazo;
-                # demais campos = [soma, count] -> média simples.
-                _ev_dia: dict = {}
-                for _r in _desemb_det:
-                    _pdk = _r.get("pd")
-                    if not _pdk:
-                        continue
-                    _slot = _ev_dia.setdefault(_pdk, {"taxa": [0.0, 0, 0.0], "prazo": [0.0, 0],
-                                                      "liberado": [0.0, 0], "parcela": [0.0, 0]})
-                    for _k in ("prazo", "liberado", "parcela"):
-                        _v = _r.get(_k)
-                        if _v:
-                            _slot[_k][0] += _v
-                            _slot[_k][1] += 1
-                    _tx, _pz = _r.get("taxa"), _r.get("prazo")
-                    if _tx and _pz:
-                        _slot["taxa"][0] += _tx * _pz   # Σ(taxa×prazo)
-                        _slot["taxa"][1] += 1           # nº de contratos (hover)
-                        _slot["taxa"][2] += _pz         # Σ(prazo) = peso
-
-                _dias_ev = sorted(_ev_dia.keys())
-                _x_ev = [datetime.strptime(_dk, "%Y%m%d").strftime("%d/%m") for _dk in _dias_ev]
-
-                def _serie_ev(_campo):
-                    _y, _cnt = [], []
-                    for _dk in _dias_ev:
-                        _slotv = _ev_dia[_dk][_campo]
-                        if _campo == "taxa":
-                            _wsum, _c, _psum = _slotv
-                            _y.append(round(_wsum / _psum, 4) if _psum else None)
-                        else:
-                            _s, _c = _slotv
-                            _y.append(round(_s / _c, 4) if _c else None)
-                        _cnt.append(_c)
-                    return _y, _cnt
-
-                def _fig_media(_campo, _titulo, _ytitle, _tickfmt, _tickpref="", _ticksuf="", _hval="", _ymin=None, _dtick=None):
-                    _y, _cnt = _serie_ev(_campo)
-                    _yax = dict(title=_ytitle, tickfont=_AF, showgrid=True, gridcolor=_GRID,
-                                tickformat=_tickfmt, tickprefix=_tickpref, ticksuffix=_ticksuf)
-                    if _ymin is not None:
-                        _vals = [v for v in _y if v is not None]
-                        if _vals and max(_vals) > _ymin:
-                            _top = max(_vals)
-                            _yax["range"] = [_ymin, _top + (_top - _ymin) * 0.08]
-                            # 1º tick (base) = exatamente o mínimo (tickmode linear a partir de _ymin)
-                            if _dtick:
-                                _yax["tickmode"] = "linear"
-                                _yax["tick0"] = _ymin
-                                _yax["dtick"] = _dtick
-                    _figm = go.Figure()
-                    _figm.add_trace(go.Scatter(
-                        x=_x_ev, y=_y, name=_titulo, mode="lines+markers",
-                        line=dict(color="#10b981", width=2),
-                        marker=dict(size=6, color="#10b981"),
-                        fill="tozeroy", fillcolor="rgba(16,185,129,0.08)",
-                        connectgaps=True, customdata=_cnt,
-                        hovertemplate=(f"<b>%{{x}}</b><br>{_titulo}: <b>{_hval}</b><br>"
-                                       "Contratos: <b>%{customdata}</b><extra></extra>"),
-                    ))
-                    _figm.update_layout(
-                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                        separators=",.",   # vírgula decimal, ponto milhar (pt-BR)
-                        title=dict(text=_titulo, font=_TF),
-                        xaxis=dict(title="Data de Desembolso", tickfont=_AF, showgrid=True, gridcolor=_GRID),
-                        yaxis=_yax,
-                        showlegend=False, margin=dict(t=50, b=40, l=10, r=10),
-                        height=360, hovermode="x unified",
-                    )
-                    return _figm
-
-                _tab_tx, _tab_pz, _tab_lb, _tab_pc = st.tabs(
-                    ["Taxa média", "Número de parcelas médio", "Valor liberado médio", "Valor da parcela médio"])
-                with _tab_tx:
-                    st.plotly_chart(_fig_media("taxa", "Taxa média", "Taxa (% a.m.)", ".2f",
-                                    _ticksuf="%", _hval="%{y:.2f}%", _ymin=1.98, _dtick=0.5),
-                                    width='stretch', config=_CONF)
-                with _tab_pz:
-                    st.plotly_chart(_fig_media("prazo", "Número de parcelas médio", "Número de parcelas", ".0f",
-                                    _hval="%{y:.1f} parcelas", _ymin=12.0, _dtick=6),
-                                    width='stretch', config=_CONF)
-                with _tab_lb:
-                    st.plotly_chart(_fig_media("liberado", "Valor liberado médio", "Valor (R$)", ",.2f",
-                                    _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=600, _dtick=1000),
-                                    width='stretch', config=_CONF)
-                with _tab_pc:
-                    _yp, _cp = _serie_ev("parcela")
-                    if any(_cp):
-                        st.plotly_chart(_fig_media("parcela", "Valor da parcela médio", "Valor (R$)",
-                                        ",.2f", _tickpref="R$ ", _hval="R$ %{y:,.2f}", _ymin=50, _dtick=50),
-                                        width='stretch', config=_CONF)
-                    else:
-                        st.info("Sem valor de parcela nos desembolsos do período.")
-                st.caption(
-                    "Média por data de desembolso entre os contratos desembolsados no período."
-                )
-
-            # ── 5. Alertas ────────────────────────────────────────────────────────────────
-
-            st.markdown('<div class="sec">5. Alertas</div>', unsafe_allow_html=True)
-
-            if _dup:
-                _brl2 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-                # Pre-load historical approved leads for each CPF in _dup
-                _dup_cpf_set = {str(_it["cpf"]).strip().zfill(11) for _it in _dup}
-                _dup_hist: dict = {}
-                for _dd_h in datas:
-                    _dj_h = carregar_dia(_dd_h)
-                    if not _dj_h:
-                        continue
-                    for _cpf_h, _vh in (_dj_h.get("aprovados_por_cpf") or {}).items():
-                        _cpf_h_z = str(_cpf_h).strip().zfill(11)
-                        if _cpf_h_z not in _dup_cpf_set:
-                            continue
-                        if _cpf_h_z not in _dup_hist:
-                            _dup_hist[_cpf_h_z] = {"_seen": set(), "leads": []}
-                        for _lh in (_vh.get("leads") or []):
-                            if _ori_ativas and (_lh.get("origem") or "Outros") not in _ori_ativas:
-                                continue
-                            _lid_h = _lh.get("id", "")
-                            if _lid_h and _lid_h in _dup_hist[_cpf_h_z]["_seen"]:
-                                continue
-                            if _lid_h:
-                                _dup_hist[_cpf_h_z]["_seen"].add(_lid_h)
-                            _dup_hist[_cpf_h_z]["leads"].append(_lh)
-
-                def _mask_ccb_dup(c):
-                    c = str(c).strip()
-                    if len(c) <= 4:
-                        return c
-                    return c[:3] + "*" * (len(c) - 4) + c[-1]
-
-                def _fmt_d_dup(d):
-                    if not d:
-                        return "—"
-                    try:
-                        return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
-                    except ValueError:
-                        return d
-
-                _dup_rows = []
-                for _i, _item in enumerate(_dup):
-                    _rc = "g0" if _i % 2 == 0 else "g1"
-                    _conts = "<br>".join(
-                        f'{c["codigo"] or c["identificador"][:8]} — {c["etapa"]} — {_brl2(c["valor"])}'
-                        for c in _item["contratos"]
-                    )
-                    _cpf_d = str(_item["cpf"]).strip().zfill(11)
-                    _cpf_d_mask = f"{_cpf_d[:3]}.***.***-**"
-                    _nome_d = str(_item["nome"]).strip().split()
-                    _nome_d_mask = (_nome_d[0].capitalize() + (" *" if len(_nome_d) > 1 else "")) if _nome_d else "—"
-
-                    _hist_leads = _dup_hist.get(_cpf_d, {}).get("leads", [])
-                    if _hist_leads:
-                        _dup_det_hdr = (
-                            "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
-                            "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
-                            "<span class='pj-det-dt'>CCB</span>"
-                            "<span class='pj-det-n'>C&#243;digo do Lead</span>"
-                            "<span class='pj-det-n'>Data do Lead</span>"
-                            "<span class='pj-det-n'>Data Desembolso</span>"
-                            "</div>"
-                        )
-                        _dup_det_body = "".join(
-                            f"<div class='pj-det-row'>"
-                            f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb_dup(_lh.get('ccb',''))}</span>"
-                            f"<span class='pj-det-n'>{_lh.get('codigo','—')}</span>"
-                            f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_criacao'))}</span>"
-                            f"<span class='pj-det-n'>{_fmt_d_dup(_lh.get('data_desembolso'))}</span>"
-                            f"</div>"
-                            for _lh in _hist_leads
-                        )
-                        _nome_cell = (
-                            f"<details class='pj-det'><summary>{_nome_d_mask}</summary>"
-                            f"{_dup_det_hdr}{_dup_det_body}</details>"
-                        )
-                    else:
-                        _nome_cell = _nome_d_mask
-
-                    _dup_rows.append(
-                        f'<tr class="{_rc}">'
-                        f'<td style="font-family:monospace">{_cpf_d_mask}</td>'
-                        f'<td>{_nome_cell}</td>'
-                        f'<td class="r">{len(_item["contratos"])}</td>'
-                        f'<td class="r">{_brl2(_item["total"])}</td>'
-                        f'<td style="font-size:.82em;line-height:1.5">{_conts}</td>'
-                        f'</tr>'
-                    )
-                _dup_html = (
-                    '<div class="dtbl-title" style="color:#f59e0b">&#9888; CPFs com múltiplos contratos &mdash; total liberado &gt; R$&nbsp;15k</div>'
-                    '<div class="dtbl-wrap"><table class="dtbl">'
-                    '<thead><tr>'
-                    '<th>CPF</th><th>Nome</th><th class="r">Contratos</th>'
-                    '<th class="r">Liberado</th><th>Detalhes</th>'
-                    '</tr></thead>'
-                    '<tbody>' + "".join(_dup_rows) + '</tbody>'
-                    '</table></div>'
-                )
-                st.markdown(_dup_html, unsafe_allow_html=True)
-            elif _pf:
-                st.markdown(
-                    "<p style='color:#475569;font-size:.88em'>Nenhum CPF com múltiplos contratos acima de R$&nbsp;15k.</p>",
-                    unsafe_allow_html=True,
-                )
-
-            # ── Clientes aprovados com total histórico > 15k ──────────────────────────
-            _cpfs_periodo: set = set()
-            for _dj_p in dias_raw:
-                for _cpf_k in (_dj_p.get("aprovados_por_cpf") or {}).keys():
-                    if _cpf_k:
-                        _cpfs_periodo.add(_cpf_k)
-
-            if _cpfs_periodo:
-                # Agrega todos os dias, deduplicando por lead ID para evitar dupla contagem
-                _aprov_glob: dict = {}
-                for _dd_all in datas:
-                    _dj_all = carregar_dia(_dd_all)
-                    if not _dj_all:
-                        continue
-                    for _cpf_k, _vk in (_dj_all.get("aprovados_por_cpf") or {}).items():
-                        if not _cpf_k:
-                            continue
-                        if _cpf_k not in _aprov_glob:
-                            _aprov_glob[_cpf_k] = {"nome": _vk.get("nome", ""), "valor": 0.0, "liberado": 0.0, "_seen": set(), "leads": []}
-                        if not _aprov_glob[_cpf_k]["nome"] and _vk.get("nome"):
-                            _aprov_glob[_cpf_k]["nome"] = _vk["nome"]
-                        for _lv in (_vk.get("leads") or []):
-                            if _ori_ativas and (_lv.get("origem") or "Outros") not in _ori_ativas:
-                                continue
-                            _lid = _lv.get("id", "")
-                            if _lid and _lid in _aprov_glob[_cpf_k]["_seen"]:
-                                continue
-                            if _lid:
-                                _aprov_glob[_cpf_k]["_seen"].add(_lid)
-                            _aprov_glob[_cpf_k]["valor"]    += _lv.get("valor", 0.0)
-                            _aprov_glob[_cpf_k]["liberado"] += _lv.get("liberado", 0.0)
-                            _aprov_glob[_cpf_k]["leads"].append(_lv)
-
-                def _mask_cpf(c):
-                    c = str(c).strip().zfill(11)
-                    return f"{c[:3]}.***.***-**"
-
-                def _mask_nome(n):
-                    parts = str(n).strip().split()
-                    if not parts:
-                        return "—"
-                    return parts[0].capitalize() + (" *" if len(parts) > 1 else "")
-
-                def _mask_ccb(c):
-                    c = str(c).strip()
-                    if len(c) <= 4:
-                        return c
-                    return c[:3] + "*" * (len(c) - 4) + c[-1]
-
-                _brl3 = lambda x: "R$ " + f"{x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-                _alto_valor = sorted(
-                    [
-                        (cpf, d)
-                        for cpf, d in _aprov_glob.items()
-                        if cpf in _cpfs_periodo and d["liberado"] > 15_000
-                    ],
-                    key=lambda x: x[1]["liberado"],
-                    reverse=True,
-                )
-
-                if _alto_valor:
-                    _av_rows = ""
-                    for _cpf_v, _dv in _alto_valor:
-                        def _fmt_d(d):
-                            if not d:
-                                return "—"
-                            try:
-                                return datetime.strptime(d, "%Y%m%d").strftime("%d/%m/%Y")
-                            except ValueError:
-                                return d
-                        _det_hdr = (
-                            "<div class='pj-det-row' style='font-size:.7em;color:#475569;font-weight:600;"
-                            "letter-spacing:.04em;text-transform:uppercase;border-top:none'>"
-                            "<span class='pj-det-dt'>CCB</span>"
-                            "<span class='pj-det-n'>C&#243;digo do Lead</span>"
-                            "<span class='pj-det-n'>Data do Lead</span>"
-                            "<span class='pj-det-n'>Data Desembolso</span>"
-                            "</div>"
-                        )
-                        _det_inner = _det_hdr + "".join(
-                            f"<div class='pj-det-row'>"
-                            f"<span class='pj-det-dt' style='font-family:monospace'>{_mask_ccb(_ld.get('ccb',''))}</span>"
-                            f"<span class='pj-det-n'>{_ld.get('codigo','—')}</span>"
-                            f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_criacao'))}</span>"
-                            f"<span class='pj-det-n'>{_fmt_d(_ld.get('data_desembolso'))}</span>"
-                            f"</div>"
-                            for _ld in _dv["leads"]
-                        )
-                        _name_cell = (
-                            f"<details class='pj-det'><summary>{_mask_nome(_dv['nome'])}</summary>"
-                            f"{_det_inner}</details>"
-                        )
-                        _av_rows += (
-                            f"<tr>"
-                            f"<td class='pj-lbl'>{_name_cell}</td>"
-                            f"<td class='pj-n' style='font-family:monospace'>{_mask_cpf(_cpf_v)}</td>"
-                            f"<td class='pj-n'>{len(_dv['leads'])}</td>"
-                            f"<td class='pj-n'>{_brl3(_dv['valor'])}</td>"
-                            f"<td class='pj-n'>{_brl3(_dv['liberado'])}</td>"
-                            f"</tr>"
-                        )
-                    _av_html = f"""
-<style>
-.av-wrap{{overflow-x:auto;margin:6px 0 18px}}
-.av-tbl{{width:100%;border-collapse:collapse;font-size:.91em}}
-.av-tbl th{{background:#1c1a17;color:#94a3b8;font-weight:600;padding:9px 16px;
-            text-align:left;border-bottom:2px solid #272420;white-space:nowrap}}
-.av-tbl th.pj-n{{text-align:right}}
-.av-tbl td{{padding:7px 16px;border-bottom:1px solid #1c1a17;color:#e2e8f0}}
-.av-tbl tr:hover td{{background:#1a1815}}
-.pj-lbl{{color:#cbd5e1;white-space:nowrap}}
-.pj-n{{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}}
-.pj-det{{cursor:pointer}}
-.pj-det summary{{list-style:none;display:flex;align-items:center;gap:6px;
-                 cursor:pointer;color:#cbd5e1;white-space:nowrap}}
-.pj-det summary::-webkit-details-marker{{display:none}}
-.pj-det summary::before{{content:'▶';font-size:.6em;color:#64748b;
-                          transition:transform .15s;flex-shrink:0}}
-.pj-det[open] summary::before{{transform:rotate(90deg)}}
-.pj-det-row{{display:flex;gap:16px;padding:3px 0 3px 18px;font-size:.82em;
-             color:#94a3b8;border-top:1px solid #272420}}
-.pj-det-dt{{min-width:120px;color:#64748b}}
-.pj-det-n{{min-width:80px}}
-</style>
-<div class="dtbl-title" style="color:#f59e0b">&#9888; Clientes aprovados com total liberado &gt; R$&nbsp;15k (histórico completo)</div>
-<div class="av-wrap"><table class="av-tbl">
-<thead><tr>
-  <th>Nome</th><th>CPF</th>
-  <th class="pj-n">Contratos</th>
-  <th class="pj-n">Total Contratado</th>
-  <th class="pj-n">Total Liberado</th>
-</tr></thead>
-<tbody>{_av_rows}</tbody>
-</table></div>"""
-                    st.markdown(_av_html, unsafe_allow_html=True)
-
-            # ── 6. Distribuição por Status ────────────────────────────────────────────────
-
-            st.markdown('<div class="sec">6. Distribuição por Status</div>', unsafe_allow_html=True)
-            
-            col_d, col_f = st.columns(2)
-            with col_d:
-                fig = _fig_donut(f.get("_d_status", {}))
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-            with col_f:
-                fig = _fig_funil_rico(f)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-            
-            # ── 7. Status Novo — CTPS ─────────────────────────────────────────────────────
-
-            # OCULTA temporariamente (pedido): 'CTPS — Aguardando clique' fica SUPERESTIMADO e
-            # 'CTPS — Bot WhatsApp iniciado' SUBESTIMADO, pois só sabemos do clique quando o lead
-            # entra no fluxo do S-Works (aceite dos termos), nao no clique real no WhatsApp.
-            # Para reativar a secao 7: trocar para _MOSTRAR_SEC7_CTPS = True.
-            _MOSTRAR_SEC7_CTPS = False
-            if _MOSTRAR_SEC7_CTPS:
-                st.markdown('<div class="sec">7. Status Novo — CTPS</div>', unsafe_allow_html=True)
-                _ncs = agg.get("novo_ctps_status", {})
-                if _ncs:
-                    _ctps_total     = _ncs.get("ctps_total", 0)
-                    _ctps_antes     = _ncs.get("ctps_antes", 0)
-                    _ctps_apos      = _ncs.get("ctps_apos", 0)
-                    _ctps_outros_st = _ncs.get("ctps_outros_status", 0)
-                    _ctps_bot_total = _ctps_apos + _ctps_outros_st
-                    _outros_all     = _ncs.get("outros_total_all", 0)
-                    _grand_total    = _ctps_antes + _ctps_bot_total + _outros_all
-                    _pct_antes      = f"{100 * _ctps_antes     / _grand_total:.1f}%" if _grand_total else "—"
-                    _pct_bot        = f"{100 * _ctps_bot_total / _grand_total:.1f}%" if _grand_total else "—"
-                    _pct_outros     = f"{100 * _outros_all     / _grand_total:.1f}%" if _grand_total else "—"
-                    st.markdown(f"""
-    <div class="kpi-row" style="grid-template-columns: repeat(3, 1fr); max-width: 860px;">
-      <div class="kpi-card">
-        <div class="kpi-label">CTPS — Aguardando clique</div>
-        <div class="kpi-value">{_nbr(_ctps_antes)}</div>
-        <div class="kpi-sub">{_pct_antes} do total · {_nbr(_ctps_total)} CTPS Novos</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">CTPS — Bot WhatsApp iniciado</div>
-        <div class="kpi-value">{_nbr(_ctps_bot_total)}</div>
-        <div class="kpi-sub">{_pct_bot} do total · {_nbr(_ctps_outros_st)} em outros status</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Outros na esteira</div>
-        <div class="kpi-value">{_nbr(_outros_all)}</div>
-        <div class="kpi-sub">{_pct_outros} do total · não-CTPS (todos os status)</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-            # ── 7. Evolução Temporal ──────────────────────────────────────────────────────
-
-            st.markdown('<div class="sec">7. Evolução Temporal</div>', unsafe_allow_html=True)
-            
-            fig = _fig_evolucao(agg, n_dias, dias_raw=dias_raw, datas_sel=datas_sel)
-            if fig:
-                st.plotly_chart(fig, width='stretch', config=_CONF)
-            
             # ── 8. Perfil Financeiro — Aprovados ─────────────────────────────────────────
+            if _show("leads_aprovados"):
 
-            st.markdown('<div class="sec">8. Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Perfil Financeiro — Aprovados</div>', unsafe_allow_html=True)
             
-            html_fin = _html_tabela_financeira(fin)
-            if html_fin:
-                st.markdown(html_fin, unsafe_allow_html=True)
-                if n_dias > 1:
-                    st.caption("*Mediana = média ponderada das medianas diárias")
+                html_fin = _html_tabela_financeira(fin)
+                if html_fin:
+                    st.markdown(html_fin, unsafe_allow_html=True)
+                    if n_dias > 1:
+                        st.caption("*Mediana = média ponderada das medianas diárias")
             
-            fig = _fig_histograma(agg.get("valores_contratacao", []))
-            if fig:
-                st.plotly_chart(fig, width='stretch', config=_CONF)
+                fig = _fig_histograma(agg.get("valores_contratacao", []))
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
 
-            # Distribuição de taxa — taxa média por empregador por dia, agregada pelo dash
-            _dist_taxa = agg.get("taxa_dist", {})
-            if _dist_taxa:
-                    _n_taxa_total = sum(_dist_taxa.values())
-                    _taxa_sorted = dict(sorted(
-                        ((f"{float(k):.2f}".replace(".", ",") + "% a.m.", v)
-                         for k, v in _dist_taxa.items()),
-                        key=lambda x: float(x[0].replace(",", ".").replace("% a.m.", ""))
-                    ))
-                    fig_taxa = _fig_barras_h(
-                        _taxa_sorted,
-                        "Distribuição de Taxa — Aprovados",
-                        "#3b82f6",
-                        n=50,
-                        pct_base=_n_taxa_total,
-                        show_abs=True,
-                    )
-                    if fig_taxa:
-                        st.plotly_chart(fig_taxa, width='stretch', config=_CONF)
+                # Distribuição de taxa — taxa média por empregador por dia, agregada pelo dash
+                _dist_taxa = agg.get("taxa_dist", {})
+                if _dist_taxa:
+                        _n_taxa_total = sum(_dist_taxa.values())
+                        _taxa_sorted = dict(sorted(
+                            ((f"{float(k):.2f}".replace(".", ",") + "% a.m.", v)
+                             for k, v in _dist_taxa.items()),
+                            key=lambda x: float(x[0].replace(",", ".").replace("% a.m.", ""))
+                        ))
+                        fig_taxa = _fig_barras_h(
+                            _taxa_sorted,
+                            "Distribuição de Taxa — Aprovados",
+                            "#3b82f6",
+                            n=50,
+                            pct_base=_n_taxa_total,
+                            show_abs=True,
+                        )
+                        if fig_taxa:
+                            st.plotly_chart(fig_taxa, width='stretch', config=_CONF)
 
-            # Distribuição do número de parcelas — aprovados
-            _fig_pz_ap = _fig_dist_prazo(
-                agg.get("prazo_dist", {}), "Distribuição de Nº de Parcelas — Aprovados")
-            if _fig_pz_ap:
-                st.plotly_chart(_fig_pz_ap, width='stretch', config=_CONF)
+                # Distribuição do número de parcelas — aprovados
+                _fig_pz_ap = _fig_dist_prazo(
+                    agg.get("prazo_dist", {}), "Distribuição de Nº de Parcelas — Aprovados")
+                if _fig_pz_ap:
+                    st.plotly_chart(_fig_pz_ap, width='stretch', config=_CONF)
 
             # ── 9. Etapa de Reprovação ────────────────────────────────────────────────────
+            if _show("leads_reprovados"):
 
-            st.markdown('<div class="sec">9. Etapa de Reprovação</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Etapa de Reprovação</div>', unsafe_allow_html=True)
             
-            n_rep    = f.get("reprovados", 0)
-            etapas_d = agg.get("etapas", {})
-            etapa_motivos_d = agg.get("etapa_motivos", {})
+                n_rep    = f.get("reprovados", 0)
+                etapas_d = agg.get("etapas", {})
+                etapa_motivos_d = agg.get("etapa_motivos", {})
             
-            # Diagrama interativo do Workflow 166 — drill-down por CLIQUE na caixa (JS,
-            # client-side, instantâneo). Clicar na caixa 'Motor de Crédito' entra nela; a
-            # setinha ◂ discreta no topo-esquerdo volta. Documento HTML completo (renderiza
-            # de forma confiável no iframe, ao contrário do fragmento HTML anterior).
-            # Diagrama do Workflow 166 — drill-down por clique SEM recarregar a página.
-            # As caixas são cards numa faixa com scroll horizontal; o Motor de Crédito é um
-            # botão (clicável) dentro de um @st.fragment → só a seção 9 re-renderiza (entrar
-            # E voltar). (components.html/iframe vem vazio neste deploy → sem JS.)
-            _WF166_FASES = ["Inicializa Dados", "Motor de Crédito", "Cálculo Proposta",
-                "Cadastro Proposta", "Formalização", "Atualização Dados Cliente", "Obter CCB",
-                "Envia CCB Único", "Averbação Dataprev", "Nuvidio Antifraude",
-                "Envio de Informações Dataprev", "Pagamento Pix", "Atualizar Tesouraria",
-                "Atualizar Portal de Crédito", "Contratar o Seguro", "Aprovação Processo"]
-            _WF166_MOTOR = ["Validações Iniciais", "Token", "Dataprev Vínculos",
-                "Dataprev Dados do Trabalhador", "RF PJ", "RF PF", "SCR", "BDC PJ Dados Básicos",
-                "BDC PJ Dados Unificados", "PH3A PJ", "BDC PF Dados Unificados",
-                "BDC PF Risco Financeiro", "BDC PF Dados Básicos", "PH3A PF", "Decisão Motor"]
-            _WF166_CSS = """<style>
-            .st-key-wf166flow [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;overflow-x:auto;gap:8px;padding:12px 12px 16px;border:1px solid #2a2620;border-radius:10px;background:#100e0a}
-            .st-key-wf166flow [data-testid="stColumn"]{min-width:150px!important;width:150px!important;flex:0 0 150px!important}
-            .st-key-wf166flow [data-testid="stColumn"] [data-testid="stVerticalBlock"]{gap:0!important}
-            .wfbox{background:#15130e;border:1px solid #332e25;border-radius:9px;padding:10px 11px;min-height:66px;display:flex;align-items:center;color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25}
-            .wfbox.sub{background:#141019;border-color:rgba(99,102,241,0.35);color:#c4b5fd}
-            .wfbox.dec{background:#1a1420;border-color:rgba(167,139,250,0.55);color:#d8b4fe}
-            .st-key-wf166_motor button{min-height:66px;width:100%;white-space:normal;background:rgba(99,102,241,0.12)!important;border:1.5px solid #6366f1!important;color:#c7d2fe!important;font-size:12px!important;font-weight:700!important;border-radius:9px!important;box-shadow:0 0 0 3px rgba(99,102,241,0.07)}
-            .st-key-wf166_motor button:hover{background:rgba(99,102,241,0.22)!important;border-color:#818cf8!important;color:#e0e7ff!important}
-            .st-key-wf166_back button{padding:2px 11px!important;min-height:0;color:#a5b4fc!important;background:#15130e!important;border:1px solid #332e25!important;border-radius:7px!important}
-            .st-key-wf166_back button:hover{border-color:#6366f1!important;background:#1a1726!important;color:#c7d2fe!important}
-            </style>"""
+                # Diagrama interativo do Workflow 166 — drill-down por CLIQUE na caixa (JS,
+                # client-side, instantâneo). Clicar na caixa 'Motor de Crédito' entra nela; a
+                # setinha ◂ discreta no topo-esquerdo volta. Documento HTML completo (renderiza
+                # de forma confiável no iframe, ao contrário do fragmento HTML anterior).
+                # Diagrama do Workflow 166 — drill-down por clique SEM recarregar a página.
+                # As caixas são cards numa faixa com scroll horizontal; o Motor de Crédito é um
+                # botão (clicável) dentro de um @st.fragment → só a seção 9 re-renderiza (entrar
+                # E voltar). (components.html/iframe vem vazio neste deploy → sem JS.)
+                _WF166_FASES = ["Inicializa Dados", "Motor de Crédito", "Cálculo Proposta",
+                    "Cadastro Proposta", "Formalização", "Atualização Dados Cliente", "Obter CCB",
+                    "Envia CCB Único", "Averbação Dataprev", "Nuvidio Antifraude",
+                    "Envio de Informações Dataprev", "Pagamento Pix", "Atualizar Tesouraria",
+                    "Atualizar Portal de Crédito", "Contratar o Seguro", "Aprovação Processo"]
+                _WF166_MOTOR = ["Validações Iniciais", "Token", "Dataprev Vínculos",
+                    "Dataprev Dados do Trabalhador", "RF PJ", "RF PF", "SCR", "BDC PJ Dados Básicos",
+                    "BDC PJ Dados Unificados", "PH3A PJ", "BDC PF Dados Unificados",
+                    "BDC PF Risco Financeiro", "BDC PF Dados Básicos", "PH3A PF", "Decisão Motor"]
+                _WF166_CSS = """<style>
+                .st-key-wf166flow [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;overflow-x:auto;gap:8px;padding:12px 12px 16px;border:1px solid #2a2620;border-radius:10px;background:#100e0a}
+                .st-key-wf166flow [data-testid="stColumn"]{min-width:150px!important;width:150px!important;flex:0 0 150px!important}
+                .st-key-wf166flow [data-testid="stColumn"] [data-testid="stVerticalBlock"]{gap:0!important}
+                .wfbox{background:#15130e;border:1px solid #332e25;border-radius:9px;padding:10px 11px;min-height:66px;display:flex;align-items:center;color:#e2e8f0;font-size:12px;font-weight:600;line-height:1.25}
+                .wfbox.sub{background:#141019;border-color:rgba(99,102,241,0.35);color:#c4b5fd}
+                .wfbox.dec{background:#1a1420;border-color:rgba(167,139,250,0.55);color:#d8b4fe}
+                .st-key-wf166_motor button{min-height:66px;width:100%;white-space:normal;background:rgba(99,102,241,0.12)!important;border:1.5px solid #6366f1!important;color:#c7d2fe!important;font-size:12px!important;font-weight:700!important;border-radius:9px!important;box-shadow:0 0 0 3px rgba(99,102,241,0.07)}
+                .st-key-wf166_motor button:hover{background:rgba(99,102,241,0.22)!important;border-color:#818cf8!important;color:#e0e7ff!important}
+                .st-key-wf166_back button{padding:2px 11px!important;min-height:0;color:#a5b4fc!important;background:#15130e!important;border:1px solid #332e25!important;border-radius:7px!important}
+                .st-key-wf166_back button:hover{border-color:#6366f1!important;background:#1a1726!important;color:#c7d2fe!important}
+                </style>"""
 
-            @st.fragment
-            def _wf166_frag():
-                st.session_state.setdefault("wf166_lvl", "root")
-                st.markdown(_WF166_CSS, unsafe_allow_html=True)
-                if st.session_state["wf166_lvl"] == "motor":
-                    _bk, _cr = st.columns([0.55, 9], vertical_alignment="center")
-                    with _bk:
-                        if st.button("◂", key="wf166_back", help="Voltar ao nível externo"):
-                            st.session_state["wf166_lvl"] = "root"
-                            st.rerun(scope="fragment")
-                    with _cr:
-                        st.markdown('<div style="color:#94a3b8;font-size:13px;">&#128194; Workflow 37 &#183; v39 '
-                                    '&nbsp;&#8250;&nbsp; <b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></div>',
-                                    unsafe_allow_html=True)
-                else:
-                    st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Workflow 37 &#183; v39 '
-                                '&#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; clique no '
-                                'Motor de Cr&#233;dito para entrar</span></div>', unsafe_allow_html=True)
-                with st.container(key="wf166flow"):
+                @st.fragment
+                def _wf166_frag():
+                    st.session_state.setdefault("wf166_lvl", "root")
+                    st.markdown(_WF166_CSS, unsafe_allow_html=True)
                     if st.session_state["wf166_lvl"] == "motor":
-                        _cols = st.columns(len(_WF166_MOTOR))
-                        for _i, _n in enumerate(_WF166_MOTOR):
-                            with _cols[_i]:
-                                _cls = "wfbox dec" if _n == "Decisão Motor" else "wfbox sub"
-                                st.markdown('<div class="' + _cls + '">' + _n + '</div>', unsafe_allow_html=True)
+                        _bk, _cr = st.columns([0.55, 9], vertical_alignment="center")
+                        with _bk:
+                            if st.button("◂", key="wf166_back", help="Voltar ao nível externo"):
+                                st.session_state["wf166_lvl"] = "root"
+                                st.rerun(scope="fragment")
+                        with _cr:
+                            st.markdown('<div style="color:#94a3b8;font-size:13px;">&#128194; Workflow 37 &#183; v39 '
+                                        '&nbsp;&#8250;&nbsp; <b style="color:#c7d2fe;">Motor de Cr&#233;dito</b></div>',
+                                        unsafe_allow_html=True)
                     else:
-                        _cols = st.columns(len(_WF166_FASES))
-                        for _i, _n in enumerate(_WF166_FASES):
-                            with _cols[_i]:
-                                if _n == "Motor de Crédito":
-                                    if st.button("Motor de Crédito", key="wf166_motor",
-                                                 width='stretch'):
-                                        st.session_state["wf166_lvl"] = "motor"
-                                        st.rerun(scope="fragment")
-                                else:
-                                    st.markdown('<div class="wfbox">' + _n + '</div>', unsafe_allow_html=True)
-            _wf166_frag()
+                        st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Workflow 37 &#183; v39 '
+                                    '&#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; clique no '
+                                    'Motor de Cr&#233;dito para entrar</span></div>', unsafe_allow_html=True)
+                    with st.container(key="wf166flow"):
+                        if st.session_state["wf166_lvl"] == "motor":
+                            _cols = st.columns(len(_WF166_MOTOR))
+                            for _i, _n in enumerate(_WF166_MOTOR):
+                                with _cols[_i]:
+                                    _cls = "wfbox dec" if _n == "Decisão Motor" else "wfbox sub"
+                                    st.markdown('<div class="' + _cls + '">' + _n + '</div>', unsafe_allow_html=True)
+                        else:
+                            _cols = st.columns(len(_WF166_FASES))
+                            for _i, _n in enumerate(_WF166_FASES):
+                                with _cols[_i]:
+                                    if _n == "Motor de Crédito":
+                                        if st.button("Motor de Crédito", key="wf166_motor",
+                                                     width='stretch'):
+                                            st.session_state["wf166_lvl"] = "motor"
+                                            st.rerun(scope="fragment")
+                                    else:
+                                        st.markdown('<div class="wfbox">' + _n + '</div>', unsafe_allow_html=True)
+                _wf166_frag()
             
-            # 2 abas: Visão geral | Visão de Funil
-            if etapas_d and n_rep > 0:
-                tab_g, tab_f = st.tabs(["Visão geral", "Visão de Funil"])
+                # 2 abas: Visão geral | Visão de Funil
+                if etapas_d and n_rep > 0:
+                    tab_g, tab_f = st.tabs(["Visão geral", "Visão de Funil"])
 
-                # Agrupa por conceito: cada workflow com seu nome; conceito presente nos
-                # dois (período misto) vira "nome_v38 | nome_v39" numa linha só.
-                _etapas_c, _motivos_c, _ordem_c = _combinar_etapas_conceito(etapas_d, etapa_motivos_d)
+                    # Agrupa por conceito: cada workflow com seu nome; conceito presente nos
+                    # dois (período misto) vira "nome_v38 | nome_v39" numa linha só.
+                    _etapas_c, _motivos_c, _ordem_c = _combinar_etapas_conceito(etapas_d, etapa_motivos_d)
 
-                with tab_g:
-                    _order_idx = {e: i for i, e in enumerate(_ordem_c)}
-                    ordered = sorted(
-                        [(e, _etapas_c.get(e, 0)) for e in _etapas_c if _etapas_c.get(e, 0) > 0],
-                        key=lambda x: _order_idx.get(x[0], 999)
-                    )
-                    max_v = max(v for _, v in ordered) if ordered else 1
-                    y  = [e for e, _ in reversed(ordered)]
-                    x  = [v for _, v in reversed(ordered)]
-                    ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
-                    shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
+                    with tab_g:
+                        _order_idx = {e: i for i, e in enumerate(_ordem_c)}
+                        ordered = sorted(
+                            [(e, _etapas_c.get(e, 0)) for e in _etapas_c if _etapas_c.get(e, 0) > 0],
+                            key=lambda x: _order_idx.get(x[0], 999)
+                        )
+                        max_v = max(v for _, v in ordered) if ordered else 1
+                        y  = [e for e, _ in reversed(ordered)]
+                        x  = [v for _, v in reversed(ordered)]
+                        ps = [f"{100*v/n_rep:.1f}%" for v in reversed([v for _, v in ordered])]
+                        shades = [f"rgba(96,165,250,{0.40 + 0.55*(v/max_v):.2f})" for v in x]
 
-                    fig_g = go.Figure(go.Bar(
-                        x=x, y=y, orientation="h",
-                        marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
-                        text=[f"{_nbr(v)} ({p})" for v, p in zip(x, ps)],
-                        textposition="inside", insidetextanchor="end",
-                        textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
-                        hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
-                    ))
-                    h = max(300, len(ordered) * 40 + 80)
-                    fig_g.update_layout(
-                        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
-                        title=dict(text="Reprovados por Etapa de Workflow", font=_TF),
-                        xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
-                        yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
-                        uniformtext_minsize=9, uniformtext_mode="hide",
-                        margin=dict(t=50, b=30, l=20, r=40), height=h,
-                    )
-                    st.plotly_chart(fig_g, width='stretch', config=_CONF)
+                        fig_g = go.Figure(go.Bar(
+                            x=x, y=y, orientation="h",
+                            marker=dict(color=shades, line=dict(color="#0d0c0a", width=0.5)),
+                            text=[f"{_nbr(v)} ({p})" for v, p in zip(x, ps)],
+                            textposition="inside", insidetextanchor="end",
+                            textfont=dict(size=11, color="rgba(255,255,255,0.85)"),
+                            hovertemplate="%{y}: <b>%{x:,}</b><extra></extra>",
+                        ))
+                        h = max(300, len(ordered) * 40 + 80)
+                        fig_g.update_layout(
+                            template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_BG,
+                            title=dict(text="Reprovados por Etapa de Workflow", font=_TF),
+                            xaxis=dict(title="Ocorrências", tickfont=_AF, showgrid=True, gridcolor=_GRID, zeroline=False),
+                            yaxis=dict(tickfont=dict(size=11, color="#cbd5e1"), automargin=True, zeroline=False),
+                            uniformtext_minsize=9, uniformtext_mode="hide",
+                            margin=dict(t=50, b=30, l=20, r=40), height=h,
+                        )
+                        st.plotly_chart(fig_g, width='stretch', config=_CONF)
 
-                    tbl_g = _html_tabela_etapa_motivo(_motivos_c, _etapas_c, n_rep, order=_ordem_c)
-                    if tbl_g:
-                        st.markdown(tbl_g, unsafe_allow_html=True)
+                        tbl_g = _html_tabela_etapa_motivo(_motivos_c, _etapas_c, n_rep, order=_ordem_c)
+                        if tbl_g:
+                            st.markdown(tbl_g, unsafe_allow_html=True)
 
-                with tab_f:
-                    result_f = _fig_funil_etapa(_etapas_c, n_rep, order=_ordem_c)
-                    if result_f:
-                        fig_f, rows_f = result_f
-                        st.plotly_chart(fig_f, width='stretch', config=_CONF)
-                        tbl_resumo = _html_tabela_resumo_funil(rows_f)
-                        if tbl_resumo:
-                            st.markdown(tbl_resumo, unsafe_allow_html=True)
-            else:
-                st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
+                    with tab_f:
+                        result_f = _fig_funil_etapa(_etapas_c, n_rep, order=_ordem_c)
+                        if result_f:
+                            fig_f, rows_f = result_f
+                            st.plotly_chart(fig_f, width='stretch', config=_CONF)
+                            tbl_resumo = _html_tabela_resumo_funil(rows_f)
+                            if tbl_resumo:
+                                st.markdown(tbl_resumo, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de etapas (JSONs desta data ainda não possuem o campo).")
             
             # ── 10. Motivos de Reprovação ──────────────────────────────────────────────────
+            if _show("leads_reprovados"):
 
-            st.markdown('<div class="sec">10. Motivos de Reprovação</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Motivos de Reprovação</div>', unsafe_allow_html=True)
             
-            col_m1, col_m2 = st.columns(2)
+                col_m1, col_m2 = st.columns(2)
             
-            with col_m1:
-                fig = _fig_barras_h(agg.get("top_motivos", {}),
-                                    "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                else:
-                    st.info("Sem dados de motivos.")
-            
-            with col_m2:
-                mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
-                if mot_det:
-                    n_det = sum(mot_det.values())
-                    fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
-                                        pct_base=n_det)
+                with col_m1:
+                    fig = _fig_barras_h(agg.get("top_motivos", {}),
+                                        "Motivo de Reprovação — Alto Nível", "#ef4444", pct_base=n_rep)
                     if fig:
                         st.plotly_chart(fig, width='stretch', config=_CONF)
-                else:
-                    st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
+                    else:
+                        st.info("Sem dados de motivos.")
+            
+                with col_m2:
+                    mot_det = _merge_motivos_det(agg.get("top_motivos_det", {}))
+                    if mot_det:
+                        n_det = sum(mot_det.values())
+                        fig = _fig_barras_h(mot_det, "Motivo de Reprovação — Detalhado", "#f97316",
+                                            pct_base=n_det)
+                        if fig:
+                            st.plotly_chart(fig, width='stretch', config=_CONF)
+                    else:
+                        st.info("Motivos detalhados ainda não disponíveis (requer nova exportação dos JSONs).")
             
             # ── 11. Bloqueios ─────────────────────────────────────────────────────────────
+            if _show("leads_reprovados"):
 
-            st.markdown('<div class="sec">11. Bloqueios por Tipo</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Bloqueios por Tipo</div>', unsafe_allow_html=True)
             
-            fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
-            if fig:
-                col_bl, _ = st.columns([1, 1])
-                with col_bl:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-            else:
-                st.info("Sem dados de bloqueios.")
+                fig = _fig_bloqueios(agg.get("bloqueios", {}), n_bloq=agg.get("bloqueados_total", 0))
+                if fig:
+                    col_bl, _ = st.columns([1, 1])
+                    with col_bl:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                else:
+                    st.info("Sem dados de bloqueios.")
             
             # ── 12. Segmentação — Reprovados ─────────────────────────────────────────────
+            if _show("leads_reprovados"):
 
-            st.markdown('<div class="sec">12. Segmentação — Reprovados</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Segmentação — Reprovados</div>', unsafe_allow_html=True)
             
             
-            emp_rep = agg.get("top_emp_rep", {})
-            emp_mot = agg.get("emp_motivos", {})
-            if emp_rep:
-                fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, agg.get("emp_motivos_leads", {}), n_rep)
-                if _tbl_html:
-                    st.markdown(_tbl_html, unsafe_allow_html=True)
-            else:
-                st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
+                emp_rep = agg.get("top_emp_rep", {})
+                emp_mot = agg.get("emp_motivos", {})
+                if emp_rep:
+                    fig = _fig_barras_h(emp_rep, "Top Empregadores dos Reprovados", "#ef4444", pct_base=n_rep, show_pct=False)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    _tbl_html = _html_emp_rep_expandable(emp_rep, emp_mot, agg.get("emp_motivos_leads", {}), n_rep)
+                    if _tbl_html:
+                        st.markdown(_tbl_html, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
             
-            ufs = agg.get("top_ufs", {})
-            if ufs:
-                n_ufs = sum(ufs.values())
-                fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
-            else:
-                st.info("Sem dados de UF dos reprovados.")
+                ufs = agg.get("top_ufs", {})
+                if ufs:
+                    n_ufs = sum(ufs.values())
+                    fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de UF dos reprovados.")
             
             
-            cnaes = agg.get("top_cnaes", {})
-            if cnaes:
-                n_cnae = sum(cnaes.values())
-                fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
-                                    pct_base=n_cnae)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
-            else:
-                st.info("Sem dados de CNAE bloqueado.")
+                cnaes = agg.get("top_cnaes", {})
+                if cnaes:
+                    n_cnae = sum(cnaes.values())
+                    fig = _fig_barras_h(_sem_codigo(cnaes), "Top CNAEs Bloqueados (Reprovados)", "#eab308",
+                                        pct_base=n_cnae)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_ranking(cnaes, "Descrição CNAE", n_cnae, code_col_title="Código CNAE")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de CNAE bloqueado.")
             
-            cbos_rep = agg.get("top_cbos_rep", {})
-            if cbos_rep:
-                n_cbo_r = sum(cbos_rep.values())
-                fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
-                                    pct_base=n_cbo_r)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
-            else:
-                st.info("Sem dados de CBO dos reprovados.")
+                cbos_rep = agg.get("top_cbos_rep", {})
+                if cbos_rep:
+                    n_cbo_r = sum(cbos_rep.values())
+                    fig = _fig_barras_h(_sem_codigo(cbos_rep), "Top CBOs Bloqueados (Reprovados)", "#a855f7",
+                                        pct_base=n_cbo_r)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_ranking(cbos_rep, "Descrição CBO", n_cbo_r, code_col_title="Código CBO")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                else:
+                    st.info("Sem dados de CBO dos reprovados.")
             
             # ── 13. Aprovados — Empregadores e CBOs ──────────────────────────────────────
+            if _show("leads_aprovados"):
 
-            st.markdown('<div class="sec">13. Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Aprovados — Empregadores e CBOs</div>', unsafe_allow_html=True)
             
-            n_ap = f.get("aprovados", 0)
+                n_ap = f.get("aprovados", 0)
             
 
-            emp_ap = agg.get("top_empregadores", {})
-            emp_ap_stats = agg.get("emp_ap_stats", {})
-            fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
-            if fig:
-                st.plotly_chart(fig, width='stretch', config=_CONF)
-            tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
+                emp_ap = agg.get("top_empregadores", {})
+                emp_ap_stats = agg.get("emp_ap_stats", {})
+                fig = _fig_barras_h(emp_ap, "Top Empregadores (Aprovados)", "#22c55e", pct_base=n_ap)
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                tbl = _html_emp_ap_expandable(emp_ap, emp_ap_stats, n_ap)
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
 
-            cbos_ap = agg.get("top_cbos", {})
-            fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
-            if fig:
-                st.plotly_chart(fig, width='stretch', config=_CONF)
-            tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
-            if tbl:
-                st.markdown(tbl, unsafe_allow_html=True)
+                cbos_ap = agg.get("top_cbos", {})
+                fig = _fig_barras_h(_sem_codigo(cbos_ap), "Top CBOs (Aprovados)", "#3b82f6", pct_base=n_ap)
+                if fig:
+                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                tbl = _html_tabela_ranking(cbos_ap, "Descrição CBO", n_ap, code_col_title="Código CBO")
+                if tbl:
+                    st.markdown(tbl, unsafe_allow_html=True)
 
             # ── 14. Desembolsados no Período — Segmentação ──────────────────────────────
+            if _show("leads_desembolsados"):
 
-            st.markdown('<div class="sec">14. Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
+                st.markdown('<div class="sec">Desembolsados no Período — Segmentação</div>', unsafe_allow_html=True)
 
-            if not _desemb_det:
-                _msg_ori14 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
-                st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori14}.")
-            else:
-                # ── Agrega por dimensão (soma contratos, valor contratado e liberado) ──────
-                _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
-                _cid_d: dict = {}        # cidade -> {n, valor, liberado}
-                _gen_d: dict = {}        # genero -> contagem
-                _nat_d: dict = {}        # natureza do empregador (PF/PJ) -> contagem
-                _idades: list = []       # idades dos tomadores
-                _iof_tot = 0.0
-                _prz_vals = []
-                _tx_pz    = []   # (taxa, prazo) para média ponderada pelo nº de parcelas
+                if not _desemb_det:
+                    _msg_ori14 = " para a(s) origem(ns) selecionada(s)" if _ori_ativas else ""
+                    st.info(f"Sem contratos desembolsados no período selecionado{_msg_ori14}.")
+                else:
+                    # ── Agrega por dimensão (soma contratos, valor contratado e liberado) ──────
+                    _emp_d, _cbo_d, _cnae_d, _ori_d, _uf_d = {}, {}, {}, {}, {}
+                    _cid_d: dict = {}        # cidade -> {n, valor, liberado}
+                    _gen_d: dict = {}        # genero -> contagem
+                    _nat_d: dict = {}        # natureza do empregador (PF/PJ) -> contagem
+                    _idades: list = []       # idades dos tomadores
+                    _iof_tot = 0.0
+                    _prz_vals = []
+                    _tx_pz    = []   # (taxa, prazo) para média ponderada pelo nº de parcelas
 
-                def _bump(_m, _k, _rec):
-                    if not _k:
-                        return
-                    _a = _m.setdefault(_k, {"n": 0, "valor": 0.0, "liberado": 0.0})
-                    _a["n"]        += 1
-                    _a["valor"]    += _rec.get("valor", 0.0) or 0.0
-                    _a["liberado"] += _rec.get("liberado", 0.0) or 0.0
+                    def _bump(_m, _k, _rec):
+                        if not _k:
+                            return
+                        _a = _m.setdefault(_k, {"n": 0, "valor": 0.0, "liberado": 0.0})
+                        _a["n"]        += 1
+                        _a["valor"]    += _rec.get("valor", 0.0) or 0.0
+                        _a["liberado"] += _rec.get("liberado", 0.0) or 0.0
 
-                for _rec in _desemb_det:
-                    _bump(_emp_d,  _rec.get("emp"),    _rec)
-                    _bump(_cbo_d,  _rec.get("cbo"),    _rec)
-                    _bump(_cnae_d, _rec.get("cnae"),   _rec)
-                    _bump(_ori_d,  _rec.get("origem"), _rec)
-                    _bump(_uf_d,   _rec.get("uf"),     _rec)
-                    _bump(_cid_d,  _rec.get("cidade"), _rec)
-                    _g = str(_rec.get("genero") or "").strip().upper()
-                    if _g:
-                        _gen_d[_g] = _gen_d.get(_g, 0) + 1
-                    _nt = str(_rec.get("natureza") or "").strip().upper()
-                    if _nt:
-                        _nat_d[_nt] = _nat_d.get(_nt, 0) + 1
-                    _ida = _rec.get("idade")
-                    if _ida:
-                        _idades.append(int(_ida))
-                    _iof_tot += _rec.get("iof", 0.0) or 0.0
-                    if _rec.get("prazo"):
-                        _prz_vals.append(_rec["prazo"])
-                    if _rec.get("taxa") and _rec.get("prazo"):
-                        _tx_pz.append((_rec["taxa"], _rec["prazo"]))
+                    for _rec in _desemb_det:
+                        _bump(_emp_d,  _rec.get("emp"),    _rec)
+                        _bump(_cbo_d,  _rec.get("cbo"),    _rec)
+                        _bump(_cnae_d, _rec.get("cnae"),   _rec)
+                        _bump(_ori_d,  _rec.get("origem"), _rec)
+                        _bump(_uf_d,   _rec.get("uf"),     _rec)
+                        _bump(_cid_d,  _rec.get("cidade"), _rec)
+                        _g = str(_rec.get("genero") or "").strip().upper()
+                        if _g:
+                            _gen_d[_g] = _gen_d.get(_g, 0) + 1
+                        _nt = str(_rec.get("natureza") or "").strip().upper()
+                        if _nt:
+                            _nat_d[_nt] = _nat_d.get(_nt, 0) + 1
+                        _ida = _rec.get("idade")
+                        if _ida:
+                            _idades.append(int(_ida))
+                        _iof_tot += _rec.get("iof", 0.0) or 0.0
+                        if _rec.get("prazo"):
+                            _prz_vals.append(_rec["prazo"])
+                        if _rec.get("taxa") and _rec.get("prazo"):
+                            _tx_pz.append((_rec["taxa"], _rec["prazo"]))
 
-                _n_det   = len(_desemb_det)
-                _sum_val = sum((r.get("valor", 0.0) or 0.0) for r in _desemb_det)
-                _sum_lib = sum((r.get("liberado", 0.0) or 0.0) for r in _desemb_det)
-                _ticket  = (_sum_val / _n_det) if _n_det else 0.0
-                _prz_med = (sum(_prz_vals) / len(_prz_vals)) if _prz_vals else 0.0
-                _tx_med  = (sum(_t * _z for _t, _z in _tx_pz) / sum(_z for _, _z in _tx_pz)) if _tx_pz else 0.0
+                    _n_det   = len(_desemb_det)
+                    _sum_val = sum((r.get("valor", 0.0) or 0.0) for r in _desemb_det)
+                    _sum_lib = sum((r.get("liberado", 0.0) or 0.0) for r in _desemb_det)
+                    _ticket  = (_sum_val / _n_det) if _n_det else 0.0
+                    _prz_med = (sum(_prz_vals) / len(_prz_vals)) if _prz_vals else 0.0
+                    _tx_med  = (sum(_t * _z for _t, _z in _tx_pz) / sum(_z for _, _z in _tx_pz)) if _tx_pz else 0.0
 
-                def _brl2(v):
-                    return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
+                    def _brl2(v):
+                        return ("R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")) if v else "—"
 
-                # ── KPIs dos desembolsados (mesmos do grupo inicial "3 · Desembolsados") ────
-                st.markdown(f"""
-                <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-                  <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">média pond. pelo nº de parcelas</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
-                  <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
-                </div>
-                """, unsafe_allow_html=True)
+                    # ── KPIs dos desembolsados (mesmos do grupo inicial "3 · Desembolsados") ────
+                    st.markdown(f"""
+                    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+                      <div class="kpi-card"><div class="kpi-label">Contratos desembolsados</div><div class="kpi-value">{_desemb_cnt_s}</div><div class="kpi-sub">{periodo_label}</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Total contratado (com IOF)</div><div class="kpi-value">{_desemb_kpi_val_s}</div><div class="kpi-sub">valor contratado</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Valor contratado médio (com IOF)</div><div class="kpi-value">{_desemb_ticket_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Valor da parcela médio</div><div class="kpi-value">{_dz_parc_s}</div><div class="kpi-sub">média pond. pelo prazo</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Taxa mensal média</div><div class="kpi-value">{_dz_taxa_s}</div><div class="kpi-sub">média pond. pelo nº de parcelas</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Total liberado (sem IOF)</div><div class="kpi-value">{_desemb_kpi_lib_s}</div><div class="kpi-sub">valor recebido pelo cliente</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Valor liberado médio (sem IOF)</div><div class="kpi-value">{_desemb_ticket_lib_s}</div><div class="kpi-sub">por contrato desembolsado</div></div>
+                      <div class="kpi-card"><div class="kpi-label">Número de parcelas médio</div><div class="kpi-value">{_dz_prazo_s}</div><div class="kpi-sub">contratos desembolsados</div></div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                st.caption(
-                    "Contratos com data de desembolso (Pix) dentro do período filtrado · "
-                    "inclui leads criados até 7 dias antes do início do período."
-                )
+                    st.caption(
+                        "Contratos com data de desembolso (Pix) dentro do período filtrado · "
+                        "inclui leads criados até 7 dias antes do início do período."
+                    )
 
-                # ── Distribuição do nº de parcelas (só NumeroParcelasContrato; sem fallback) ─
-                _pzn_dist: dict = {}
-                for _rec in _desemb_det:
-                    _npz = _rec.get("n_parcelas")
-                    if _npz and _npz > 0:
-                        _npk = str(int(round(_npz)))
-                        _pzn_dist[_npk] = _pzn_dist.get(_npk, 0) + 1
-                _fig_pzn = _fig_dist_prazo(
-                    _pzn_dist, "Distribuição de Nº de Parcelas — Desembolsados")
-                if _fig_pzn:
-                    st.plotly_chart(_fig_pzn, width='stretch', config=_CONF)
+                    # ── Distribuição do nº de parcelas (só NumeroParcelasContrato; sem fallback) ─
+                    _pzn_dist: dict = {}
+                    for _rec in _desemb_det:
+                        _npz = _rec.get("n_parcelas")
+                        if _npz and _npz > 0:
+                            _npk = str(int(round(_npz)))
+                            _pzn_dist[_npk] = _pzn_dist.get(_npk, 0) + 1
+                    _fig_pzn = _fig_dist_prazo(
+                        _pzn_dist, "Distribuição de Nº de Parcelas — Desembolsados")
+                    if _fig_pzn:
+                        st.plotly_chart(_fig_pzn, width='stretch', config=_CONF)
 
-                # ── Ordenações ─────────────────────────────────────────────────────────────
-                def _items(_m, by="valor"):
-                    return [
-                        {"label": k, "n": v["n"], "valor": v["valor"], "liberado": v["liberado"]}
-                        for k, v in sorted(_m.items(), key=lambda x: -x[1][by])
-                    ]
+                    # ── Ordenações ─────────────────────────────────────────────────────────────
+                    def _items(_m, by="valor"):
+                        return [
+                            {"label": k, "n": v["n"], "valor": v["valor"], "liberado": v["liberado"]}
+                            for k, v in sorted(_m.items(), key=lambda x: -x[1][by])
+                        ]
 
-                def _trunc(s, m=42):
-                    s = str(s)
-                    return s if len(s) <= m else s[:m - 1].rstrip() + "…"
+                    def _trunc(s, m=42):
+                        s = str(s)
+                        return s if len(s) <= m else s[:m - 1].rstrip() + "…"
 
-                _emp_items  = _items(_emp_d,  "valor")   # empregadores: por R$ contratado
-                _cbo_items  = _items(_cbo_d,  "n")       # CBOs / CNAEs: por nº de contratos
-                _cnae_items = _items(_cnae_d, "n")
-                _ori_items  = _items(_ori_d,  "n")
-                _uf_items   = _items(_uf_d,   "n")
+                    _emp_items  = _items(_emp_d,  "valor")   # empregadores: por R$ contratado
+                    _cbo_items  = _items(_cbo_d,  "n")       # CBOs / CNAEs: por nº de contratos
+                    _cnae_items = _items(_cnae_d, "n")
+                    _ori_items  = _items(_ori_d,  "n")
+                    _uf_items   = _items(_uf_d,   "n")
 
-                # ── Top Empregadores (R$) | Top CBOs (contratos) ───────────────────────────
-                # soma na colisão de rótulo truncado (não sobrescreve), igual _sem_codigo
-                _emp_chart: dict = {}
-                for it in _emp_items[:12]:
-                    _k = _trunc(it["label"])
-                    _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
-                fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
-                _cbo_chart = _sem_codigo({it["label"]: it["n"] for it in _cbo_items})
-                fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
-                                    pct_base=_n_det, show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+                    # ── Top Empregadores (R$) | Top CBOs (contratos) ───────────────────────────
+                    # soma na colisão de rótulo truncado (não sobrescreve), igual _sem_codigo
+                    _emp_chart: dict = {}
+                    for it in _emp_items[:12]:
+                        _k = _trunc(it["label"])
+                        _emp_chart[_k] = _emp_chart.get(_k, 0.0) + it["valor"]
+                    fig = _fig_barras_reais(_emp_chart, "Top Empregadores · Valor Contratado", "#FEC52E")
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_desemb(_emp_items, "Empregador", _n_det)
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
+                    _cbo_chart = _sem_codigo({it["label"]: it["n"] for it in _cbo_items})
+                    fig = _fig_barras_h(_cbo_chart, "Top CBOs · Nº de Contratos", "#3b82f6",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_desemb(_cbo_items, "Descrição CBO", _n_det, code_col_title="Código CBO")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
 
-                # ── Top CNAEs (largura total) ──────────────────────────────────────────────
-                _cnae_chart = _sem_codigo({it["label"]: it["n"] for it in _cnae_items})
-                fig = _fig_barras_h(_cnae_chart, "Top CNAEs · Nº de Contratos", "#a855f7",
-                                    pct_base=_n_det, show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_desemb(_cnae_items, "Descrição CNAE", _n_det, code_col_title="Código CNAE")
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+                    # ── Top CNAEs (largura total) ──────────────────────────────────────────────
+                    _cnae_chart = _sem_codigo({it["label"]: it["n"] for it in _cnae_items})
+                    fig = _fig_barras_h(_cnae_chart, "Top CNAEs · Nº de Contratos", "#a855f7",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_desemb(_cnae_items, "Descrição CNAE", _n_det, code_col_title="Código CNAE")
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
 
-                # ── Por Origem | Por UF ────────────────────────────────────────────────────
-                _ori_chart = {it["label"]: it["n"] for it in _ori_items}
-                fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
-                                    pct_base=_n_det, show_abs=True, text_auto=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                _uf_chart = {it["label"]: it["n"] for it in _uf_items}
-                fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
-                                    pct_base=_n_det, show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                    # ── Por Origem | Por UF ────────────────────────────────────────────────────
+                    _ori_chart = {it["label"]: it["n"] for it in _ori_items}
+                    fig = _fig_barras_h(_ori_chart, "Desembolsos por Origem", "#f59e0b",
+                                        pct_base=_n_det, show_abs=True, text_auto=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    _uf_chart = {it["label"]: it["n"] for it in _uf_items}
+                    fig = _fig_barras_h(_uf_chart, "Desembolsos por UF", "#06b6d4",
+                                        pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
 
-                # ── Distribuição de Idade do tomador (faixas etárias) ──────────────────────
-                # Faixas meio-abertas: o limite superior cai na faixa seguinte (25 -> "25-30").
-                _FAIXAS_IDADE = [("21-25", 21, 24), ("25-30", 25, 29), ("30-35", 30, 34),
-                                 ("35-40", 35, 39), ("40-45", 40, 44), ("45-50", 45, 49),
-                                 ("50-55", 50, 54), ("55-60", 55, 59)]
-                _id_counts = {_lbl: 0 for _lbl, _, _ in _FAIXAS_IDADE}
-                for _a in _idades:
-                    for _lbl, _lo, _hi in _FAIXAS_IDADE:
-                        if _lo <= _a <= _hi:
-                            _id_counts[_lbl] += 1
-                            break
-                fig = _fig_barras_v([(_lbl, _id_counts[_lbl]) for _lbl, _, _ in _FAIXAS_IDADE],
-                                    "Distribuição de Idade — Tomadores Desembolsados", "Faixa etária")
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                    # ── Distribuição de Idade do tomador (faixas etárias) ──────────────────────
+                    # Faixas meio-abertas: o limite superior cai na faixa seguinte (25 -> "25-30").
+                    _FAIXAS_IDADE = [("21-25", 21, 24), ("25-30", 25, 29), ("30-35", 30, 34),
+                                     ("35-40", 35, 39), ("40-45", 40, 44), ("45-50", 45, 49),
+                                     ("50-55", 50, 54), ("55-60", 55, 59)]
+                    _id_counts = {_lbl: 0 for _lbl, _, _ in _FAIXAS_IDADE}
+                    for _a in _idades:
+                        for _lbl, _lo, _hi in _FAIXAS_IDADE:
+                            if _lo <= _a <= _hi:
+                                _id_counts[_lbl] += 1
+                                break
+                    fig = _fig_barras_v([(_lbl, _id_counts[_lbl]) for _lbl, _, _ in _FAIXAS_IDADE],
+                                        "Distribuição de Idade — Tomadores Desembolsados", "Faixa etária")
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
 
-                # ── Distribuição por Gênero do tomador ─────────────────────────────────────
-                _GEN_LBL = {"M": "Masculino", "F": "Feminino"}
-                _gen_chart = {_GEN_LBL.get(_k, _k or "—"): _v
-                              for _k, _v in sorted(_gen_d.items(), key=lambda x: -x[1])}
-                fig = _fig_barras_h(_gen_chart, "Distribuição por Gênero — Tomadores", "#ec4899",
-                                    pct_base=sum(_gen_d.values()), show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                    # ── Distribuição por Gênero do tomador ─────────────────────────────────────
+                    _GEN_LBL = {"M": "Masculino", "F": "Feminino"}
+                    _gen_chart = {_GEN_LBL.get(_k, _k or "—"): _v
+                                  for _k, _v in sorted(_gen_d.items(), key=lambda x: -x[1])}
+                    fig = _fig_barras_h(_gen_chart, "Distribuição por Gênero — Tomadores", "#ec4899",
+                                        pct_base=sum(_gen_d.values()), show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
 
-                # ── Distribuição por Natureza do Empregador (PF/PJ) ────────────────────────
-                _NAT_LBL = {"PJ": "Empregador Pessoa Jurídica", "PF": "Empregador Pessoa Física"}
-                _nat_chart = {_NAT_LBL.get(_k, _k): _v
-                              for _k, _v in sorted(_nat_d.items(), key=lambda x: -x[1])}
-                fig = _fig_barras_h(_nat_chart, "Distribuição por Natureza do Empregador — Desembolsados",
-                                    "#8b5cf6", pct_base=sum(_nat_d.values()), show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
+                    # ── Distribuição por Natureza do Empregador (PF/PJ) ────────────────────────
+                    _NAT_LBL = {"PJ": "Empregador Pessoa Jurídica", "PF": "Empregador Pessoa Física"}
+                    _nat_chart = {_NAT_LBL.get(_k, _k): _v
+                                  for _k, _v in sorted(_nat_d.items(), key=lambda x: -x[1])}
+                    fig = _fig_barras_h(_nat_chart, "Distribuição por Natureza do Empregador — Desembolsados",
+                                        "#8b5cf6", pct_base=sum(_nat_d.values()), show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
 
-                # ── Top 50 Cidades por nº de desembolsos ────────────────────────────────────
-                _cid_items = _items(_cid_d, "n")
-                _cid_chart = {_trunc(it["label"]): it["n"] for it in _cid_items[:50]}
-                fig = _fig_barras_h(_cid_chart, "Top 50 Cidades · Nº de Desembolsos", "#22c55e",
-                                    n=50, pct_base=_n_det, show_abs=True)
-                if fig:
-                    st.plotly_chart(fig, width='stretch', config=_CONF)
-                tbl = _html_tabela_desemb(_cid_items, "Cidade", _n_det, n=50)
-                if tbl:
-                    st.markdown(tbl, unsafe_allow_html=True)
+                    # ── Top 50 Cidades por nº de desembolsos ────────────────────────────────────
+                    _cid_items = _items(_cid_d, "n")
+                    _cid_chart = {_trunc(it["label"]): it["n"] for it in _cid_items[:50]}
+                    fig = _fig_barras_h(_cid_chart, "Top 50 Cidades · Nº de Desembolsos", "#22c55e",
+                                        n=50, pct_base=_n_det, show_abs=True)
+                    if fig:
+                        st.plotly_chart(fig, width='stretch', config=_CONF)
+                    tbl = _html_tabela_desemb(_cid_items, "Cidade", _n_det, n=50)
+                    if tbl:
+                        st.markdown(tbl, unsafe_allow_html=True)
 
 except Exception as _exc:
     import traceback as _tb
