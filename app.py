@@ -3692,6 +3692,17 @@ try:
                 """True se o hub tem um dos grupos `_keys` selecionado (None => nada)."""
                 return st.session_state.get("hub_sel") in _keys
 
+            # Empty state: nenhum botão selecionado ainda → orienta o usuário.
+            if st.session_state.get("hub_sel") is None:
+                st.markdown(
+                    '<div style="text-align:center;color:#64748b;font-size:.98em;'
+                    'padding:34px 16px;margin-top:8px;border:1px dashed #cbd5e1;'
+                    'border-radius:12px;background:rgba(148,163,184,0.06)">'
+                    '👆 Selecione uma das seções acima para visualizar os dados.'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+
             if _show("principais_kpis", "evolucao_leads"):
                 st.markdown(f"""
             <div class="kpi-grp">Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
