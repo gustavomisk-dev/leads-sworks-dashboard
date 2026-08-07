@@ -3586,6 +3586,36 @@ try:
             _pct_novos_s = _pct_tot(f.get("novos", 0))
             _pct_aprov_s = _pct_tot(f["aprovados"])
             _pct_repro_s = _pct_tot(f["reprovados"])
+            # Distribuição de Leads — Total + 9 status (SWorks 0-8). Sob filtro de origem,
+            # os não-terminais vêm consolidados em -1 (em_curso) → somados em "Em andamento".
+            _dist = dict(f.get("_d_status", {}))
+            if -1 in _dist:
+                _dist[2] = _dist.get(2, 0) + _dist.pop(-1)
+            def _dnum(_c): return _nbr(_dist.get(_c, 0))
+            def _dpct(_c): return _pct_tot(_dist.get(_c, 0))
+            def _esc_ttl(_s):
+                return (_s.replace("&", "&amp;").replace('"', "&quot;")
+                          .replace("<", "&lt;").replace(">", "&gt;"))
+            _DIST_CARDS = [
+                (None, "Total",           "Total de Leads criados na esteira, incluindo todos os status possíveis"),
+                (0,    "Novo",            "Leads que estão esperando estímulo do cliente para que seja iniciado o fluxo na esteira"),
+                (2,    "Em andamento",    "Leads que estão sendo processados por um sistema em alguma etapa da esteira"),
+                (4,    "Reprovado",       "Leads que foram reprovados em alguma etapa da esteira"),
+                (3,    "Aprovado",        "Leads que foram convertidos em clientes"),
+                (5,    "Suspenso",        "Leads que estão esperando estímulo do cliente ou de um sistema para seguir o fluxo na esteira"),
+                (1,    "Pendente",        "Leads que estão aguardando processamento por um sistema em alguma etapa da esteira"),
+                (6,    "Pendente Manual", "Leads que estão esperando estímulo interno para seguir o fluxo na esteira"),
+                (7,    "Pendente Falha",  "Leads que resultaram em alguma falha ao longo da esteira e estão aguardando correção"),
+                (8,    "Cancelado",       "Leads que foram cancelados manualmente em alguma etapa da esteira"),
+            ]
+            _dist_html = ""
+            for _dc, _dl, _dt in _DIST_CARDS:
+                _dv = _f_total_fmt if _dc is None else _dnum(_dc)
+                _dp = ("100,00%" if f.get("total") else "—") if _dc is None else _dpct(_dc)
+                _di = f'<span class="pj-i" title="{_esc_ttl(_dt)}">i</span>'
+                _dist_html += (f'<div class="kpi-card"><div class="kpi-label">{_dl} {_di}</div>'
+                               f'<div class="kpi-value">{_dv}</div>'
+                               f'<div class="kpi-sub">{_dp} do Total</div></div>')
             _f_ag_fmt    = _nbr(_proj_cnt)
             _proj_global_tag = (
                 " · <span style='color:#64748b;font-size:0.82em'>global</span>"
@@ -3705,12 +3735,9 @@ try:
 
             if _show("principais_kpis", "evolucao_leads"):
                 st.markdown(f"""
-            <div class="kpi-grp">Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
-            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-              <div class="kpi-card"><div class="kpi-label">Total de leads</div><div class="kpi-value">{_f_total_fmt}</div><div class="kpi-sub">{periodo_label}</div></div>
-              <div class="kpi-card"><div class="kpi-label">Novos</div><div class="kpi-value">{_f_novos_fmt}</div><div class="kpi-sub">{_pct_novos_s} do total</div></div>
-              <div class="kpi-card"><div class="kpi-label">Reprovados</div><div class="kpi-value">{_f_repro_fmt}</div><div class="kpi-sub">{_pct_repro_s} do total</div></div>
-              <div class="kpi-card"><div class="kpi-label">Aprovados</div><div class="kpi-value">{_f_aprov_fmt}</div><div class="kpi-sub">{_pct_aprov_s} do total</div></div>
+            <div class="kpi-grp">Distribuição de Leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
+            <div class="kpi-row" style="grid-template-columns:repeat(5,1fr)">
+              {_dist_html}
             </div>
                 """, unsafe_allow_html=True)
             if _show("principais_kpis"):
