@@ -3657,6 +3657,35 @@ try:
             _nat_pf_sub = (f"{100*_nat_pf_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
             _nat_pj_sub = (f"{100*_nat_pj_n/_nat_base:.1f}% dos identificados" if _nat_base else "sem dados no período")
 
+            # ── Hub de navegação ──────────────────────────────────────────────
+            # 6 botões (3 col × 2 linhas) que selecionam um grupo de seções.
+            # ETAPA 1 (esta): apenas criar os botões e guardar a escolha em
+            # st.session_state["hub_sel"] (None = nada selecionado ainda).
+            # PRÓXIMA ETAPA: exibir abaixo só o grupo de seções escolhido
+            # (gating por _HUB_SECOES), escondendo o resto enquanto não houver clique.
+            _HUB_LABELS = {
+                "principais_kpis":      "Principais KPIs",
+                "evolucao_leads":       "Evolução de Leads",
+                "leads_reprovados":     "Leads Reprovados",
+                "projecao_desembolsos": "Projeção de Desembolsos",
+                "leads_desembolsados":  "Leads desembolsados",
+                "leads_aprovados":      "Leads Aprovados",
+            }
+            _HUB_LAYOUT = [
+                ["principais_kpis", "evolucao_leads", "leads_reprovados"],
+                ["projecao_desembolsos", "leads_desembolsados", "leads_aprovados"],
+            ]
+            st.session_state.setdefault("hub_sel", None)
+            for _hub_linha in _HUB_LAYOUT:
+                for _hcol, _hkey in zip(st.columns(3, gap="small"), _hub_linha):
+                    with _hcol:
+                        if st.button(
+                            _HUB_LABELS[_hkey], key=f"hub_{_hkey}", width='stretch',
+                            type=("primary" if st.session_state["hub_sel"] == _hkey else "secondary"),
+                        ):
+                            st.session_state["hub_sel"] = _hkey
+                            st.rerun()
+
             st.markdown(f"""
             <div class="kpi-grp">1 · Funil de leads <span>{periodo_label} · {n_dias} dia(s)</span></div>
             <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
