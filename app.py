@@ -586,7 +586,7 @@ _BG       = "rgba(0,0,0,0)"
 _TF       = dict(size=15, color="#FEC52E")
 _AF       = dict(size=13, color="#94a3b8")
 
-_TV_N_SLIDES   = 25
+_TV_N_SLIDES   = 24
 _TV_INTERVAL_S = 20  # seconds per slide
 
 _TV_CSS = """<style>
@@ -2913,19 +2913,6 @@ def _render_tv_slide(slide: int, agg: dict, funil: dict, fin: dict,
         else:
             st.info("Sem dados de CBO dos reprovados.")
 
-    elif slide == 24:
-        _tv_h("UF dos Reprovados", periodo)
-        ufs = agg.get("top_ufs", {})
-        if ufs:
-            fig = _fig_mapa_ufs(ufs)
-            if fig:
-                fig.update_layout(height=760)
-                st.plotly_chart(fig, width='stretch', config=_CONF)
-            else:
-                _tv_bar(_fig_barras_h(ufs, "", "#3b82f6", n=27, pct_base=sum(ufs.values())))
-        else:
-            st.info("Sem dados de UF.")
-
     _tv_nav(slide)
 
 
@@ -5108,20 +5095,7 @@ try:
                         st.markdown(_tbl_html, unsafe_allow_html=True)
                 else:
                     st.info("Sem dados de empregadores dos reprovados (requer nova exportação dos JSONs).")
-            
-                ufs = agg.get("top_ufs", {})
-                if ufs:
-                    n_ufs = sum(ufs.values())
-                    fig = _fig_barras_h(ufs, "UF dos Reprovados", "#3b82f6", pct_base=n_ufs)
-                    if fig:
-                        st.plotly_chart(fig, width='stretch', config=_CONF)
-                    tbl = _html_tabela_ranking(ufs, "UF", n_ufs)
-                    if tbl:
-                        st.markdown(tbl, unsafe_allow_html=True)
-                else:
-                    st.info("Sem dados de UF dos reprovados.")
-            
-            
+
                 cnaes = agg.get("top_cnaes", {})
                 if cnaes:
                     n_cnae = sum(cnaes.values())
