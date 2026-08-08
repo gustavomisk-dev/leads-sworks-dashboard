@@ -4966,8 +4966,8 @@ try:
                                         unsafe_allow_html=True)
                     else:
                         st.markdown('<div style="color:#94a3b8;font-size:13px;margin-bottom:2px;">&#128194; Esteira Zili '
-                                    '&#183; <span style="color:#64748b;">n&#237;vel externo (16 fases) &#183; clique no '
-                                    'Motor de Cr&#233;dito para entrar</span></div>', unsafe_allow_html=True)
+                                    '&#183; <span style="color:#64748b;">clique em uma etapa para mais detalhes</span></div>',
+                                    unsafe_allow_html=True)
                     with st.container(key="wf166flow"):
                         if st.session_state["wf166_lvl"] == "motor":
                             _cols = st.columns(len(_WF166_MOTOR))
