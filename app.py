@@ -3635,13 +3635,13 @@ try:
                 (0,    "Novo",            "Leads que estão esperando estímulo do cliente para que seja iniciado o fluxo na esteira"),
                 (2,    "Em andamento",    "Leads que estão sendo processados por um sistema em alguma etapa da esteira"),
                 (5,    "Suspenso",        "Leads que estão esperando estímulo do cliente ou de um sistema para seguir o fluxo na esteira"),
-                (8,    "Cancelado",       "Leads que foram cancelados manualmente em alguma etapa da esteira"),
+                (3,    "Aprovado",        "Leads que foram convertidos em clientes"),
                 # 2ª linha
                 (1,    "Pendente",        "Leads que estão aguardando processamento por um sistema em alguma etapa da esteira"),
                 (6,    "Pendente Manual", "Leads que estão esperando estímulo interno para seguir o fluxo na esteira"),
                 (7,    "Pendente Falha",  "Leads que resultaram em alguma falha ao longo da esteira e estão aguardando correção"),
+                (8,    "Cancelado",       "Leads que foram cancelados manualmente em alguma etapa da esteira"),
                 (4,    "Reprovado",       "Leads que foram reprovados em alguma etapa da esteira"),
-                (3,    "Aprovado",        "Leads que foram convertidos em clientes"),
             ]
             _dist_html = ""
             for _dc, _dl, _dt in _DIST_CARDS:
