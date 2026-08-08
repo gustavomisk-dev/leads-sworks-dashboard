@@ -3334,6 +3334,45 @@ try:
                         placeholder="Todas",
                         label_visibility="collapsed",
                     )
+                    # Renomeia o "Select all" interno do multiselect -> "Todas". É texto do
+                    # Streamlit (opção sintética prependada no dropdown), sem parâmetro na API.
+                    # Trocamos via observer no DOM do parent, só o "Select all" EXATO (preserva
+                    # o "Select N matches" que aparece ao digitar/filtrar). Mesmo mecanismo (JS
+                    # client-side no parent) do botão de download.
+                    components.html('''
+<script>
+(function(){
+  try{
+    var d = window.parent.document;
+    function relabel(root){
+      try{
+        var w = d.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        var n;
+        while(n = w.nextNode()){
+          if(n.nodeValue && n.nodeValue.trim() === "Select all"){ n.nodeValue = "Todas"; }
+        }
+      }catch(_e){}
+    }
+    relabel(d.body);
+    var obs = new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){
+        var m = muts[i];
+        if(m.type === "characterData"){
+          if(m.target.nodeValue && m.target.nodeValue.trim() === "Select all"){ m.target.nodeValue = "Todas"; }
+          continue;
+        }
+        for(var j=0;j<m.addedNodes.length;j++){
+          var node = m.addedNodes[j];
+          if(node.nodeType === 1){ relabel(node); }
+          else if(node.nodeType === 3 && node.nodeValue && node.nodeValue.trim() === "Select all"){ node.nodeValue = "Todas"; }
+        }
+      }
+    });
+    obs.observe(d.body, {childList:true, subtree:true, characterData:true});
+  }catch(_e){}
+})();
+</script>
+''', height=0)
                 with _cp_ref:
                     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                     if st.button("↺", width='stretch', help="Forçar atualização dos dados"):
